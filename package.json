@@ -1,0 +1,10 @@
+{
+  "name": "joninha-suspensoes",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Joninha Suspensões — gestão local + nuvem Firebase",
+  "scripts": {
+    "build": "node scripts/build-firebase-env.js",
+    "vercel-build": "node scripts/build-firebase-env.js"
+  }
+}

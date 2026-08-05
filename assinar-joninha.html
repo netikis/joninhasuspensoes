@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Assinar — Joninha Suspensões</title>
+    <script src="firebase-config.js"></script>
+    <script src="firebase-env.js" onerror="/* opcional */"></script>
+    <style>
+        :root {
+            --blue: #c8102e;
+            --bg: #121214;
+            --card: #1a1a1e;
+            --text: #f2f2f4;
+            --muted: #9a9aa3;
+            --ok: #2f9e6b;
+            --line: rgba(230, 30, 37, 0.3);
+            --brand-red: #e61e25;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background:
+                radial-gradient(900px 400px at 10% -10%, rgba(230, 30, 37, 0.16), transparent 55%),
+                linear-gradient(180deg, #0e0e10, #16161a);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 16px;
+        }
+        .wrap { max-width: 640px; margin: 0 auto; }
+        .logo {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            text-align: center;
+            margin-bottom: 14px;
+            border: 2px solid rgba(230, 30, 37, 0.4);
+        }
+        .logo img { max-width: 100%; max-height: 120px; object-fit: contain; }
+        h1 { font-size: 1.15rem; margin-bottom: 6px; }
+        .hint { color: var(--muted); font-size: 0.88rem; margin-bottom: 14px; line-height: 1.4; }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 12px;
+        }
+        .card h2 {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .campo.full { grid-column: 1 / -1; }
+        .lbl { display: block; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+        .val { display: block; margin-top: 3px; font-size: 0.95rem; white-space: pre-wrap; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+        th, td { padding: 7px 4px; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; }
+        th { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; }
+        .total { text-align: right; font-size: 1.2rem; font-weight: 700; color: #7ec8ff; margin-top: 8px; }
+        canvas {
+            width: 100%;
+            height: 180px;
+            background: #fff;
+            border-radius: 8px;
+            touch-action: none;
+            border: 2px solid #ccc;
+            display: block;
+        }
+        .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .btn {
+            appearance: none;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            flex: 1;
+            min-width: 120px;
+        }
+        .btn-ok { background: var(--ok); color: #fff; }
+        .btn-sec { background: #243447; color: var(--text); border: 1px solid var(--line); }
+        .erro {
+            background: #3b1a1a;
+            border: 1px solid #c0392b;
+            color: #ffb4b4;
+            padding: 14px;
+            border-radius: 10px;
+            white-space: pre-wrap;
+        }
+        .ok-box {
+            background: #143528;
+            border: 1px solid #2f9e6b;
+            color: #9fe8c0;
+            padding: 14px;
+            border-radius: 10px;
+            line-height: 1.45;
+        }
+        .sig-preview { max-width: 100%; max-height: 80px; background: #fff; border-radius: 6px; margin-top: 8px; }
+        .fotos-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .fotos-grid img {
+            width: 100%;
+            border-radius: 8px;
+            background: #111;
+            object-fit: cover;
+            max-height: 180px;
+        }
+        @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } .fotos-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="logo">
+            <img id="logoAssinar" src="logo-joninha.jpg" alt="Joninha Suspensões">
+        </div>
+        <h1 id="tituloEmpresa">Assinatura do cliente</h1>
+        <p class="hint" id="hintTopo">Carregando documento…</p>
+        <p class="hint" id="endEmpresa" style="display:none;margin-top:-8px"></p>
+
+        <div id="areaErro" class="erro" style="display:none"></div>
+        <div id="areaOk" class="ok-box" style="display:none"></div>
+
+        <div id="areaDoc" style="display:none">
+            <div class="card">
+                <h2>Cliente &amp; veículo</h2>
+                <div class="grid">
+                    <div class="campo full"><span class="lbl">Cliente</span><span class="val" id="dNome">—</span></div>
+                    <div class="campo" id="wrapCpf" style="display:none"><span class="lbl">CPF</span><span class="val" id="dCpf">—</span></div>
+                    <div class="campo" id="wrapCnpj" style="display:none"><span class="lbl">CNPJ</span><span class="val" id="dCnpj">—</span></div>
+                    <div class="campo" id="wrapTel" style="display:none"><span class="lbl">Telefone</span><span class="val" id="dTel">—</span></div>
+                    <div class="campo" id="wrapEmail" style="display:none"><span class="lbl">E-mail</span><span class="val" id="dEmail">—</span></div>
+                    <div class="campo"><span class="lbl">Placa</span><span class="val" id="dPlaca">—</span></div>
+                    <div class="campo"><span class="lbl">Veículo</span><span class="val" id="dCarro">—</span></div>
+                    <div class="campo"><span class="lbl">Ano fab.</span><span class="val" id="dAnoFab">—</span></div>
+                    <div class="campo"><span class="lbl">Ano modelo</span><span class="val" id="dAnoModelo">—</span></div>
+                    <div class="campo"><span class="lbl">Entrada</span><span class="val" id="dEntrada">—</span></div>
+                    <div class="campo"><span class="lbl">Responsável</span><span class="val" id="dResp">—</span></div>
+                    <div class="campo full"><span class="lbl">Chegada / checklist</span><span class="val" id="dEstado">—</span></div>
+                    <div class="campo full"><span class="lbl">Diagnóstico</span><span class="val" id="dDiagnostico">—</span></div>
+                    <div class="campo full"><span class="lbl">Serviços</span><span class="val" id="dServicos">—</span></div>
+                </div>
+            </div>
+
+            <div class="card" id="cardFotos" style="display:none">
+                <h2>Fotos do veículo</h2>
+                <div class="fotos-grid" id="dFotos"></div>
+            </div>
+
+            <div class="card">
+                <h2>Valores</h2>
+                <div id="dItens"></div>
+                <div class="total" id="dTotal">R$ 0,00</div>
+            </div>
+
+            <div class="card" id="boxAssinar">
+                <h2>Assine aqui</h2>
+                <canvas id="pad" width="600" height="180"></canvas>
+                <div class="btns">
+                    <button type="button" class="btn btn-sec" id="btnLimpar">Limpar</button>
+                    <button type="button" class="btn btn-ok" id="btnConfirmar">Confirmar assinatura</button>
+                </div>
+            </div>
+
+            <div class="card" id="boxJaAssinado" style="display:none">
+                <h2>Já assinado</h2>
+                <p class="hint">Este documento já possui assinatura.</p>
+                <img id="imgAssinada" class="sig-preview" alt="Assinatura">
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+    (async function () {
+        var ASSIN_KEY = 'joninha_suspensoes_assinaturas';
+        var STORAGE_KEY = 'joninha_suspensoes_v1';
+        var COL_ASSIN = 'joninha_assinaturas';
+        var token = new URLSearchParams(location.search).get('t') || '';
+        var pack = null;
+        var desenhando = false;
+        var fsMod = null;
+        var dbFs = null;
+
+        function moeda(n) {
+            return (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+        function fmtData(iso) {
+            if (!iso) return '—';
+            var p = String(iso).slice(0, 10).split('-');
+            if (p.length !== 3) return iso;
+            return p[2] + '/' + p[1] + '/' + p[0];
+        }
+        function carregarMapa() {
+            try { return JSON.parse(localStorage.getItem(ASSIN_KEY) || '{}') || {}; }
+            catch (e) { return {}; }
+        }
+        function salvarMapa(m) {
+            localStorage.setItem(ASSIN_KEY, JSON.stringify(m));
+        }
+        function erro(msg) {
+            document.getElementById('areaErro').style.display = '';
+            document.getElementById('areaErro').textContent = msg;
+            document.getElementById('areaDoc').style.display = 'none';
+            document.getElementById('hintTopo').textContent = 'Não foi possível abrir o documento.';
+        }
+
+        async function initFirestorePublico() {
+            var c = window.JONINHA_FIREBASE_CONFIG;
+            if (!c || !c.apiKey || !c.projectId) return null;
+            var appMod = await import('https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js');
+            var fs = await import('https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js');
+            var appName = 'joninha-assinar-' + c.projectId;
+            var app;
+            try { app = appMod.getApp(appName); }
+            catch (e) {
+                app = appMod.initializeApp({
+                    apiKey: c.apiKey,
+                    authDomain: c.authDomain || (c.projectId + '.firebaseapp.com'),
+                    projectId: c.projectId,
+                    storageBucket: c.storageBucket || undefined,
+                    messagingSenderId: c.messagingSenderId || '',
+                    appId: c.appId || ''
+                }, appName);
+            }
+            fsMod = fs;
+            dbFs = fs.getFirestore(app);
+            return { fsMod: fs, dbFs: dbFs };
+        }
+
+        async function baixarPackNuvem() {
+            try {
+                var sess = await initFirestorePublico();
+                if (!sess) return null;
+                var snap = await sess.fsMod.getDoc(sess.fsMod.doc(sess.dbFs, COL_ASSIN, token));
+                if (!snap.exists()) return null;
+                return snap.data() || null;
+            } catch (e) {
+                console.warn('Firestore assinatura:', e);
+                return null;
+            }
+        }
+
+        async function salvarPackNuvem(p) {
+            try {
+                var sess = await initFirestorePublico();
+                if (!sess) return false;
+                await sess.fsMod.setDoc(sess.fsMod.doc(sess.dbFs, COL_ASSIN, token), p, { merge: true });
+                return true;
+            } catch (e) {
+                console.warn('Falha ao gravar assinatura na nuvem:', e);
+                return false;
+            }
+        }
+
+        function renderDoc(doc) {
+            var empNome = doc.empresa || 'Joninha Suspensões';
+            var logo = doc.empresaLogo || 'logo-joninha.jpg';
+            document.getElementById('logoAssinar').src = logo;
+            document.getElementById('logoAssinar').onerror = function () { this.src = 'logo-joninha.jpg'; };
+            document.getElementById('tituloEmpresa').textContent = empNome + ' — Assinatura';
+            var endEl = document.getElementById('endEmpresa');
+            var partes = [];
+            if (doc.empresaEndereco) partes.push(doc.empresaEndereco);
+            if (doc.empresaTelefone) partes.push('Tel: ' + doc.empresaTelefone);
+            if (doc.empresaCnpj) partes.push('CNPJ: ' + doc.empresaCnpj);
+            if (doc.empresaIe) partes.push('Inscrição Estadual: ' + doc.empresaIe);
+            if (partes.length) {
+                endEl.style.display = '';
+                endEl.textContent = partes.join(' · ');
+            }
+
+            var cad = doc.clienteCadastro || {};
+            document.getElementById('dNome').textContent = doc.nomeCliente || cad.nome || '—';
+            function campoOpcional(wrapId, valId, valor) {
+                var wrap = document.getElementById(wrapId);
+                var el = document.getElementById(valId);
+                if (valor) {
+                    wrap.style.display = '';
+                    el.textContent = valor;
+                } else {
+                    wrap.style.display = 'none';
+                }
+            }
+            campoOpcional('wrapCpf', 'dCpf', doc.cpf || cad.cpf || '');
+            campoOpcional('wrapCnpj', 'dCnpj', doc.cnpj || cad.cnpj || '');
+            campoOpcional('wrapTel', 'dTel', doc.telefone || cad.telefone || '');
+            campoOpcional('wrapEmail', 'dEmail', doc.email || cad.email || '');
+            document.getElementById('dPlaca').textContent = (doc.placa || '—').toUpperCase();
+            document.getElementById('dCarro').textContent = doc.carro || '—';
+            document.getElementById('dAnoFab').textContent = doc.anoFabricacao || '—';
+            document.getElementById('dAnoModelo').textContent = doc.anoModelo || '—';
+            document.getElementById('dEntrada').textContent = fmtData(doc.entrada);
+            document.getElementById('dResp').textContent = doc.responsavel || '—';
+            document.getElementById('dEstado').textContent = doc.estado || '—';
+            document.getElementById('dDiagnostico').textContent = doc.diagnostico || '—';
+            document.getElementById('dServicos').textContent = doc.servicos || '—';
+
+            var cardFotos = document.getElementById('cardFotos');
+            var boxFotos = document.getElementById('dFotos');
+            var fotos = (doc.fotos || []).filter(function (f) { return f && (f.data || f.url); });
+            if (fotos.length) {
+                cardFotos.style.display = '';
+                boxFotos.innerHTML = fotos.map(function (f) {
+                    return '<img src="' + (f.url || f.data) + '" alt="Foto do veículo">';
+                }).join('');
+            } else {
+                cardFotos.style.display = 'none';
+                boxFotos.innerHTML = '';
+            }
+
+            var itens = doc.itens || [];
+            var box = document.getElementById('dItens');
+            if (!itens.length) {
+                box.innerHTML = '<p style="color:#8fa3b8">Sem itens.</p>';
+            } else {
+                box.innerHTML = '<table><thead><tr><th>Tipo</th><th>Descrição</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
+                    itens.map(function (it) {
+                        return '<tr><td>' + (it.tipo === 'mao' ? 'Mão de obra' : 'Peça') +
+                            '</td><td>' + (it.desc || '') +
+                            '</td><td style="text-align:right">' + moeda(it.valor) + '</td></tr>';
+                    }).join('') + '</tbody></table>';
+            }
+            var total = itens.reduce(function (s, it) { return s + (Number(it.valor) || 0); }, 0);
+            if (!itens.length && doc.total) total = doc.total;
+            document.getElementById('dTotal').textContent = moeda(total);
+        }
+
+        function setupCanvas() {
+            var canvas = document.getElementById('pad');
+            var ctx = canvas.getContext('2d');
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 2.2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            function pos(e) {
+                var r = canvas.getBoundingClientRect();
+                var src = e.touches ? e.touches[0] : e;
+                return {
+                    x: (src.clientX - r.left) * (canvas.width / r.width),
+                    y: (src.clientY - r.top) * (canvas.height / r.height)
+                };
+            }
+            function start(e) {
+                e.preventDefault();
+                desenhando = true;
+                var p = pos(e);
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+            }
+            function move(e) {
+                if (!desenhando) return;
+                e.preventDefault();
+                var p = pos(e);
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+            }
+            function end(e) {
+                if (!desenhando) return;
+                e.preventDefault();
+                desenhando = false;
+            }
+            canvas.addEventListener('mousedown', start);
+            canvas.addEventListener('mousemove', move);
+            canvas.addEventListener('mouseup', end);
+            canvas.addEventListener('mouseleave', end);
+            canvas.addEventListener('touchstart', start, { passive: false });
+            canvas.addEventListener('touchmove', move, { passive: false });
+            canvas.addEventListener('touchend', end);
+
+            document.getElementById('btnLimpar').onclick = function () {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            };
+
+            document.getElementById('btnConfirmar').onclick = async function () {
+                var blank = document.createElement('canvas');
+                blank.width = canvas.width;
+                blank.height = canvas.height;
+                if (canvas.toDataURL() === blank.toDataURL()) {
+                    alert('Faça a assinatura antes de confirmar.');
+                    return;
+                }
+                var mini = document.createElement('canvas');
+                mini.width = 400;
+                mini.height = 120;
+                var mctx = mini.getContext('2d');
+                mctx.fillStyle = '#fff';
+                mctx.fillRect(0, 0, mini.width, mini.height);
+                mctx.drawImage(canvas, 0, 0, mini.width, mini.height);
+                var dataUrl = mini.toDataURL('image/jpeg', 0.72);
+                var agora = new Date().toISOString();
+
+                pack.assinaturaCliente = dataUrl;
+                pack.assinadoEm = agora;
+                pack.atualizadoEm = agora;
+
+                var mapa = carregarMapa();
+                mapa[token] = pack;
+                salvarMapa(mapa);
+
+                try {
+                    var db = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+                    if (db && Array.isArray(db.atendimentos)) {
+                        var at = db.atendimentos.find(function (a) {
+                            return a.tokenAssinatura === token || a.id === pack.atendimentoId;
+                        });
+                        if (at) {
+                            at.assinaturaCliente = dataUrl;
+                            at.assinadoEm = agora;
+                            at.tokenAssinatura = token;
+                            localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+                        }
+                    }
+                } catch (e) { /* ok */ }
+
+                var nuvOk = await salvarPackNuvem(pack);
+
+                var arquivo = {
+                    tipo: 'joninha-assinatura',
+                    token: token,
+                    atendimentoId: pack.atendimentoId,
+                    assinaturaCliente: dataUrl,
+                    assinadoEm: agora,
+                    documento: pack.documento || null
+                };
+                var blob = new Blob([JSON.stringify(arquivo)], { type: 'application/json' });
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'assinatura-' + token + '.json';
+                a.click();
+                URL.revokeObjectURL(a.href);
+
+                document.getElementById('boxAssinar').style.display = 'none';
+                document.getElementById('boxJaAssinado').style.display = '';
+                document.getElementById('imgAssinada').src = dataUrl;
+                document.getElementById('areaOk').style.display = '';
+                document.getElementById('areaOk').innerHTML =
+                    '<strong>Assinatura registrada.</strong><br>' +
+                    (nuvOk
+                        ? 'A oficina já consegue ver no sistema (nuvem).'
+                        : 'Se a oficina não ver na hora, envie o arquivo baixado (<em>assinatura-….json</em>) para importar em <strong>Enviar nota → Importar assinatura</strong>.');
+                document.getElementById('hintTopo').textContent = 'Obrigado! Assinatura concluída.';
+            };
+        }
+
+        if (!token) {
+            erro('Link inválido: falta o código de assinatura.');
+            return;
+        }
+
+        var mapa = carregarMapa();
+        pack = mapa[token];
+        if (!pack || !pack.documento) {
+            document.getElementById('hintTopo').textContent = 'Buscando documento na nuvem…';
+            pack = await baixarPackNuvem();
+            if (pack && pack.documento) {
+                mapa[token] = pack;
+                salvarMapa(mapa);
+            }
+        }
+
+        if (!pack || !pack.documento) {
+            erro(
+                'Documento não encontrado.\n\n' +
+                'Peça à oficina Joninha Suspensões para gerar o link de novo (Enviar nota ao cliente).\n' +
+                'Se assinou em outro aparelho, a oficina pode usar Importar assinatura.'
+            );
+            return;
+        }
+
+        document.getElementById('areaDoc').style.display = '';
+        document.getElementById('hintTopo').textContent = 'Confira o espelho e assine abaixo com o dedo ou o mouse.';
+        renderDoc(pack.documento || {});
+
+        if (pack.assinaturaCliente) {
+            document.getElementById('boxAssinar').style.display = 'none';
+            document.getElementById('boxJaAssinado').style.display = '';
+            document.getElementById('imgAssinada').src = pack.assinaturaCliente;
+            document.getElementById('hintTopo').textContent = 'Este atendimento já foi assinado.';
+        } else {
+            setupCanvas();
+        }
+    })();
+    </script>
+</body>
+</html>

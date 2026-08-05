@@ -1,0 +1,26 @@
+{
+  "name": "Joninha Suspensões",
+  "short_name": "Joninha",
+  "description": "Gestão de clientes, vendas, oficina e caixa — Joninha Suspensões",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#121214",
+  "theme_color": "#c8102e",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "logo-joninha.jpg",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logo-joninha.jpg",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
