@@ -2136,13 +2136,18 @@
         .checklist-joninha input { width: auto; accent-color: var(--blue-soft); }
         .wa-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
         .cards-oficina .card .k { font-size: 0.78rem; }
-        .modo-func body, body.modo-funcionario .menu-grupo:not([data-grupo="oficina"]) { display: none !important; }
+        body.modo-funcionario .menu-grupo:not([data-grupo="oficina"]) { display: none !important; }
         body.modo-funcionario .menu-grupo[data-grupo="oficina"] { display: flex !important; flex-direction: column; }
         body.modo-funcionario .menu-grupo[data-grupo="oficina"] > .submenu-lateral { display: flex !important; }
         body.modo-funcionario #badgeDb { display: none; }
         body.modo-funcionario .banner-canal { display: none !important; }
         #btnSairFuncPainel { display: none; width: calc(100% - 0px); margin: 10px 0 0; }
         body.modo-funcionario #btnSairFuncPainel { display: block !important; }
+        body.modo-funcionario .sidebar,
+        body.modo-funcionario .main {
+            visibility: visible !important;
+            pointer-events: auto !important;
+        }
         .login-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
         .login-tabs button {
             flex: 1; border: 1px solid var(--line); background: rgba(0,0,0,0.25);
@@ -2179,7 +2184,6 @@
                 <div class="row" style="margin-top:14px">
                     <button type="button" class="btn btn-ok" id="btnLoginFunc" style="width:100%">Entrar no painel</button>
                 </div>
-                <p class="hint" style="margin-top:10px">No painel aparece só <strong>Oficina</strong>: Ordem de Serviço / Veículo e Histórico de Atendimentos. Cadastro do login em <strong>Sistema → Acesso do funcionário ao painel</strong>.</p>
             </div>
             <p class="erro-login" id="loginErro"></p>
         </div>
@@ -3401,7 +3405,7 @@
         <section id="painelConfigLoginFunc" class="panel">
             <div class="box">
                 <h2>Acesso do funcionário ao painel</h2>
-                <p class="hint">Cadastre <strong>login e senha</strong> para o funcionário entrar na aba <strong>Funcionário</strong>. No painel dele aparece só <strong>Oficina</strong> (Ordem de Serviço / Veículo e Histórico). O funcionário precisa estar em <strong>FUNCIONÁRIO → Cadastro de Funcionários</strong>.</p>
+                <p class="hint">Cadastre <strong>login e senha</strong> para o funcionário entrar na aba <strong>Funcionário</strong>. O funcionário precisa estar em <strong>FUNCIONÁRIO → Cadastro de Funcionários</strong>.</p>
                 <form id="formLoginFuncCfg">
                     <div class="row">
                         <div class="col" style="flex:1.4">
@@ -3652,7 +3656,7 @@
             painelConfigSync: ['Sincronizar — PC ↔ Celular', 'Nuvem automática · forçar sync'],
             painelConfigLogo: ['Logo da empresa', 'Arquivo ou link da logo'],
             painelConfigPasta: ['Pasta no PC', 'Fotos e atendimento no computador'],
-            painelConfigLoginFunc: ['Acesso do funcionário ao painel', 'Login e senha · só Oficina'],
+            painelConfigLoginFunc: ['Acesso do funcionário ao painel', 'Login e senha do funcionário'],
             painelConfigBackup: ['Backup e limpeza', 'Exportar · importar · zerar dados']
         };
 
@@ -6139,14 +6143,32 @@
         var SENHA_LOCAL_KEY = 'joninha_suspensoes_senha_local';
         var SESS_LOCAL_KEY = 'joninha_suspensoes_sessao_ok';
 
-        function liberarApp() {
-            document.body.classList.remove('aguardando-login');
-            document.getElementById('telaLogin').classList.add('oculto');
-            document.getElementById('loginErro').style.display = 'none';
-            localStorage.setItem(SESS_LOCAL_KEY, '1');
-            if (!sessaoFuncionarioId) aplicarModoFuncionario(null);
-            atualizarStatusNuvemUI();
-            if (!sessaoFuncionarioId) {
+        function liberarApp(opts) {
+            opts = opts || {};
+            try {
+                if (opts.funcionarioId) {
+                    sessaoFuncionarioId = opts.funcionarioId;
+                } else if (!opts.manterFuncionario) {
+                    sessaoFuncionarioId = null;
+                }
+
+                document.body.classList.remove('aguardando-login');
+                var tela = document.getElementById('telaLogin');
+                if (tela) tela.classList.add('oculto');
+                var errEl = document.getElementById('loginErro');
+                if (errEl) errEl.style.display = 'none';
+
+                if (sessaoFuncionarioId) {
+                    localStorage.setItem(SESS_LOCAL_KEY, 'func:' + sessaoFuncionarioId);
+                    pararSyncAutomatico();
+                    aplicarModoFuncionario(sessaoFuncionarioId);
+                    atualizarStatusNuvemUI();
+                    return;
+                }
+
+                localStorage.setItem(SESS_LOCAL_KEY, '1');
+                aplicarModoFuncionario(null);
+                atualizarStatusNuvemUI();
                 iniciarSyncAutomatico();
                 sincronizarTodosNuvem({ silencioso: true, mostrarToast: true }).catch(function () {
                     if (typeof puxarConfigEmpresaNuvemSilencioso === 'function') {
@@ -6155,6 +6177,9 @@
                         });
                     }
                 });
+            } catch (err) {
+                console.error(err);
+                mostrarErroLogin('Erro ao liberar o painel. Tente novamente.');
             }
         }
 
@@ -6162,11 +6187,27 @@
             document.body.classList.add('aguardando-login');
             document.getElementById('telaLogin').classList.remove('oculto');
             localStorage.removeItem(SESS_LOCAL_KEY);
+            sessaoFuncionarioId = null;
             aplicarModoFuncionario(null);
             prepararTelaLogin();
             preencherSelectLoginFunc();
             pararSyncAutomatico();
             atualizarStatusNuvemUI();
+        }
+
+        function restaurarSessaoFuncionarioSalva() {
+            var sess = localStorage.getItem(SESS_LOCAL_KEY) || '';
+            if (sess.indexOf('func:') !== 0) return false;
+            var fid = sess.slice(5);
+            var f = listarFuncionariosInterno().find(function (x) {
+                return x && x.id === fid && x.ativo !== false && String(x.loginUsuario || '').trim();
+            });
+            if (!f) {
+                localStorage.removeItem(SESS_LOCAL_KEY);
+                return false;
+            }
+            liberarApp({ funcionarioId: f.id });
+            return true;
         }
 
         function mostrarErroLogin(msg) {
@@ -6215,6 +6256,8 @@
         }
 
         async function iniciarLoginApp() {
+            if (restaurarSessaoFuncionarioSalva()) return;
+
             var cfg = carregarConfigNuvem();
             if (!cfg || !cfg.apiKey || !cfg.projectId) {
                 if (localStorage.getItem(SESS_LOCAL_KEY) === '1') {
@@ -6235,9 +6278,8 @@
                         try { unsub(); } catch (e) { /* ok */ }
                         if (user) {
                             if (user.email) localStorage.setItem(LOGIN_EMAIL_KEY, user.email);
-                            sessaoFuncionarioId = null;
                             liberarApp();
-                        } else {
+                        } else if (!restaurarSessaoFuncionarioSalva()) {
                             prepararTelaLogin();
                         }
                         resolve();
@@ -6247,16 +6289,19 @@
                             done = true;
                             try { unsub(); } catch (e) { /* ok */ }
                             if (sessao.auth.currentUser) {
-                                sessaoFuncionarioId = null;
                                 liberarApp();
-                            } else prepararTelaLogin();
+                            } else if (!restaurarSessaoFuncionarioSalva()) {
+                                prepararTelaLogin();
+                            }
                             resolve();
                         }
                     }, 4000);
                 });
             } catch (err) {
-                prepararTelaLogin();
-                mostrarErroLogin(mensagemErroFirebase(err));
+                if (!restaurarSessaoFuncionarioSalva()) {
+                    prepararTelaLogin();
+                    mostrarErroLogin(mensagemErroFirebase(err));
+                }
             }
         }
 
@@ -12354,11 +12399,19 @@
                 canalVendas = 'normal';
                 atualizarBadgeCanal();
                 abrirGrupoMenu('oficina', true);
-                abrirPainel('painelVeiculo');
+                var btnOs = document.querySelector('.menu-grupo[data-grupo="oficina"] .nav-btn[data-panel="painelVeiculo"]');
+                try {
+                    abrirPainel('painelVeiculo', btnOs || undefined);
+                } catch (err) {
+                    console.error(err);
+                    document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
+                    var pv = document.getElementById('painelVeiculo');
+                    if (pv) pv.classList.add('active');
+                }
                 var tit = document.getElementById('tituloPainel');
                 var sub = document.getElementById('subtituloPainel');
                 if (tit) tit.textContent = 'Oficina';
-                if (sub) sub.textContent = 'Painel do funcionário — OS e Histórico';
+                if (sub) sub.textContent = 'Ordem de Serviço e Histórico';
             } else {
                 document.body.classList.remove('modo-funcionario');
             }
@@ -12408,31 +12461,39 @@
             }
             var btnLF = document.getElementById('btnLoginFunc');
             if (btnLF) btnLF.addEventListener('click', function () {
-                var user = (document.getElementById('loginFuncUser').value || '').trim().toLowerCase();
-                var senha = (document.getElementById('loginFuncSenha').value || '').trim();
-                if (!user || !senha) {
-                    mostrarErroLogin('Informe o login e a senha.');
-                    return;
+                try {
+                    var user = (document.getElementById('loginFuncUser').value || '').trim().toLowerCase();
+                    var senha = (document.getElementById('loginFuncSenha').value || '').trim();
+                    if (!user || !senha) {
+                        mostrarErroLogin('Informe o login e a senha.');
+                        return;
+                    }
+                    var funcs = listarFuncionariosInterno();
+                    var f = funcs.find(function (x) {
+                        if (!x || x.ativo === false) return false;
+                        var u = String(x.loginUsuario || '').trim().toLowerCase();
+                        var s = String(x.loginSenha || '').trim();
+                        return u === user && s === senha;
+                    });
+                    if (!f) {
+                        mostrarErroLogin('Login ou senha incorretos. Cadastre em Sistema → Acesso do funcionário.');
+                        return;
+                    }
+                    mostrarErroLogin('');
+                    btnLF.disabled = true;
+                    btnLF.textContent = 'Abrindo…';
+                    liberarApp({ funcionarioId: f.id });
+                    toast('Olá, ' + (f.nome || '') + '!');
+                } catch (err) {
+                    console.error(err);
+                    mostrarErroLogin('Falha ao entrar: ' + (err && err.message ? err.message : 'erro'));
+                } finally {
+                    btnLF.disabled = false;
+                    btnLF.textContent = 'Entrar no painel';
                 }
-                var funcs = listarFuncionariosInterno();
-                var f = funcs.find(function (x) {
-                    return x && x.ativo !== false &&
-                        String(x.loginUsuario || '').trim().toLowerCase() === user &&
-                        String(x.loginSenha || '') === senha;
-                });
-                if (!f) {
-                    mostrarErroLogin('Login ou senha incorretos.');
-                    return;
-                }
-                mostrarErroLogin('');
-                liberarApp();
-                aplicarModoFuncionario(f.id);
-                toast('Olá, ' + (f.nome || '') + ' — painel Oficina (OS e Histórico).');
             });
             var btnSairF = document.getElementById('btnSairFuncPainel');
             if (btnSairF) btnSairF.addEventListener('click', function () {
-                sessaoFuncionarioId = null;
-                aplicarModoFuncionario(null);
                 bloquearApp();
                 toast('Saiu do painel do funcionário.');
             });
