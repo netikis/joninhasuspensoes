@@ -10,6 +10,14 @@
     <meta name="apple-mobile-web-app-title" content="Joninha Suspensões">
     <meta name="application-name" content="Joninha Suspensões">
     <meta name="description" content="Joninha Suspensões — gestão de clientes, vendas, oficina e caixa">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Joninha Suspensões">
+    <meta property="og:title" content="Joninha Suspensões">
+    <meta property="og:description" content="Gestão de clientes, vendas, oficina e caixa.">
+    <meta property="og:image" content="https://joninhasuspensoes.vercel.app/logo-joninha.png">
+    <meta property="og:image:type" content="image/png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://joninhasuspensoes.vercel.app/logo-joninha.png">
     <title>Joninha Suspensões</title>
     <!-- Config pública do Firebase (GitHub Pages). firebase-env.js é opcional (Vercel/local). -->
     <script src="firebase-config.js"></script>
@@ -2230,6 +2238,7 @@
             <button type="button" class="menu-grupo-btn" data-toggle-grupo="funcionario">👷 FUNCIONÁRIO</button>
             <div class="submenu-lateral">
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelFuncionarios" data-canal="interno">👷 Cadastro de Funcionários</button>
+                <button type="button" class="nav-btn submenu-btn" data-panel="painelListaFuncionarios" data-canal="interno">👥 Funcionários Cadastrados</button>
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelPagFuncionarios" data-canal="interno">💰 Pagamento Funcionários</button>
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelComissoes" data-canal="interno">💵 Comissão de cada Funcionário</button>
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelOrcamento" data-canal="interno">🧾 Venda para Funcionário</button>
@@ -3161,7 +3170,7 @@
         <section id="painelFuncionarios" class="panel">
             <div class="box">
                 <h2>👷 Cadastro de Funcionários (interno)</h2>
-                <p class="hint">Cadastre aqui quem pode comprar no <strong>modo interno</strong>. A venda interna só libera para funcionário desta lista.</p>
+                <p class="hint">Cadastre aqui quem pode comprar no <strong>modo interno</strong>. A venda interna só libera para funcionário desta lista. Para ver, editar ou excluir, use <strong>Funcionários Cadastrados</strong>.</p>
                 <form id="formFuncionario">
                     <input type="hidden" id="pfFuncEditId">
                     <div class="row">
@@ -3182,27 +3191,36 @@
                     <div class="row" style="margin-top:14px">
                         <button type="submit" class="btn btn-primary" id="btnSalvarFunc">Salvar funcionário</button>
                         <button type="button" class="btn btn-secondary" id="btnCancelarFunc" style="display:none">Cancelar edição</button>
+                        <button type="button" class="btn btn-ok" id="btnIrListaFunc">👥 Funcionários cadastrados</button>
                     </div>
                 </form>
             </div>
+        </section>
+
+        <section id="painelListaFuncionarios" class="panel">
             <div class="box">
-                <h2>Funcionários cadastrados</h2>
-                <div class="toolbar">
+                <h2>👥 Funcionários Cadastrados</h2>
+                <p class="hint">Lista completa. Use <strong>Ver</strong>, <strong>Editar</strong> ou <strong>Excluir</strong>. Para cadastrar novo, abra <strong>Cadastro de Funcionários</strong>.</p>
+                <div class="toolbar" style="margin-bottom:12px">
                     <input type="search" id="buscaFuncionario" class="search" placeholder="Buscar nome, telefone ou cargo...">
+                    <button type="button" class="btn btn-primary" id="btnListaIrCadFunc">➕ Novo cadastro</button>
+                    <button type="button" class="btn btn-secondary" id="btnAtualizarListaFunc">🔄 Atualizar</button>
                 </div>
-                <table style="margin-top:10px">
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Telefone</th>
-                            <th>Cargo</th>
-                            <th>Comissão %</th>
-                            <th>Status</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabelaFuncionarios"></tbody>
-                </table>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Telefone</th>
+                                <th>Cargo</th>
+                                <th>Comissão %</th>
+                                <th>Status</th>
+                                <th style="min-width:220px">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaFuncionarios"></tbody>
+                    </table>
+                </div>
                 <div id="listaFuncionariosVazia" class="empty" style="display:none;margin-top:12px">Nenhum funcionário cadastrado.</div>
             </div>
         </section>
@@ -3585,6 +3603,18 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modalVerFuncionario">
+        <div class="modal-box">
+            <h3 id="modalVerFuncTitulo">Funcionário</h3>
+            <div id="modalVerFuncCorpo" style="color:#fff;font-weight:700;line-height:1.55"></div>
+            <div class="modal-acoes" style="margin-top:14px">
+                <button type="button" class="btn btn-secondary" id="btnVerFuncEditar">✏️ Editar</button>
+                <button type="button" class="btn btn-danger" id="btnVerFuncExcluir">🗑️ Excluir</button>
+                <button type="button" class="btn btn-primary" id="btnFecharVerFunc">Fechar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="mirror-print-section" id="printNota"></div>
 
     <script>
@@ -3613,6 +3643,7 @@
             painelRelatorioDespesas: ['Relatório de Despesas', 'Pastas mensais · todas as saídas / despesas'],
             painelDespesasOs: ['Despesas por OS', 'Pastas mensais · bruto · despesas · lucro'],
             painelFuncionarios: ['Cadastro de Funcionários', 'Comissão % · PIN · modo interno'],
+            painelListaFuncionarios: ['Funcionários Cadastrados', 'Ver · editar · excluir'],
             painelPagFuncionarios: ['Pagamento funcionários', 'Controle semanal interno · sem impressão'],
             painelRelatorioOficina: ['Relatório Oficina', 'Peças · ganho em peça · mão de obra · despesas'],
             painelComissoes: ['Comissões', 'Só o valor da comissão de cada um'],
@@ -4954,6 +4985,11 @@
                 atualizarBadgeCanal();
                 renderCadastroFuncionarios();
             }
+            if (id === 'painelListaFuncionarios') {
+                canalVendas = 'interno';
+                atualizarBadgeCanal();
+                renderListaFuncionarios();
+            }
             if (id === 'painelPagFuncionarios') {
                 canalVendas = 'interno';
                 atualizarBadgeCanal();
@@ -4979,6 +5015,7 @@
         var PAINEIS_CANAL = {
             painelDespesasOs: true,
             painelFuncionarios: true,
+            painelListaFuncionarios: true,
             painelPagFuncionarios: true,
             painelProdutos: true,
             painelOrcamento: true,
@@ -8859,37 +8896,123 @@
             document.getElementById('btnSalvarFunc').textContent = 'Salvar funcionário';
         }
 
+        function preencherFormFuncionario(f) {
+            if (!f) return;
+            document.getElementById('pfFuncEditId').value = f.id;
+            document.getElementById('pfNomeFunc').value = f.nome || '';
+            document.getElementById('pfTelFunc').value = f.telefone || '';
+            document.getElementById('pfCargoFunc').value = f.cargo || '';
+            document.getElementById('pfObsFunc').value = f.obs || '';
+            document.getElementById('pfAtivoFunc').checked = f.ativo !== false;
+            var pctEl = document.getElementById('pfComissaoPct');
+            if (pctEl) pctEl.value = f.comissaoPct != null ? f.comissaoPct : 40;
+            var pinEl = document.getElementById('pfPinFunc');
+            if (pinEl) pinEl.value = '';
+            if (pinEl) pinEl.placeholder = f.pin ? 'PIN já definido (deixe em branco para manter)' : 'Ex: 1234';
+            document.getElementById('btnCancelarFunc').style.display = '';
+            document.getElementById('btnSalvarFunc').textContent = 'Salvar alterações';
+        }
+
+        function abrirEdicaoFuncionario(id) {
+            comCanalInterno(function () {
+                var db = carregar();
+                var f = (db.funcionarios || []).find(function (x) { return x.id === id; });
+                if (!f) { toast('Funcionário não encontrado.'); return; }
+                preencherFormFuncionario(f);
+            });
+            abrirPainel('painelFuncionarios', document.querySelector('.nav-btn[data-panel="painelFuncionarios"]'));
+            setTimeout(function () {
+                var el = document.getElementById('pfNomeFunc');
+                if (el) el.focus();
+            }, 80);
+        }
+
+        function excluirFuncionarioPorId(id) {
+            if (!id) return;
+            if (!confirm('Excluir este funcionário? Histórico de pagamentos e vendas permanece.')) return;
+            comCanalInterno(function () {
+                var db = carregar();
+                db.funcionarios = (db.funcionarios || []).filter(function (f) { return f.id !== id; });
+                salvar(db);
+                toast('Funcionário removido.');
+                if (document.getElementById('pfFuncEditId').value === id) limparFormFuncionario();
+            });
+            fecharModalVerFuncionario();
+            renderListaFuncionarios();
+            renderPagFuncionarios();
+            preencherSelectFuncionariosVenda();
+        }
+
+        var _verFuncIdAtual = null;
+
+        function fecharModalVerFuncionario() {
+            var m = document.getElementById('modalVerFuncionario');
+            if (m) m.classList.remove('aberto');
+            _verFuncIdAtual = null;
+        }
+
+        function abrirModalVerFuncionario(id) {
+            comCanalInterno(function () {
+                var db = carregar();
+                var f = (db.funcionarios || []).find(function (x) { return x.id === id; });
+                if (!f) { toast('Funcionário não encontrado.'); return; }
+                _verFuncIdAtual = f.id;
+                var pct = f.comissaoPct != null ? Number(f.comissaoPct) : 0;
+                var ativo = f.ativo !== false;
+                document.getElementById('modalVerFuncTitulo').textContent = f.nome || 'Funcionário';
+                document.getElementById('modalVerFuncCorpo').innerHTML =
+                    '<div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+                    '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">NOME</span><div>' + esc(f.nome || '—') + '</div></div>' +
+                    '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">TELEFONE</span><div>' + esc(f.telefone || '—') + '</div></div>' +
+                    '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">CARGO</span><div>' + esc(f.cargo || '—') + '</div></div>' +
+                    '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">COMISSÃO</span><div>' + esc(String(pct)) + '%</div></div>' +
+                    '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">STATUS</span><div style="color:' + (ativo ? '#2ecc71' : '#e74c3c') + '">' + (ativo ? 'Ativo' : 'Inativo') + '</div></div>' +
+                    '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">PIN</span><div>' + (f.pin ? 'Definido' : 'Não definido') + '</div></div>' +
+                    '<div style="grid-column:1/-1"><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">OBSERVAÇÃO</span><div>' + esc(f.obs || '—') + '</div></div>' +
+                    '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">CADASTRADO EM</span><div>' + esc(fmtData(f.criadoEm) || '—') + '</div></div>' +
+                    '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">ATUALIZADO EM</span><div>' + esc(fmtData(f.atualizadoEm) || '—') + '</div></div>' +
+                    '</div>';
+                document.getElementById('modalVerFuncionario').classList.add('aberto');
+            });
+        }
+
         function renderCadastroFuncionarios() {
-            var panel = document.getElementById('painelFuncionarios');
+            /* painel só do formulário — lista fica em Funcionários Cadastrados */
+        }
+
+        function renderListaFuncionarios() {
+            var panel = document.getElementById('painelListaFuncionarios');
             if (!panel) return;
             comCanalInterno(function () {
                 var db = carregar();
-                var q = (document.getElementById('buscaFuncionario').value || '').trim().toLowerCase();
+                var q = ((document.getElementById('buscaFuncionario') && document.getElementById('buscaFuncionario').value) || '').trim().toLowerCase();
                 var funcs = listarFuncionariosOrdenados(db, false).filter(function (f) {
                     if (!q) return true;
                     return [f.nome, f.telefone, f.cargo, f.obs].join(' ').toLowerCase().indexOf(q) >= 0;
                 });
                 var tb = document.getElementById('tabelaFuncionarios');
                 var vaz = document.getElementById('listaFuncionariosVazia');
+                if (!tb) return;
                 if (!funcs.length) {
                     tb.innerHTML = '';
-                    vaz.style.display = 'block';
+                    if (vaz) vaz.style.display = 'block';
                 } else {
-                    vaz.style.display = 'none';
+                    if (vaz) vaz.style.display = 'none';
                     tb.innerHTML = funcs.map(function (f) {
                         var ativo = f.ativo !== false;
                         var pct = f.comissaoPct != null ? Number(f.comissaoPct) : 0;
                         return '<tr>' +
-                            '<td>' + esc(f.nome || '—') + '</td>' +
-                            '<td>' + esc(f.telefone || '—') + '</td>' +
-                            '<td>' + esc(f.cargo || '—') + '</td>' +
-                            '<td><strong>' + esc(String(pct)) + '%</strong></td>' +
+                            '<td style="color:#fff;font-weight:800">' + esc(f.nome || '—') + '</td>' +
+                            '<td style="color:#fff;font-weight:700">' + esc(f.telefone || '—') + '</td>' +
+                            '<td style="color:#fff;font-weight:700">' + esc(f.cargo || '—') + '</td>' +
+                            '<td style="color:#fff;font-weight:800"><strong>' + esc(String(pct)) + '%</strong></td>' +
                             '<td>' + (ativo
                                 ? '<span style="color:#2ecc71;font-weight:700">Ativo</span>'
                                 : '<span style="color:#e74c3c;font-weight:700">Inativo</span>') + '</td>' +
-                            '<td class="actions">' +
-                            '<button type="button" class="btn btn-secondary" data-ed-func="' + esc(f.id) + '" style="padding:4px 8px;font-size:0.8rem">Editar</button> ' +
-                            '<button type="button" class="btn btn-danger" data-excluir-func="' + esc(f.id) + '" style="padding:4px 8px;font-size:0.8rem">Excluir</button>' +
+                            '<td class="actions" style="white-space:nowrap">' +
+                            '<button type="button" class="btn btn-ver" data-ver-func="' + esc(f.id) + '" style="padding:4px 8px;font-size:0.78rem">Ver</button> ' +
+                            '<button type="button" class="btn btn-secondary" data-ed-func="' + esc(f.id) + '" style="padding:4px 8px;font-size:0.78rem">Editar</button> ' +
+                            '<button type="button" class="btn btn-danger" data-excluir-func="' + esc(f.id) + '" style="padding:4px 8px;font-size:0.78rem">Excluir</button>' +
                             '</td></tr>';
                     }).join('');
                 }
@@ -9035,18 +9158,43 @@
                 salvar(db);
                 limparFormFuncionario();
             });
-            renderCadastroFuncionarios();
+            renderListaFuncionarios();
             renderPagFuncionarios();
             preencherSelectFuncionariosVenda();
         });
 
         document.getElementById('btnCancelarFunc').addEventListener('click', limparFormFuncionario);
-        document.getElementById('buscaFuncionario').addEventListener('input', renderCadastroFuncionarios);
+        var buscaFuncEl = document.getElementById('buscaFuncionario');
+        if (buscaFuncEl) buscaFuncEl.addEventListener('input', renderListaFuncionarios);
         document.getElementById('btnPagIrCadFunc').addEventListener('click', function () {
-            abrirPainel('painelFuncionarios');
+            abrirPainel('painelFuncionarios', document.querySelector('.nav-btn[data-panel="painelFuncionarios"]'));
         });
         document.getElementById('btnVdIrFuncionarios').addEventListener('click', function () {
-            abrirPainel('painelFuncionarios');
+            abrirPainel('painelFuncionarios', document.querySelector('.nav-btn[data-panel="painelFuncionarios"]'));
+        });
+        var btnIrLista = document.getElementById('btnIrListaFunc');
+        if (btnIrLista) btnIrLista.addEventListener('click', function () {
+            abrirPainel('painelListaFuncionarios', document.querySelector('.nav-btn[data-panel="painelListaFuncionarios"]'));
+        });
+        var btnListaCad = document.getElementById('btnListaIrCadFunc');
+        if (btnListaCad) btnListaCad.addEventListener('click', function () {
+            limparFormFuncionario();
+            abrirPainel('painelFuncionarios', document.querySelector('.nav-btn[data-panel="painelFuncionarios"]'));
+        });
+        var btnAtuLista = document.getElementById('btnAtualizarListaFunc');
+        if (btnAtuLista) btnAtuLista.addEventListener('click', renderListaFuncionarios);
+
+        document.getElementById('btnFecharVerFunc').addEventListener('click', fecharModalVerFuncionario);
+        document.getElementById('modalVerFuncionario').addEventListener('click', function (e) {
+            if (e.target === this) fecharModalVerFuncionario();
+        });
+        document.getElementById('btnVerFuncEditar').addEventListener('click', function () {
+            var id = _verFuncIdAtual;
+            fecharModalVerFuncionario();
+            if (id) abrirEdicaoFuncionario(id);
+        });
+        document.getElementById('btnVerFuncExcluir').addEventListener('click', function () {
+            if (_verFuncIdAtual) excluirFuncionarioPorId(_verFuncIdAtual);
         });
 
         document.getElementById('formPagFuncionario').addEventListener('submit', function (e) {
@@ -9109,45 +9257,19 @@
         });
 
         document.getElementById('tabelaFuncionarios').addEventListener('click', function (e) {
+            var btnVer = e.target.closest('[data-ver-func]');
+            if (btnVer) {
+                abrirModalVerFuncionario(btnVer.getAttribute('data-ver-func'));
+                return;
+            }
             var btnEd = e.target.closest('[data-ed-func]');
             if (btnEd) {
-                var idEd = btnEd.getAttribute('data-ed-func');
-                comCanalInterno(function () {
-                    var db = carregar();
-                    var f = (db.funcionarios || []).find(function (x) { return x.id === idEd; });
-                    if (!f) return;
-                    document.getElementById('pfFuncEditId').value = f.id;
-                    document.getElementById('pfNomeFunc').value = f.nome || '';
-                    document.getElementById('pfTelFunc').value = f.telefone || '';
-                    document.getElementById('pfCargoFunc').value = f.cargo || '';
-                    document.getElementById('pfObsFunc').value = f.obs || '';
-                    document.getElementById('pfAtivoFunc').checked = f.ativo !== false;
-                    var pctEl = document.getElementById('pfComissaoPct');
-                    if (pctEl) pctEl.value = f.comissaoPct != null ? f.comissaoPct : 40;
-                    var pinEl = document.getElementById('pfPinFunc');
-                    if (pinEl) pinEl.value = '';
-                    if (pinEl) pinEl.placeholder = f.pin ? 'PIN já definido (deixe em branco para manter)' : 'Ex: 1234';
-                    document.getElementById('btnCancelarFunc').style.display = '';
-                    document.getElementById('btnSalvarFunc').textContent = 'Salvar alterações';
-                    document.getElementById('pfNomeFunc').focus();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                });
+                abrirEdicaoFuncionario(btnEd.getAttribute('data-ed-func'));
                 return;
             }
             var btn = e.target.closest('[data-excluir-func]');
             if (!btn) return;
-            var id = btn.getAttribute('data-excluir-func');
-            if (!confirm('Excluir este funcionário? Histórico de pagamentos e vendas permanece.')) return;
-            comCanalInterno(function () {
-                var db = carregar();
-                db.funcionarios = (db.funcionarios || []).filter(function (f) { return f.id !== id; });
-                salvar(db);
-                toast('Funcionário removido.');
-                if (document.getElementById('pfFuncEditId').value === id) limparFormFuncionario();
-            });
-            renderCadastroFuncionarios();
-            renderPagFuncionarios();
-            preencherSelectFuncionariosVenda();
+            excluirFuncionarioPorId(btn.getAttribute('data-excluir-func'));
         });
 
         document.getElementById('tabelaPagFuncionarios').addEventListener('click', function (e) {
@@ -9193,28 +9315,38 @@
                 inicialBanco: 0,
                 basePainelEntradas: 0,
                 basePainelSaidas: 0,
-                atualizadoEm: ''
+                atualizadoEm: '',
+                osBloqueadasCaixa: {}
             }, (db && db.caixaConfig) || {});
         }
 
         function mesclarCaixaConfig(localCfg, nuvemCfg) {
             var L = getCaixaConfig({ caixaConfig: localCfg });
             var N = getCaixaConfig({ caixaConfig: nuvemCfg });
+            function mergeBloqueadas(a, b) {
+                var out = {};
+                [a || {}, b || {}].forEach(function (map) {
+                    Object.keys(map).forEach(function (id) {
+                        var t = new Date(map[id] || 0).getTime();
+                        var tOut = new Date(out[id] || 0).getTime();
+                        if (!out[id] || t >= tOut) out[id] = map[id];
+                    });
+                });
+                return out;
+            }
             if (!nuvemCfg) return L;
             if (!localCfg) return N;
             var tL = new Date(L.atualizadoEm || 0).getTime();
             var tN = new Date(N.atualizadoEm || 0).getTime();
-            if (tL && tN) return tL >= tN ? L : N;
-            if (tL && !tN) return L;
-            if (!tL && tN) {
-                /* Nuvem antiga sem data: não apaga inicial local se já houver valor */
-                if ((Number(L.inicialBalcao) || 0) > 0 || (Number(L.inicialBanco) || 0) > 0) return L;
-                return N;
-            }
-            /* Sem datas: mantém o que tiver valor local mais recente / maior inicial */
-            if ((Number(L.inicialBalcao) || 0) !== (Number(N.inicialBalcao) || 0) ||
+            var base;
+            if (tL && tN) base = tL >= tN ? L : N;
+            else if (tL && !tN) base = L;
+            else if (!tL && tN) {
+                if ((Number(L.inicialBalcao) || 0) > 0 || (Number(L.inicialBanco) || 0) > 0) base = L;
+                else base = N;
+            } else if ((Number(L.inicialBalcao) || 0) !== (Number(N.inicialBalcao) || 0) ||
                 (Number(L.inicialBanco) || 0) !== (Number(N.inicialBanco) || 0)) {
-                return {
+                base = {
                     inicialBalcao: Math.max(Number(L.inicialBalcao) || 0, Number(N.inicialBalcao) || 0),
                     inicialBanco: Math.max(Number(L.inicialBanco) || 0, Number(N.inicialBanco) || 0),
                     basePainelEntradas: Number(L.basePainelEntradas) || Number(N.basePainelEntradas) || 0,
@@ -9222,8 +9354,11 @@
                     zeradoEm: L.zeradoEm || N.zeradoEm || '',
                     atualizadoEm: L.atualizadoEm || N.atualizadoEm || new Date().toISOString()
                 };
+            } else {
+                base = L;
             }
-            return L;
+            base.osBloqueadasCaixa = mergeBloqueadas(L.osBloqueadasCaixa, N.osBloqueadasCaixa);
+            return base;
         }
 
         function salvarCaixaConfigOficial(cfg) {
@@ -9471,10 +9606,22 @@
                     if (!confirm('Excluir lançamento do balcão?')) return;
                     var db2 = carregarMain();
                     var idEx = b.getAttribute('data-ex');
+                    var lanc = (db2.caixa || []).find(function (x) { return x.id === idEx; });
                     marcarExcluido(db2, 'caixa', idEx);
                     db2.caixa = (db2.caixa || []).filter(function (x) { return x.id !== idEx; });
+                    /* Impede a sync da oficina recolocar a mesma OS paga */
+                    if (lanc && lanc.atendimentoId) {
+                        var cfg = getCaixaConfig(db2);
+                        if (!cfg.osBloqueadasCaixa || typeof cfg.osBloqueadasCaixa !== 'object') {
+                            cfg.osBloqueadasCaixa = {};
+                        }
+                        cfg.osBloqueadasCaixa[lanc.atendimentoId] = new Date().toISOString();
+                        cfg.atualizadoEm = new Date().toISOString();
+                        db2.caixaConfig = cfg;
+                    }
                     salvarMain(db2);
                     agendarSyncAutomatico('salvar');
+                    toast('Lançamento excluído do balcão.');
                     renderCaixa();
                     atualizarKPIs(db2);
                 });
@@ -10982,6 +11129,10 @@
                 document.getElementById('painelDespesasOs').classList.contains('active')) {
                 renderDespesasOs();
             }
+            if (document.getElementById('painelListaFuncionarios') &&
+                document.getElementById('painelListaFuncionarios').classList.contains('active')) {
+                renderListaFuncionarios();
+            }
             if (document.getElementById('painelFuncionarios') &&
                 document.getElementById('painelFuncionarios').classList.contains('active')) {
                 renderCadastroFuncionarios();
@@ -11600,6 +11751,10 @@
             var db = carregar();
             if (!db.caixa) db.caixa = [];
             if (!db.caixaBanco) db.caixaBanco = [];
+            var cfg = getCaixaConfig(db);
+            var bloqueadas = (cfg.osBloqueadasCaixa && typeof cfg.osBloqueadasCaixa === 'object')
+                ? cfg.osBloqueadasCaixa
+                : {};
             var idsLanc = {};
             (db.caixa || []).concat(db.caixaBanco || []).forEach(function (l) {
                 if (l && l.atendimentoId) idsLanc[l.atendimentoId] = true;
@@ -11609,6 +11764,7 @@
                 if (!a || !a.id) return;
                 if (String(a.statusPagamento || '').toUpperCase() !== 'PAGO') return;
                 if (idsLanc[a.id]) return;
+                if (bloqueadas[a.id]) return; /* excluída manualmente do caixa */
                 var valor = Number(a.total) || 0;
                 if (!(valor > 0)) return;
                 var nome = nomeAtendimento(main, a);

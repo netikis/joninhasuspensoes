@@ -1,9 +1,32 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" prefix="og: https://ogp.me/ns#">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Assinar — Joninha Suspensões</title>
+    <meta name="description" content="Joninha Suspensões — confira o atendimento e assine digitalmente.">
+    <meta name="theme-color" content="#c8102e">
+
+    <!-- Prévia do link no WhatsApp / Facebook / Telegram -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Joninha Suspensões">
+    <meta property="og:title" content="Joninha Suspensões — Assinar atendimento">
+    <meta property="og:description" content="Abra o link para conferir os dados e assinar o atendimento.">
+    <meta property="og:url" content="https://joninhasuspensoes.vercel.app/assinar-joninha.html">
+    <meta property="og:image" content="https://joninhasuspensoes.vercel.app/logo-joninha.png">
+    <meta property="og:image:secure_url" content="https://joninhasuspensoes.vercel.app/logo-joninha.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1024">
+    <meta property="og:image:height" content="1024">
+    <meta property="og:image:alt" content="Logo Joninha Suspensões">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Joninha Suspensões — Assinar atendimento">
+    <meta name="twitter:description" content="Abra o link para conferir os dados e assinar o atendimento.">
+    <meta name="twitter:image" content="https://joninhasuspensoes.vercel.app/logo-joninha.png">
+    <link rel="image_src" href="https://joninhasuspensoes.vercel.app/logo-joninha.png">
+    <link rel="icon" type="image/png" href="logo-joninha.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
     <script src="firebase-config.js"></script>
     <script src="firebase-env.js" onerror="/* opcional */"></script>
     <style>
@@ -298,7 +321,11 @@
             document.getElementById('dAnoModelo').textContent = doc.anoModelo || '—';
             document.getElementById('dEntrada').textContent = fmtData(doc.entrada);
             document.getElementById('dResp').textContent = doc.responsavel || '—';
-            document.getElementById('dEstado').textContent = doc.estado || '—';
+            var estadoTxt = doc.estado || '';
+            if (doc.checklistTexto) {
+                estadoTxt = (doc.checklistTexto + (estadoTxt ? '\n\nObservações: ' + estadoTxt : '')).trim();
+            }
+            document.getElementById('dEstado').textContent = estadoTxt || '—';
             document.getElementById('dDiagnostico').textContent = doc.diagnostico || '—';
             document.getElementById('dServicos').textContent = doc.servicos || '—';
 
