@@ -243,6 +243,17 @@
             padding-left: calc(20px + var(--safe-left));
             padding-right: calc(20px + var(--safe-right));
             -webkit-overflow-scrolling: touch;
+            /* Só o fundo do layout fica branco — balões/molduras continuam coloridos */
+            background: #ffffff;
+            color: #1a1a1a;
+        }
+
+        .main .topbar h1 {
+            color: #1a1a1a;
+        }
+
+        .main .topbar p {
+            color: #55565f;
         }
 
         .btn-menu {
@@ -722,6 +733,32 @@
         th.th-ordena .seta-ord { font-size: 0.65rem; margin-left: 4px; opacity: 0.85; }
 
         tr:hover td { background: rgba(61, 160, 232, 0.05); }
+
+        /* Lista de clientes: texto legível no fundo escuro do box */
+        #painelListaClientes table td {
+            color: #fff;
+            font-weight: 600;
+        }
+        #painelListaClientes table td:first-child {
+            color: #fff;
+            font-weight: 800;
+        }
+        #painelListaClientes .box h2 {
+            color: #fff;
+        }
+
+        /* Histórico de atendimentos: nomes e dados legíveis */
+        #painelHistorico table td {
+            color: #fff;
+            font-weight: 600;
+        }
+        #painelHistorico table td:nth-child(2) {
+            color: #fff;
+            font-weight: 800;
+        }
+        #painelHistorico .box h2 {
+            color: #fff;
+        }
 
         .actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .actions .btn { padding: 6px 10px; font-size: 0.75rem; }
@@ -2188,11 +2225,11 @@
                         <div class="col">
                             <label for="atClienteBusca">Buscar cadastrado ou digitar nome avulso</label>
                             <input type="hidden" id="atClienteId" value="">
-                            <input id="atClienteBusca" list="listaClientesAt" autocomplete="off" placeholder="Digite para buscar ou escreva o nome avulso...">
+                            <input id="atClienteBusca" autocomplete="off" placeholder="Digite para buscar ou escreva o nome avulso...">
                             <datalist id="listaClientesAt"></datalist>
                         </div>
                     </div>
-                    <p class="hint" style="margin-top:10px" id="atClienteStatus">Digite o nome: se existir no cadastro, aparece na busca; se não, fica como cliente avulso.</p>
+                    <p class="hint" style="margin-top:10px" id="atClienteStatus">Digite as primeiras letras do nome para aparecer na busca; se não existir, fica como cliente avulso.</p>
                     <div id="atClienteCard" class="cliente-card-os" style="display:none"></div>
                 </div>
                 <div class="box">
@@ -2264,10 +2301,6 @@
                     </div>
                     <label>Observações do checklist / estado</label>
                     <textarea id="atEstado" placeholder="Detalhes: lado, peça, combustível, pneus, peças soltas..."></textarea>
-                    <div class="wa-actions">
-                        <button type="button" class="btn btn-ok" id="btnWaChecklist">📱 Enviar checklist no WhatsApp</button>
-                        <button type="button" class="btn btn-secondary" id="btnWaOrcamento">📱 Enviar orçamento / diagnóstico no WhatsApp</button>
-                    </div>
                 </div>
                 <div class="grid-2">
                     <div class="box">
@@ -2333,9 +2366,22 @@
                     </div>
                 </div>
 
-                <div class="row">
-                    <button type="submit" class="btn btn-primary" id="btnSalvarAt">Salvar Atendimento</button>
-                    <button type="button" class="btn btn-secondary" id="btnLimparAt">Limpar formulário</button>
+                <div class="box">
+                    <h2>Enviar e salvar</h2>
+                    <div class="row" style="margin-top:4px;align-items:flex-end">
+                        <div class="col" style="flex:1.2">
+                            <label style="color:#fff;font-weight:800">WhatsApp do cliente (obrigatório se for avulso)</label>
+                            <input id="atWaTel" type="tel" inputmode="tel" placeholder="(00) 00000-0000" autocomplete="tel">
+                            <p class="hint" style="margin-top:6px;color:#333;font-weight:600">Se o cliente estiver cadastrado, o número preenche sozinho. Se for avulso, digite aqui antes de enviar.</p>
+                        </div>
+                    </div>
+                    <div class="wa-actions">
+                        <button type="button" class="btn btn-ok" id="btnWaChecklist">📱 Checklist no WhatsApp</button>
+                        <button type="button" class="btn btn-secondary" id="btnWaOrcamento">📱 Orçamento / diagnóstico no WhatsApp</button>
+                        <button type="submit" class="btn btn-primary" id="btnSalvarAt">Salvar Atendimento</button>
+                        <button type="button" class="btn btn-secondary" id="btnLimparAt">Limpar formulário</button>
+                    </div>
+                    <p class="hint" style="margin-top:8px;font-weight:600;color:#333">Ao clicar no WhatsApp, você escolhe: texto, JPEG, PDF ou link para o cliente ler e assinar.</p>
                 </div>
             </form>
         </section>
@@ -2507,13 +2553,13 @@
                         </div>
                     </div>
 
-                    <div class="box" style="border-color:rgba(192,57,43,0.35);background:rgba(192,57,43,0.06)">
-                        <h3>3. Adicionar item avulso</h3>
+                    <div class="box box-item-avulso" style="border:2px solid #e61e25;background:#ffe5e8;box-shadow:0 0 0 1px rgba(230,30,37,0.25)">
+                        <h3 style="color:#111;font-weight:800">3. Adicionar item avulso</h3>
                         <div class="row">
-                            <div class="col" style="flex:2"><label>Descrição</label><input id="vdAvNome" placeholder="Ex: Instalação padrão, taxa de visita..."></div>
+                            <div class="col" style="flex:2"><label style="color:#111;font-weight:800">Descrição</label><input id="vdAvNome" placeholder="Ex: Instalação padrão, taxa de visita..."></div>
                         </div>
                         <div class="row" style="margin-top:8px;align-items:flex-end">
-                            <div class="col" style="flex:0.7"><label>Unid.</label>
+                            <div class="col" style="flex:0.7"><label style="color:#111;font-weight:800">Unid.</label>
                                 <select id="vdAvUn">
                                     <option value="un">Unidade</option>
                                     <option value="m">Metro</option>
@@ -2521,11 +2567,11 @@
                                     <option value="serv">Serviço</option>
                                 </select>
                             </div>
-                            <div class="col" style="flex:0.55"><label>Qtd.</label><input id="vdAvQtd" inputmode="decimal" value="1"></div>
-                            <div class="col"><label>Custo (R$)</label><input id="vdAvCusto" type="number" step="0.01" value="0"></div>
-                            <div class="col"><label>Margem (%)</label><input id="vdAvMargem" type="number" step="0.1" value="0"></div>
-                            <div class="col"><label style="color:#8fe0b8">Venda (R$)</label><input id="vdAvVenda" type="number" step="0.01"></div>
-                            <div class="col" style="flex:0.8"><label style="color:#f1c40f">Total (R$)</label><input id="vdAvTotal" readonly style="font-weight:700;color:#8fe0b8"></div>
+                            <div class="col" style="flex:0.55"><label style="color:#111;font-weight:800">Qtd.</label><input id="vdAvQtd" inputmode="decimal" value="1"></div>
+                            <div class="col"><label style="color:#111;font-weight:800">Custo (R$)</label><input id="vdAvCusto" type="number" step="0.01" value="0"></div>
+                            <div class="col"><label style="color:#111;font-weight:800">Margem (%)</label><input id="vdAvMargem" type="number" step="0.1" value="0"></div>
+                            <div class="col"><label style="color:#111;font-weight:800">Venda (R$)</label><input id="vdAvVenda" type="number" step="0.01"></div>
+                            <div class="col" style="flex:0.8"><label style="color:#111;font-weight:800">Total (R$)</label><input id="vdAvTotal" readonly style="font-weight:800;color:#111;background:#fff"></div>
                             <div class="col" style="flex:0.55"><button type="button" class="btn btn-ok" id="btnVdAddAvulso" style="width:100%">➕ ADD</button></div>
                         </div>
                     </div>
@@ -3260,8 +3306,8 @@
             <div class="modal-acoes">
                 <button type="button" class="btn btn-pdf" id="btnNotaPdf">Salvar / Imprimir PDF</button>
                 <button type="button" class="btn btn-ok" id="btnNotaSalvarPdf">💾 Salvar PDF</button>
-                <button type="button" class="btn btn-primary" id="btnNotaEncaminhar">📤 Encaminhar PDF</button>
-                <button type="button" class="btn btn-assinar" id="btnNotaLink">Enviar nota ao cliente</button>
+                <button type="button" class="btn btn-primary" id="btnNotaEncaminhar">📤 Enviar WhatsApp</button>
+                <button type="button" class="btn btn-assinar" id="btnNotaLink">✍️ Ler e assinar</button>
                 <button type="button" class="btn btn-secondary" id="btnNotaExportFotos">Exportar fotos</button>
                 <button type="button" class="btn btn-secondary" id="btnNotaFechar">Fechar</button>
             </div>
@@ -3273,7 +3319,7 @@
         <div id="viewerPdfBarra">
             <button type="button" class="btn btn-secondary" id="btnViewerFechar">✕ Fechar</button>
             <button type="button" class="btn btn-ok" id="btnViewerSalvarPdf">💾 Salvar PDF</button>
-            <button type="button" class="btn btn-primary" id="btnViewerEncaminhar">📤 Encaminhar PDF</button>
+            <button type="button" class="btn btn-primary" id="btnViewerEncaminhar">📤 Enviar WhatsApp</button>
             <button type="button" class="btn btn-pdf" id="btnViewerImprimir">🖨️ Imprimir</button>
         </div>
         <div id="viewerPdfScroll">
@@ -3320,10 +3366,24 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modalWaEnvio">
+        <div class="modal-box" style="width:min(460px,100%)">
+            <h3 id="modalWaEnvioTitulo">Enviar pelo WhatsApp</h3>
+            <p class="hint" id="modalWaEnvioHint">Escolha como enviar ao cliente:</p>
+            <div class="modal-acoes" style="flex-direction:column">
+                <button type="button" class="btn btn-ok" id="btnWaModoTexto" style="width:100%">📱 Texto — mensagem no WhatsApp</button>
+                <button type="button" class="btn btn-primary" id="btnWaModoJpeg" style="width:100%">🖼️ JPEG — imagem do documento</button>
+                <button type="button" class="btn btn-pdf" id="btnWaModoPdf" style="width:100%">📄 PDF — arquivo do documento</button>
+                <button type="button" class="btn btn-assinar" id="btnWaModoAssinar" style="width:100%">✍️ Ler e assinar — link para o cliente concordar</button>
+                <button type="button" class="btn btn-secondary" id="btnWaModoCancelar" style="width:100%">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modalLinkAssinatura">
         <div class="modal-box">
             <h3>Link para o cliente assinar</h3>
-            <p class="hint">Documento gerado conforme sua escolha (com ou sem fotos). Envie por WhatsApp — o cliente abre o link no celular (site na Vercel/GitHub) e assina. Com login na nuvem, o documento sobe automaticamente.</p>
+            <p class="hint">Documento gerado conforme sua escolha (com ou sem fotos). Envie por WhatsApp — o cliente abre o link no celular (site na Vercel/GitHub), lê e assina para ficar de acordo. Com login na nuvem, o documento sobe automaticamente.</p>
             <input type="text" id="inputLinkAssinatura" class="modal-link-input" readonly>
             <div class="modal-acoes">
                 <button type="button" class="btn btn-primary" id="btnCopiarLink">Copiar link</button>
@@ -4152,33 +4212,49 @@
             return partes.join(' ');
         }
 
-        function limparNomeArquivoPdf(nome) {
+        function limparNomeArquivo(nome, ext) {
+            var e = String(ext || 'pdf').replace(/^\./, '').toLowerCase() || 'pdf';
             var n = String(nome || '').trim();
             if (!n) n = 'ORÇAMENTO';
             n = n.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
-            if (!/\.pdf$/i.test(n)) n += '.pdf';
-            return n;
+            n = n.replace(/\.(pdf|jpe?g|png)$/i, '');
+            return n + '.' + e;
+        }
+
+        function limparNomeArquivoPdf(nome) {
+            return limparNomeArquivo(nome, 'pdf');
         }
 
         var _nomePdfResolver = null;
-        function perguntarNomeArquivoPdfAsync() {
+        var _nomeArquivoExt = 'pdf';
+        function perguntarNomeArquivoAsync(ext, tituloModal) {
+            var e = String(ext || 'pdf').replace(/^\./, '').toLowerCase() || 'pdf';
+            _nomeArquivoExt = e;
             return new Promise(function (resolve) {
                 var input = document.getElementById('inputNomePdf');
                 var modal = document.getElementById('modalNomePdf');
+                var h3 = modal ? modal.querySelector('h3') : null;
+                var hint = modal ? modal.querySelector('.hint') : null;
+                if (h3) h3.textContent = tituloModal || ('Nome do ' + e.toUpperCase());
+                if (hint) hint.textContent = 'Pode alterar antes de salvar ou enviar.';
                 if (!input || !modal) {
-                    resolve(limparNomeArquivoPdf(nomeArquivoOrcamentoPdfPadrao()));
+                    resolve(limparNomeArquivo(nomeArquivoOrcamentoPdfPadrao(), e));
                     return;
                 }
                 _nomePdfResolver = resolve;
-                input.value = nomeArquivoOrcamentoPdfPadrao();
+                input.value = nomeArquivoOrcamentoPdfPadrao().replace(/\.(pdf|jpe?g|png)$/i, '');
                 modal.classList.add('aberto');
                 setTimeout(function () {
                     try {
                         input.focus();
                         input.select();
-                    } catch (e) { /* ignore */ }
+                    } catch (err) { /* ignore */ }
                 }, 80);
             });
+        }
+
+        function perguntarNomeArquivoPdfAsync() {
+            return perguntarNomeArquivoAsync('pdf', 'Nome do PDF');
         }
 
         function fecharModalNomePdf(valor) {
@@ -4186,7 +4262,10 @@
             if (modal) modal.classList.remove('aberto');
             var resolver = _nomePdfResolver;
             _nomePdfResolver = null;
-            if (resolver) resolver(valor);
+            if (resolver) {
+                if (valor == null) resolver(null);
+                else resolver(limparNomeArquivo(valor, _nomeArquivoExt || 'pdf'));
+            }
         }
 
         function nomeArquivoOrcamentoPdf(atendimento) {
@@ -4263,18 +4342,16 @@
             });
         }
 
-        async function gerarPdfBlobDaNota(html, nomeArq) {
+        async function montarElementoRenderNota(html) {
             await carregarHtml2Pdf();
-
-            /* Sempre renderiza cópia com cabeçalho lado a lado (não usa layout empilhado do celular) */
             var htmlFonte = html || obterHtmlNotaAtual();
             var wrap = document.createElement('div');
             wrap.id = 'hmPdfRenderTemp';
+            wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1;';
             wrap.innerHTML = htmlFonte;
             document.body.appendChild(wrap);
             var alvo = wrap.querySelector('.nota-espelho') || wrap;
 
-            /* Reforça tabela do topo */
             var tabela = wrap.querySelector('.nota-topo-linha');
             if (tabela) {
                 tabela.style.cssText = 'width:100%;border-collapse:collapse;table-layout:fixed;display:table;';
@@ -4293,32 +4370,99 @@
             }
 
             await aguardarImagensElemento(alvo);
+            return { wrap: wrap, alvo: alvo };
+        }
 
+        function optHtml2CanvasNota() {
+            return {
+                scale: Math.min(2, window.devicePixelRatio || 1.5),
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                logging: false,
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: 794
+            };
+        }
+
+        async function gerarPdfBlobDaNota(html, nomeArq) {
+            var prep = await montarElementoRenderNota(html);
             var opt = {
                 margin: [8, 8, 8, 8],
                 filename: nomeArq || 'ORCAMENTO.pdf',
                 image: { type: 'jpeg', quality: 0.95 },
-                html2canvas: {
-                    scale: Math.min(2, window.devicePixelRatio || 1.5),
-                    useCORS: true,
-                    allowTaint: true,
-                    backgroundColor: '#ffffff',
-                    logging: false,
-                    scrollX: 0,
-                    scrollY: 0,
-                    windowWidth: 794
-                },
+                html2canvas: optHtml2CanvasNota(),
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 pagebreak: { mode: ['css', 'legacy'] },
                 enableLinks: false
             };
 
             try {
-                var blob = await html2pdf().set(opt).from(alvo).outputPdf('blob');
-                return blob;
+                return await html2pdf().set(opt).from(prep.alvo).outputPdf('blob');
             } finally {
-                if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+                if (prep.wrap && prep.wrap.parentNode) prep.wrap.parentNode.removeChild(prep.wrap);
             }
+        }
+
+        async function gerarJpegBlobDaNota(html) {
+            var prep = await montarElementoRenderNota(html);
+            try {
+                var canvas = await html2pdf().set({
+                    html2canvas: optHtml2CanvasNota(),
+                    image: { type: 'jpeg', quality: 0.92 }
+                }).from(prep.alvo).toCanvas();
+                return await new Promise(function (resolve, reject) {
+                    if (!canvas || !canvas.toBlob) {
+                        reject(new Error('canvas'));
+                        return;
+                    }
+                    canvas.toBlob(function (b) {
+                        if (b && b.size > 200) resolve(b);
+                        else reject(new Error('jpeg vazio'));
+                    }, 'image/jpeg', 0.92);
+                });
+            } finally {
+                if (prep.wrap && prep.wrap.parentNode) prep.wrap.parentNode.removeChild(prep.wrap);
+            }
+        }
+
+        async function compartilharArquivoCliente(blob, nomeArq, mime, telefone, textoWa) {
+            var arquivo = new File([blob], nomeArq, { type: mime || blob.type || 'application/octet-stream' });
+            if (navigator.share) {
+                try {
+                    if (!navigator.canShare || navigator.canShare({ files: [arquivo] })) {
+                        await navigator.share({
+                            title: nomeArq.replace(/\.(pdf|jpe?g|png)$/i, ''),
+                            text: textoWa || nomeArq,
+                            files: [arquivo]
+                        });
+                        return 'shared';
+                    }
+                } catch (errShare) {
+                    if (errShare && errShare.name === 'AbortError') return 'abort';
+                }
+            }
+            if (!ehCelular()) {
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = nomeArq;
+                a.rel = 'noopener';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(function () {
+                    URL.revokeObjectURL(url);
+                    a.remove();
+                }, 1500);
+                if (telefone || textoWa) {
+                    var msg = (textoWa || '') + '\n\n(Anexe o arquivo *' + nomeArq + '* que acabou de baixar.)';
+                    abrirWhatsApp(telefone || '', msg.trim());
+                }
+                return 'download';
+            }
+            toast('Seu celular não compartilhou o arquivo. Use Salvar e anexe no WhatsApp.');
+            return 'fail';
         }
 
         function moeda(n) {
@@ -4450,9 +4594,10 @@
             var status = document.getElementById('atClienteStatus');
             var hid = document.getElementById('atClienteId');
             var card = document.getElementById('atClienteCard');
+            var waTel = document.getElementById('atWaTel');
             if (!texto) {
                 hid.value = '';
-                status.innerHTML = 'Digite o nome: se existir no cadastro, aparece na busca; se não, fica como cliente avulso.';
+                status.innerHTML = 'Digite as primeiras letras do nome para buscar no cadastro; se não existir, fica como cliente avulso.';
                 card.style.display = 'none';
                 card.innerHTML = '';
                 return;
@@ -4464,27 +4609,49 @@
                 var snap = snapshotClienteCadastro(db, r);
                 card.innerHTML = htmlCardClienteOs(snap);
                 card.style.display = '';
+                if (waTel && snap && snap.telefone) waTel.value = snap.telefone;
             } else {
                 hid.value = '';
-                status.innerHTML = '<span style="color:#9fd3ff;font-weight:700">Cliente avulso</span> — será salvo só com este nome.';
+                status.innerHTML = '<span style="color:#9fd3ff;font-weight:700">Cliente avulso</span> — informe o WhatsApp abaixo para enviar.';
                 card.style.display = 'none';
                 card.innerHTML = '';
             }
         }
 
-        function preencherListaClientesAt(db) {
+        function preencherListaClientesAt(db, filtroTexto) {
             var lista = document.getElementById('listaClientesAt');
             var busca = document.getElementById('atClienteBusca');
-            var atual = busca ? busca.value : '';
+            if (!lista) return;
             lista.innerHTML = '';
-            db.clientes.slice().sort(function (a, b) {
-                return a.nome.localeCompare(b.nome, 'pt-BR');
-            }).forEach(function (c) {
-                var opt = document.createElement('option');
-                opt.value = c.nome;
-                lista.appendChild(opt);
-            });
-            if (atual) busca.value = atual;
+            var q = String(
+                filtroTexto != null
+                    ? filtroTexto
+                    : (busca ? busca.value : '')
+            ).trim().toLowerCase();
+            /* Só sugere depois de digitar ao menos 1 letra — evita abrir a lista inteira ao clicar vazio */
+            if (q.length < 1) {
+                if (busca) busca.removeAttribute('list');
+                return;
+            }
+            if (busca) busca.setAttribute('list', 'listaClientesAt');
+            db.clientes.slice()
+                .filter(function (c) {
+                    var nome = String(c.nome || '').toLowerCase();
+                    return nome.indexOf(q) === 0;
+                })
+                .sort(function (a, b) {
+                    return a.nome.localeCompare(b.nome, 'pt-BR');
+                })
+                .forEach(function (c) {
+                    var opt = document.createElement('option');
+                    opt.value = c.nome;
+                    lista.appendChild(opt);
+                });
+        }
+
+        function atualizarSugestoesClienteAt() {
+            preencherListaClientesAt(carregar(), document.getElementById('atClienteBusca').value);
+            atualizarStatusClienteAt();
         }
 
         /* ---------- Navegação ---------- */
@@ -4790,10 +4957,10 @@
             lista.forEach(function (c) {
                 var tr = document.createElement('tr');
                 tr.innerHTML =
-                    '<td>' + esc(c.nome) + '</td>' +
-                    '<td>' + esc(docCliente(c)) + '</td>' +
-                    '<td>' + esc(c.telefone || '—') + '</td>' +
-                    '<td>' + esc(c.cidade || '—') + '</td>' +
+                    '<td style="color:#fff;font-weight:800">' + esc(c.nome) + '</td>' +
+                    '<td style="color:#fff;font-weight:600">' + esc(docCliente(c)) + '</td>' +
+                    '<td style="color:#fff;font-weight:600">' + esc(c.telefone || '—') + '</td>' +
+                    '<td style="color:#fff;font-weight:600">' + esc(c.cidade || '—') + '</td>' +
                     '<td class="actions">' +
                     '<button type="button" class="btn btn-secondary" data-ed="' + c.id + '">Editar</button>' +
                     '<button type="button" class="btn btn-primary" data-at="' + c.id + '">Atendimento</button>' +
@@ -5990,6 +6157,8 @@
             document.getElementById('atEntrada').value = hojeISO();
             document.getElementById('atStatus').value = 'Em andamento';
             document.getElementById('atAgendadoPara').value = '';
+            var waTel = document.getElementById('atWaTel');
+            if (waTel) waTel.value = '';
             itensTemp = [];
             fotosAtuais = [];
             aplicarChecklistUI({});
@@ -6006,8 +6175,16 @@
         document.getElementById('btnLimparAt').addEventListener('click', limparAtendimento);
         document.getElementById('atStatus').addEventListener('change', atualizarCampoAgendamentoUI);
 
-        document.getElementById('atClienteBusca').addEventListener('input', atualizarStatusClienteAt);
+        document.getElementById('atClienteBusca').addEventListener('input', atualizarSugestoesClienteAt);
         document.getElementById('atClienteBusca').addEventListener('change', atualizarStatusClienteAt);
+        document.getElementById('atClienteBusca').addEventListener('focus', function () {
+            preencherListaClientesAt(carregar(), this.value);
+        });
+        document.getElementById('atClienteBusca').addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                preencherListaClientesAt(carregar(), '');
+            }
+        });
 
         document.getElementById('formAtendimento').addEventListener('submit', async function (e) {
             e.preventDefault();
@@ -6130,6 +6307,10 @@
                 ? (a.clienteNome || '')
                 : (a.clienteNome || nomeCliente(db, a.clienteId));
             atualizarStatusClienteAt();
+            var waTel = document.getElementById('atWaTel');
+            if (waTel) {
+                waTel.value = telefoneDoAtendimento(db, a) || waTel.value || '';
+            }
             document.getElementById('atResponsavel').value = a.responsavel || '';
             document.getElementById('atCarro').value = a.carro || '';
             document.getElementById('atPlaca').value = a.placa || '';
@@ -6343,9 +6524,29 @@
                 '<div class="nota-total compacto">Total: ' + moeda(pecas + mao) + '</div>';
         }
 
+        function htmlBlocoChecklistNota(mapa) {
+            if (!mapa) return '';
+            var linhas = [];
+            Object.keys(CHECKLIST_LABELS).forEach(function (k) {
+                if (mapa[k]) linhas.push('<li>☑ ' + esc(CHECKLIST_LABELS[k]) + '</li>');
+            });
+            if (!linhas.length) return '';
+            return '<div class="nota-bloco compacto"><div class="tit vermelho">Checklist de chegada</div>' +
+                '<ul style="margin:0;padding-left:18px;font-size:0.92rem;line-height:1.45">' + linhas.join('') + '</ul></div>';
+        }
+
+        function textoChecklistLinhas(mapa) {
+            var linhas = [];
+            Object.keys(CHECKLIST_LABELS).forEach(function (k) {
+                if (mapa && mapa[k]) linhas.push('☑ ' + CHECKLIST_LABELS[k]);
+            });
+            return linhas;
+        }
+
         function htmlNotaEspelho(db, a, opts) {
             opts = opts || {};
             var incluirFotos = !!opts.incluirFotos;
+            var tituloDoc = opts.tituloDoc || 'ESPELHO DE ATENDIMENTO';
             var emp = getEmpresa(db);
             var cad = dadosClienteDoAtendimento(db, a);
             var nome = cad.nome || nomeAtendimento(db, a);
@@ -6366,9 +6567,10 @@
                     }).join('') +
                     '</div></div>';
             }
+            var blocoChecklist = htmlBlocoChecklistNota(a.checklist);
             return '<div class="nota-espelho" id="notaEspelhoHtml">' +
                 htmlCabecalhoNotaEmpresa(emp,
-                    '<div class="nota-sub nota-titulo-espelho">ESPELHO DE ATENDIMENTO</div>' +
+                    '<div class="nota-sub nota-titulo-espelho">' + esc(tituloDoc) + '</div>' +
                     '<div class="nota-sub nota-registro">Registro ' + esc(fmtData(a.entrada || a.criadoEm)) +
                     (a.id ? ' · ID ' + esc(String(a.id).slice(-6)) : '') + '</div>'
                 ) +
@@ -6390,6 +6592,7 @@
                 '<div class="nota-campo"><span class="nota-label">Ano modelo</span><span class="nota-valor">' + esc(a.anoModelo || '—') + '</span></div>' +
                 '<div class="nota-campo full"><span class="nota-label">Chassi</span><span class="nota-valor nota-chassi">' + esc((a.chassi || '—').toUpperCase()) + '</span></div>' +
                 '</div></div>' +
+                blocoChecklist +
                 '<div class="nota-bloco compacto"><div class="tit escuro">Oficina, Chegada &amp; Serviços</div><div class="nota-grid nota-grid-compacta">' +
                 '<div class="nota-campo"><span class="nota-label">Responsável</span><span class="nota-valor">' + esc(a.responsavel || '—') + '</span></div>' +
                 '<div class="nota-campo"><span class="nota-label">Status</span><span class="nota-valor">' + esc(a.status || '—') +
@@ -6651,6 +6854,8 @@
                 status: a.status || '',
                 agendadoPara: a.agendadoPara || '',
                 estado: a.estado || '',
+                checklist: a.checklist || null,
+                checklistTexto: textoChecklistLinhas(a.checklist || {}).join('\n'),
                 diagnostico: a.diagnostico || '',
                 servicos: a.servicos || '',
                 itens: a.itens || [],
@@ -6855,13 +7060,13 @@
                 var tr = document.createElement('tr');
                 if (ehAgendado) tr.className = 'linha-agendada';
                 tr.innerHTML =
-                    '<td>' + esc(fmtData(ehAgendado && a.agendadoPara ? a.agendadoPara : (a.entrada || a.criadoEm))) +
+                    '<td style="color:#fff;font-weight:600">' + esc(fmtData(ehAgendado && a.agendadoPara ? a.agendadoPara : (a.entrada || a.criadoEm))) +
                     (ehAgendado ? '<div style="font-size:0.68rem;color:#f1c40f;font-weight:700">agendado</div>' : '') +
                     '</td>' +
-                    '<td>' + badgeAg + esc(nome) + tagAvulso + badgeAssinatura(a) + badgePago + '</td>' +
-                    '<td>' + esc(a.carro || '—') + '</td>' +
-                    '<td>' + esc(a.placa || '—') + '</td>' +
-                    '<td>' + moeda(a.total) + '</td>' +
+                    '<td style="color:#fff;font-weight:800">' + badgeAg + esc(nome) + tagAvulso + badgeAssinatura(a) + badgePago + '</td>' +
+                    '<td style="color:#fff;font-weight:600">' + esc(a.carro || '—') + '</td>' +
+                    '<td style="color:#fff;font-weight:700">' + esc(a.placa || '—') + '</td>' +
+                    '<td style="color:#fff;font-weight:700">' + moeda(a.total) + '</td>' +
                     '<td class="actions">' +
                     '<select class="status-at-select' + (ehAgendado ? ' status-agendado' : '') +
                     '" data-st="' + a.id + '" title="Alterar status" style="min-width:150px;padding:6px 8px;font-size:0.75rem;font-weight:700">' +
@@ -6871,8 +7076,8 @@
                     '<button type="button" class="btn btn-ver" data-ver="' + a.id + '">Ver nota</button>' +
                     '<button type="button" class="btn btn-pdf" data-pdf="' + a.id + '">PDF</button>' +
                     '<button type="button" class="btn btn-assinar" data-link="' + a.id + '">Enviar nota</button>' +
-                    '<button type="button" class="btn btn-ok" data-wa-checklist="' + a.id + '" title="Checklist no WhatsApp">📱 Check</button>' +
-                    '<button type="button" class="btn btn-secondary" data-wa-orc="' + a.id + '" title="Orçamento no WhatsApp">📱 Orç</button>' +
+                    '<button type="button" class="btn btn-ok" data-wa-checklist="' + a.id + '" title="Checklist no WhatsApp (texto/JPEG/PDF/assinar)">📱 Check</button>' +
+                    '<button type="button" class="btn btn-secondary" data-wa-orc="' + a.id + '" title="Orçamento no WhatsApp (texto/JPEG/PDF/assinar)">📱 Orç</button>' +
                     (atendimentoTemFotos(a)
                         ? '<button type="button" class="btn btn-secondary" data-expf="' + a.id + '">Exportar fotos</button>'
                         : '') +
@@ -7080,14 +7285,27 @@
             if (atendimentoNotaAtual) imprimirNotaPdf(atendimentoNotaAtual.id);
         });
         document.getElementById('btnNotaEncaminhar').addEventListener('click', function () {
-            encaminharNotaAtual();
+            if (!atendimentoNotaAtual) {
+                toast('Abra a nota antes.');
+                return;
+            }
+            abrirModalWaEnvio({
+                tipo: 'nota',
+                atendimentoId: atendimentoNotaAtual.id,
+                deFormulario: false
+            });
         });
         document.getElementById('btnNotaSalvarPdf').addEventListener('click', function () {
             salvarNotaPdfArquivo();
         });
         document.getElementById('btnViewerFechar').addEventListener('click', fecharViewerPdf);
         document.getElementById('btnViewerEncaminhar').addEventListener('click', function () {
-            encaminharNotaAtual();
+            var id = atendimentoNotaAtual && atendimentoNotaAtual.id;
+            abrirModalWaEnvio({
+                tipo: 'nota',
+                atendimentoId: id || null,
+                deFormulario: false
+            });
         });
         document.getElementById('btnViewerSalvarPdf').addEventListener('click', function () {
             salvarNotaPdfArquivo();
@@ -7098,7 +7316,7 @@
         });
         document.getElementById('btnNomePdfOk').addEventListener('click', function () {
             var v = document.getElementById('inputNomePdf').value;
-            fecharModalNomePdf(limparNomeArquivoPdf(v));
+            fecharModalNomePdf(v);
         });
         document.getElementById('btnNomePdfCancelar').addEventListener('click', function () {
             fecharModalNomePdf(null);
@@ -7139,7 +7357,7 @@
             var a = atendimentoNotaAtual;
             var nome = a ? nomeAtendimento(db, a) : 'cliente';
             var texto = 'Olá ' + nome + '! A ' + (getEmpresa().nome || 'Joninha Suspensões') +
-                ' enviou o espelho do seu veículo para leitura e assinatura:\n' + link;
+                ' enviou o documento do seu veículo para você *ler e assinar* (ficar de acordo):\n' + link;
             abrirWhatsApp(a ? telefoneDoAtendimento(db, a) : '', texto);
         });
         document.getElementById('btnImportarSig').addEventListener('click', function () {
@@ -10387,9 +10605,342 @@
 
         function telefoneDoAtendimento(db, a) {
             if (!a) return '';
+            if (a.telefoneWa) return a.telefoneWa;
             if (a.clienteCadastro && a.clienteCadastro.telefone) return a.clienteCadastro.telefone;
             var c = (db.clientes || []).find(function (x) { return x.id === a.clienteId; });
             return (c && c.telefone) || '';
+        }
+
+        function obterTelefoneWhatsAppOs() {
+            var manual = (document.getElementById('atWaTel') && document.getElementById('atWaTel').value.trim()) || '';
+            if (manual) return manual;
+            var db = carregar();
+            var id = document.getElementById('atClienteId').value;
+            if (id) {
+                var c = (db.clientes || []).find(function (x) { return x.id === id; });
+                if (c && c.telefone) return c.telefone;
+            }
+            return '';
+        }
+
+        var _waEnvioCtx = null;
+
+        function garantirTelefoneWaEnvio(tel) {
+            if (telWa(tel)) return true;
+            toast('Informe o WhatsApp do cliente (obrigatório se for avulso).');
+            var el = document.getElementById('atWaTel');
+            if (el) {
+                el.focus();
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return false;
+        }
+
+        function montarAtendimentoDoFormulario() {
+            var db = carregar();
+            var resolvido = resolverClienteAtendimento(db, document.getElementById('atClienteBusca').value);
+            var id = document.getElementById('atId').value;
+            var tots = totaisItens(itensTemp);
+            var base = id ? (db.atendimentos || []).find(function (x) { return x.id === id; }) : null;
+            var a = {
+                id: id || ('temp_' + Date.now()),
+                clienteId: resolvido.ok ? resolvido.clienteId : '',
+                clienteNome: (resolvido.ok && resolvido.clienteNome) || document.getElementById('atClienteBusca').value.trim() || 'cliente',
+                clienteAvulso: resolvido.ok ? !!resolvido.clienteAvulso : true,
+                clienteCadastro: resolvido.ok ? snapshotClienteCadastro(db, resolvido) : null,
+                responsavel: document.getElementById('atResponsavel').value.trim(),
+                carro: document.getElementById('atCarro').value.trim(),
+                placa: (document.getElementById('atPlaca').value || '').toUpperCase().trim(),
+                cidadePlaca: document.getElementById('atCidadePlaca').value.trim(),
+                cor: document.getElementById('atCor').value.trim(),
+                anoFabricacao: document.getElementById('atAnoFabricacao').value.trim(),
+                anoModelo: document.getElementById('atAnoModelo').value.trim(),
+                chassi: document.getElementById('atChassi').value.trim(),
+                km: document.getElementById('atKm').value,
+                entrada: document.getElementById('atEntrada').value || hojeISO(),
+                saida: document.getElementById('atSaida').value,
+                status: document.getElementById('atStatus').value,
+                agendadoPara: document.getElementById('atAgendadoPara').value || '',
+                checklist: lerChecklistUI(),
+                estado: document.getElementById('atEstado').value.trim(),
+                diagnostico: (document.getElementById('atDiagnostico') && document.getElementById('atDiagnostico').value.trim()) || '',
+                servicos: document.getElementById('atServicos').value.trim(),
+                itens: itensTemp.slice(),
+                fotos: fotosAtuais.map(function (f) {
+                    return { id: f.id || uid(), data: f.data || null, url: f.url || null };
+                }).filter(function (f) { return f.data || f.url; }),
+                maoObra: tots.mao,
+                totalPecas: tots.pecas,
+                custoPecas: tots.custoPecas,
+                ganhoPecas: tots.ganhoPecas,
+                total: tots.total,
+                tokenAssinatura: base ? base.tokenAssinatura : null,
+                assinaturaCliente: base ? base.assinaturaCliente : null,
+                assinadoEm: base ? base.assinadoEm : null,
+                criadoEm: (base && base.criadoEm) || new Date().toISOString()
+            };
+            var wa = obterTelefoneWhatsAppOs();
+            if (wa && a.clienteCadastro) a.clienteCadastro.telefone = wa;
+            else if (wa) a.telefoneWa = wa;
+            return a;
+        }
+
+        function obterCtxWaAtendimento() {
+            var db = carregar();
+            var ctx = _waEnvioCtx || {};
+            if (ctx.deFormulario) {
+                var formA = montarAtendimentoDoFormulario();
+                return { db: db, a: formA, tel: obterTelefoneWhatsAppOs(), deFormulario: true };
+            }
+            if (ctx.atendimentoId) {
+                var a = (db.atendimentos || []).find(function (x) { return x.id === ctx.atendimentoId; });
+                if (a) return { db: db, a: a, tel: telefoneDoAtendimento(db, a), deFormulario: false };
+            }
+            if (atendimentoNotaAtual) {
+                return {
+                    db: db,
+                    a: atendimentoNotaAtual,
+                    tel: telefoneDoAtendimento(db, atendimentoNotaAtual),
+                    deFormulario: false
+                };
+            }
+            return null;
+        }
+
+        function tituloDocWa(tipo) {
+            if (tipo === 'checklist') return 'CHECKLIST DE CHEGADA';
+            if (tipo === 'orcamento') return 'ORÇAMENTO / DIAGNÓSTICO';
+            return 'ESPELHO DE ATENDIMENTO';
+        }
+
+        function abrirModalWaEnvio(ctx) {
+            _waEnvioCtx = ctx || {};
+            var tit = document.getElementById('modalWaEnvioTitulo');
+            var hint = document.getElementById('modalWaEnvioHint');
+            var tipo = _waEnvioCtx.tipo || 'nota';
+            if (tit) {
+                if (tipo === 'checklist') tit.textContent = 'Checklist no WhatsApp';
+                else if (tipo === 'orcamento') tit.textContent = 'Orçamento no WhatsApp';
+                else tit.textContent = 'Enviar pelo WhatsApp';
+            }
+            if (hint) {
+                hint.textContent = 'Escolha o formato: texto, imagem JPEG, PDF ou link para o cliente ler e assinar.';
+            }
+            document.getElementById('modalWaEnvio').classList.add('aberto');
+        }
+
+        function fecharModalWaEnvio() {
+            document.getElementById('modalWaEnvio').classList.remove('aberto');
+        }
+
+        async function prepararHtmlWaEnvio(incluirFotos) {
+            var info = obterCtxWaAtendimento();
+            if (!info || !info.a) {
+                toast('Documento não encontrado.');
+                return null;
+            }
+            var a = info.a;
+            if (incluirFotos) {
+                a = await garantirFotosCarregadas(a);
+            }
+            var opts = {
+                incluirFotos: !!incluirFotos,
+                tituloDoc: tituloDocWa((_waEnvioCtx && _waEnvioCtx.tipo) || 'nota')
+            };
+            var html = htmlNotaEspelho(info.db, a, opts);
+            _htmlNotaImpressaoAtual = html;
+            atendimentoNotaAtual = a;
+            return { html: html, a: a, tel: info.tel, db: info.db };
+        }
+
+        async function waEnvioTexto() {
+            var tipo = (_waEnvioCtx && _waEnvioCtx.tipo) || 'nota';
+            var id = _waEnvioCtx && _waEnvioCtx.atendimentoId;
+            fecharModalWaEnvio();
+            if (tipo === 'checklist' && id) {
+                enviarWaChecklistSalvo(id);
+                return;
+            }
+            if (tipo === 'orcamento' && id) {
+                enviarWaOrcamentoSalvo(id);
+                return;
+            }
+            if (tipo === 'checklist') {
+                var tel = obterTelefoneWhatsAppOs();
+                if (!garantirTelefoneWaEnvio(tel)) return;
+                var m = montarMsgChecklistAtual();
+                abrirWhatsApp(tel, m.msg);
+                return;
+            }
+            if (tipo === 'orcamento') {
+                var tel2 = obterTelefoneWhatsAppOs();
+                if (!garantirTelefoneWaEnvio(tel2)) return;
+                var m2 = montarMsgOrcamentoAtual();
+                abrirWhatsApp(tel2, m2.msg);
+                return;
+            }
+            var info = obterCtxWaAtendimento();
+            if (!info || !info.a) { toast('Abra a nota antes.'); return; }
+            enviarWaOrcamentoSalvo(info.a.id);
+        }
+
+        async function waEnvioArquivo(formato) {
+            var info0 = obterCtxWaAtendimento();
+            if (!info0 || !info0.a) {
+                toast('Documento não encontrado.');
+                return;
+            }
+            fecharModalWaEnvio();
+            var comFotos = await perguntarEnviarComFotos(info0.a, { forcarPergunta: true });
+            if (comFotos === null) return;
+            var prep = await prepararHtmlWaEnvio(!!comFotos);
+            if (!prep) return;
+            var tel = prep.tel || obterTelefoneWhatsAppOs() || '';
+            var nomeCli = nomeAtendimento(prep.db, prep.a);
+            var emp = getEmpresa().nome || 'Joninha Suspensões';
+            var texto = 'Olá *' + nomeCli + '*, segue o documento da *' + emp + '*.';
+
+            if (formato === 'jpeg') {
+                var nomeJpg = await perguntarNomeArquivoAsync('jpg', 'Nome do JPEG');
+                if (!nomeJpg) return;
+                toast('Gerando JPEG…');
+                try {
+                    var blobJpg = await gerarJpegBlobDaNota(prep.html);
+                    var r1 = await compartilharArquivoCliente(blobJpg, nomeJpg, 'image/jpeg', tel, texto);
+                    if (r1 === 'shared') toast('JPEG pronto — escolha WhatsApp para enviar.');
+                    else if (r1 === 'download') toast('JPEG baixado — anexe no WhatsApp.');
+                } catch (err) {
+                    console.error(err);
+                    toast('Falha ao gerar JPEG. Tente PDF.');
+                }
+                return;
+            }
+
+            var nomePdf = await perguntarNomeArquivoAsync('pdf', 'Nome do PDF');
+            if (!nomePdf) return;
+            toast('Gerando PDF…');
+            try {
+                var blobPdf = await gerarPdfBlobDaNota(prep.html, nomePdf);
+                if (!blobPdf || blobPdf.size < 800) throw new Error('PDF vazio');
+                var r2 = await compartilharArquivoCliente(blobPdf, nomePdf, 'application/pdf', tel, texto);
+                if (r2 === 'shared') toast('PDF pronto — escolha WhatsApp para enviar.');
+                else if (r2 === 'download') toast('PDF baixado — anexe no WhatsApp.');
+            } catch (err2) {
+                console.error(err2);
+                toast('Falha ao gerar PDF.');
+            }
+        }
+
+        function salvarAtendimentoRapidoParaEnvio() {
+            var db = carregar();
+            var resolvido = resolverClienteAtendimento(db, document.getElementById('atClienteBusca').value);
+            if (!resolvido.ok) {
+                toast('Informe o nome do cliente (cadastrado ou avulso) para enviar.');
+                return null;
+            }
+            var st = document.getElementById('atStatus').value;
+            var agData = document.getElementById('atAgendadoPara').value;
+            if (st === 'Agendado' && !agData) {
+                toast('Informe a data agendada antes de enviar.');
+                document.getElementById('atAgendadoPara').focus();
+                return null;
+            }
+            var id = document.getElementById('atId').value;
+            var tots = totaisItens(itensTemp);
+            var payload = {
+                id: id || uid(),
+                clienteId: resolvido.clienteId,
+                clienteNome: resolvido.clienteNome,
+                clienteAvulso: resolvido.clienteAvulso,
+                clienteCadastro: snapshotClienteCadastro(db, resolvido),
+                responsavel: document.getElementById('atResponsavel').value.trim(),
+                carro: document.getElementById('atCarro').value.trim(),
+                placa: (document.getElementById('atPlaca').value || '').toUpperCase().trim(),
+                cidadePlaca: document.getElementById('atCidadePlaca').value.trim(),
+                cor: document.getElementById('atCor').value.trim(),
+                anoFabricacao: document.getElementById('atAnoFabricacao').value.trim(),
+                anoModelo: document.getElementById('atAnoModelo').value.trim(),
+                chassi: document.getElementById('atChassi').value.trim(),
+                km: document.getElementById('atKm').value,
+                entrada: document.getElementById('atEntrada').value || hojeISO(),
+                saida: document.getElementById('atSaida').value,
+                status: document.getElementById('atStatus').value,
+                agendadoPara: document.getElementById('atAgendadoPara').value || '',
+                checklist: lerChecklistUI(),
+                estado: document.getElementById('atEstado').value.trim(),
+                diagnostico: (document.getElementById('atDiagnostico') && document.getElementById('atDiagnostico').value.trim()) || '',
+                servicos: document.getElementById('atServicos').value.trim(),
+                itens: itensTemp.slice(),
+                fotos: fotosAtuais.map(function (f) {
+                    return { id: f.id || uid(), data: f.data || null, url: f.url || null };
+                }).filter(function (f) { return f.data || f.url; }),
+                maoObra: tots.mao,
+                totalPecas: tots.pecas,
+                custoPecas: tots.custoPecas,
+                ganhoPecas: tots.ganhoPecas,
+                total: tots.total,
+                atualizadoEm: new Date().toISOString()
+            };
+            var wa = obterTelefoneWhatsAppOs();
+            if (wa) {
+                if (!payload.clienteCadastro) payload.clienteCadastro = {};
+                payload.clienteCadastro.telefone = wa;
+            }
+            if (id) {
+                var i = db.atendimentos.findIndex(function (a) { return a.id === id; });
+                if (i >= 0) {
+                    if (db.atendimentos[i].tokenAssinatura) payload.tokenAssinatura = db.atendimentos[i].tokenAssinatura;
+                    if (db.atendimentos[i].assinaturaCliente) {
+                        payload.assinaturaCliente = db.atendimentos[i].assinaturaCliente;
+                        payload.assinadoEm = db.atendimentos[i].assinadoEm;
+                    }
+                    db.atendimentos[i] = Object.assign({}, db.atendimentos[i], payload);
+                } else {
+                    payload.criadoEm = new Date().toISOString();
+                    db.atendimentos.push(payload);
+                }
+            } else {
+                payload.criadoEm = new Date().toISOString();
+                db.atendimentos.push(payload);
+            }
+            limparExcluido(db, 'atendimentos', payload.id);
+            salvar(db);
+            document.getElementById('atId').value = payload.id;
+            return payload;
+        }
+
+        async function waEnvioAssinar() {
+            fecharModalWaEnvio();
+            var info = obterCtxWaAtendimento();
+            var id = null;
+
+            if (info && info.deFormulario) {
+                var salvo = salvarAtendimentoRapidoParaEnvio();
+                if (!salvo) return;
+                id = salvo.id;
+            } else if (info && info.a && info.a.id && String(info.a.id).indexOf('temp_') !== 0) {
+                var dbCheck = carregar();
+                var existe = (dbCheck.atendimentos || []).some(function (x) { return x.id === info.a.id; });
+                if (existe) {
+                    id = info.a.id;
+                } else {
+                    var salvo2 = salvarAtendimentoRapidoParaEnvio();
+                    if (!salvo2) return;
+                    id = salvo2.id;
+                }
+            } else {
+                var salvo3 = salvarAtendimentoRapidoParaEnvio();
+                if (!salvo3) return;
+                id = salvo3.id;
+            }
+
+            await abrirLinkAssinatura(id);
+        }
+
+        function enviarWhatsAppOs(tipo) {
+            var tel = obterTelefoneWhatsAppOs();
+            if (!garantirTelefoneWaEnvio(tel)) return;
+            abrirModalWaEnvio({ tipo: tipo, deFormulario: true });
         }
 
         function montarMsgChecklistAtual() {
@@ -10407,11 +10958,7 @@
             if (km) msg += '*Km:* ' + km + '\n';
             msg += '\n' + textoChecklist(chk, obs).replace('*Checklist do veículo — Joninha Suspensões*\n\n', '');
             msg += '\n\nQualquer dúvida, estamos à disposição.';
-            return { msg: msg, telefone: (function () {
-                var id = document.getElementById('atClienteId').value;
-                var c = (db.clientes || []).find(function (x) { return x.id === id; });
-                return (c && c.telefone) || '';
-            })() };
+            return { msg: msg, telefone: obterTelefoneWhatsAppOs() };
         }
 
         function montarMsgOrcamentoAtual() {
@@ -10438,9 +10985,7 @@
             msg += '\n*Mão de obra:* ' + moeda(tot.mao);
             msg += '\n*Total:* ' + moeda(tot.total) + '\n';
             msg += '\nAguardamos sua aprovação. Obrigado!';
-            var id = document.getElementById('atClienteId').value;
-            var c = (db.clientes || []).find(function (x) { return x.id === id; });
-            return { msg: msg, telefone: (c && c.telefone) || '' };
+            return { msg: msg, telefone: obterTelefoneWhatsAppOs() };
         }
 
         function enviarWaChecklistSalvo(id) {
@@ -10783,13 +11328,11 @@
         (function ligarExtrasJoninha() {
             var bChk = document.getElementById('btnWaChecklist');
             if (bChk) bChk.addEventListener('click', function () {
-                var m = montarMsgChecklistAtual();
-                abrirWhatsApp(m.telefone, m.msg);
+                enviarWhatsAppOs('checklist');
             });
             var bOr = document.getElementById('btnWaOrcamento');
             if (bOr) bOr.addEventListener('click', function () {
-                var m = montarMsgOrcamentoAtual();
-                abrirWhatsApp(m.telefone, m.msg);
+                enviarWhatsAppOs('orcamento');
             });
             var bFechar = document.getElementById('btnFecharCaixaDia');
             if (bFechar) bFechar.addEventListener('click', fecharCaixaDoDia);
@@ -10846,9 +11389,30 @@
                 var t = ev.target;
                 if (!t || !t.getAttribute) return;
                 var waC = t.getAttribute('data-wa-checklist');
-                if (waC) { enviarWaChecklistSalvo(waC); return; }
+                if (waC) {
+                    abrirModalWaEnvio({ tipo: 'checklist', atendimentoId: waC, deFormulario: false });
+                    return;
+                }
                 var waO = t.getAttribute('data-wa-orc');
-                if (waO) { enviarWaOrcamentoSalvo(waO); return; }
+                if (waO) {
+                    abrirModalWaEnvio({ tipo: 'orcamento', atendimentoId: waO, deFormulario: false });
+                    return;
+                }
+            });
+
+            var bWaTxt = document.getElementById('btnWaModoTexto');
+            if (bWaTxt) bWaTxt.addEventListener('click', function () { waEnvioTexto(); });
+            var bWaJpg = document.getElementById('btnWaModoJpeg');
+            if (bWaJpg) bWaJpg.addEventListener('click', function () { waEnvioArquivo('jpeg'); });
+            var bWaPdf = document.getElementById('btnWaModoPdf');
+            if (bWaPdf) bWaPdf.addEventListener('click', function () { waEnvioArquivo('pdf'); });
+            var bWaSig = document.getElementById('btnWaModoAssinar');
+            if (bWaSig) bWaSig.addEventListener('click', function () { waEnvioAssinar(); });
+            var bWaCan = document.getElementById('btnWaModoCancelar');
+            if (bWaCan) bWaCan.addEventListener('click', fecharModalWaEnvio);
+            var modalWa = document.getElementById('modalWaEnvio');
+            if (modalWa) modalWa.addEventListener('click', function (e) {
+                if (e.target.id === 'modalWaEnvio') fecharModalWaEnvio();
             });
         })();
 
