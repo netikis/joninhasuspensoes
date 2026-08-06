@@ -3405,7 +3405,7 @@
         <section id="painelConfigLoginFunc" class="panel">
             <div class="box">
                 <h2>Acesso do funcionário ao painel</h2>
-                <p class="hint">Cadastre <strong>login e senha</strong> para o funcionário entrar na aba <strong>Funcionário</strong>. O funcionário precisa estar em <strong>FUNCIONÁRIO → Cadastro de Funcionários</strong>.</p>
+                <p class="hint">Cadastre <strong>login e senha</strong> para o funcionário entrar na aba <strong>Funcionário</strong>. Use o <strong>mesmo site e navegador</strong> onde salvou o acesso. O funcionário precisa estar em <strong>FUNCIONÁRIO → Cadastro de Funcionários</strong>.</p>
                 <form id="formLoginFuncCfg">
                     <div class="row">
                         <div class="col" style="flex:1.4">
@@ -3629,6 +3629,7 @@
         /** Banco exclusivo deste index — não usa chaves dos outros sistemas */
         var STORAGE_KEY = 'joninha_suspensoes_v1';
         var STORAGE_INTERNO = 'joninha_suspensoes_interno_v1';
+        var STORAGE_LOGINS_FUNC = 'joninha_suspensoes_logins_func_v1';
         var ASSIN_KEY = 'joninha_suspensoes_assinaturas';
         var atendimentoNotaAtual = null;
         var canalVendas = 'normal'; /* normal | interno */
@@ -12323,6 +12324,107 @@
             }
         }
 
+        function normalizarLoginFunc(s) {
+            return String(s || '')
+                .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                .trim()
+                .toLowerCase();
+        }
+
+        function normalizarSenhaFunc(s) {
+            return String(s || '')
+                .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                .trim();
+        }
+
+        function carregarMapaLoginsFunc() {
+            var map = {};
+            try {
+                var raw = localStorage.getItem(STORAGE_LOGINS_FUNC);
+                if (raw) map = JSON.parse(raw) || {};
+            } catch (e) { map = {}; }
+            if (!map || typeof map !== 'object') map = {};
+            /* Reconstrói a partir dos funcionários (caso o mapa esteja vazio/desatualizado) */
+            listarFuncionariosInterno().forEach(function (f) {
+                if (!f || !f.id) return;
+                var u = normalizarLoginFunc(f.loginUsuario);
+                var s = normalizarSenhaFunc(f.loginSenha);
+                if (!u || !s) return;
+                map[u] = {
+                    funcionarioId: f.id,
+                    senha: s,
+                    nome: f.nome || '',
+                    atualizadoEm: f.atualizadoEm || new Date().toISOString()
+                };
+            });
+            return map;
+        }
+
+        function persistirMapaLoginsFunc(map) {
+            try {
+                localStorage.setItem(STORAGE_LOGINS_FUNC, JSON.stringify(map || {}));
+            } catch (e) {
+                toast('Não foi possível gravar o login do funcionário neste navegador.');
+            }
+        }
+
+        function salvarCredencialLoginFunc(funcionario, usuario, senha) {
+            var u = normalizarLoginFunc(usuario);
+            var s = normalizarSenhaFunc(senha);
+            if (!funcionario || !funcionario.id || !u || !s) return false;
+            var map = {};
+            try { map = JSON.parse(localStorage.getItem(STORAGE_LOGINS_FUNC) || '{}') || {}; } catch (e) { map = {}; }
+            Object.keys(map).forEach(function (k) {
+                if (map[k] && String(map[k].funcionarioId) === String(funcionario.id)) delete map[k];
+            });
+            map[u] = {
+                funcionarioId: funcionario.id,
+                senha: s,
+                nome: funcionario.nome || '',
+                atualizadoEm: new Date().toISOString()
+            };
+            persistirMapaLoginsFunc(map);
+
+            var lista = listarFuncionariosInterno();
+            var i = lista.findIndex(function (x) { return x.id === funcionario.id; });
+            if (i >= 0) {
+                lista[i].loginUsuario = u;
+                lista[i].loginSenha = s;
+                lista[i].atualizadoEm = new Date().toISOString();
+                salvarFuncionariosInterno(lista);
+            }
+            return true;
+        }
+
+        function autenticarFuncionarioLogin(usuario, senha) {
+            var u = normalizarLoginFunc(usuario);
+            var s = normalizarSenhaFunc(senha);
+            if (!u || !s) return null;
+
+            var map = carregarMapaLoginsFunc();
+            var cred = map[u];
+            if (cred && normalizarSenhaFunc(cred.senha) === s) {
+                var f = listarFuncionariosInterno().find(function (x) {
+                    return x && String(x.id) === String(cred.funcionarioId);
+                });
+                if (f && f.ativo === false) return null;
+                if (f) return f;
+                return {
+                    id: cred.funcionarioId,
+                    nome: cred.nome || u,
+                    ativo: true,
+                    loginUsuario: u,
+                    loginSenha: s
+                };
+            }
+
+            return listarFuncionariosInterno().find(function (x) {
+                if (!x || x.ativo === false) return false;
+                return normalizarLoginFunc(x.loginUsuario) === u &&
+                    normalizarSenhaFunc(x.loginSenha) === s;
+            }) || null;
+        }
+
         function renderLoginsFuncCfg() {
             var sel = document.getElementById('cfgLoginFuncId');
             var tb = document.getElementById('tabelaLoginsFunc');
@@ -12381,10 +12483,17 @@
                     delete lista[i].loginUsuario;
                     delete lista[i].loginSenha;
                     salvarFuncionariosInterno(lista);
+                    var map = {};
+                    try { map = JSON.parse(localStorage.getItem(STORAGE_LOGINS_FUNC) || '{}') || {}; } catch (e) { map = {}; }
+                    Object.keys(map).forEach(function (k) {
+                        if (map[k] && String(map[k].funcionarioId) === String(id)) delete map[k];
+                    });
+                    persistirMapaLoginsFunc(map);
                     toast('Acesso removido.');
                     renderLoginsFuncCfg();
                 });
             });
+            persistirMapaLoginsFunc(carregarMapaLoginsFunc());
         }
 
         function preencherSelectLoginFunc() {
@@ -12462,21 +12571,21 @@
             var btnLF = document.getElementById('btnLoginFunc');
             if (btnLF) btnLF.addEventListener('click', function () {
                 try {
-                    var user = (document.getElementById('loginFuncUser').value || '').trim().toLowerCase();
-                    var senha = (document.getElementById('loginFuncSenha').value || '').trim();
-                    if (!user || !senha) {
+                    var user = document.getElementById('loginFuncUser').value;
+                    var senha = document.getElementById('loginFuncSenha').value;
+                    if (!normalizarLoginFunc(user) || !normalizarSenhaFunc(senha)) {
                         mostrarErroLogin('Informe o login e a senha.');
                         return;
                     }
-                    var funcs = listarFuncionariosInterno();
-                    var f = funcs.find(function (x) {
-                        if (!x || x.ativo === false) return false;
-                        var u = String(x.loginUsuario || '').trim().toLowerCase();
-                        var s = String(x.loginSenha || '').trim();
-                        return u === user && s === senha;
-                    });
+                    var f = autenticarFuncionarioLogin(user, senha);
                     if (!f) {
-                        mostrarErroLogin('Login ou senha incorretos. Cadastre em Sistema → Acesso do funcionário.');
+                        var map = carregarMapaLoginsFunc();
+                        var uNorm = normalizarLoginFunc(user);
+                        if (map[uNorm]) {
+                            mostrarErroLogin('Senha incorreta para este login.');
+                        } else {
+                            mostrarErroLogin('Login não encontrado neste aparelho. Cadastre de novo em Sistema → Acesso do funcionário (no mesmo navegador/site).');
+                        }
                         return;
                     }
                     mostrarErroLogin('');
@@ -12501,23 +12610,30 @@
             if (formLoginCfg) formLoginCfg.addEventListener('submit', function (e) {
                 e.preventDefault();
                 var fid = document.getElementById('cfgLoginFuncId').value;
-                var usuario = (document.getElementById('cfgLoginUsuario').value || '').trim();
-                var senha = (document.getElementById('cfgLoginSenha').value || '').trim();
+                var usuario = document.getElementById('cfgLoginUsuario').value;
+                var senha = document.getElementById('cfgLoginSenha').value;
                 if (!fid) { toast('Selecione o funcionário.'); return; }
-                if (!usuario || !senha) { toast('Informe login e senha.'); return; }
+                if (!normalizarLoginFunc(usuario) || !normalizarSenhaFunc(senha)) {
+                    toast('Informe login e senha.');
+                    return;
+                }
                 var lista = listarFuncionariosInterno();
                 var i = lista.findIndex(function (x) { return x.id === fid; });
                 if (i < 0) { toast('Funcionário não encontrado. Cadastre em FUNCIONÁRIO.'); return; }
-                var userLow = usuario.toLowerCase();
+                var userLow = normalizarLoginFunc(usuario);
                 var conflito = lista.some(function (x) {
-                    return x.id !== fid && String(x.loginUsuario || '').trim().toLowerCase() === userLow;
+                    return x.id !== fid && normalizarLoginFunc(x.loginUsuario) === userLow;
                 });
+                var mapChk = carregarMapaLoginsFunc();
+                if (mapChk[userLow] && String(mapChk[userLow].funcionarioId) !== String(fid)) {
+                    conflito = true;
+                }
                 if (conflito) { toast('Este login já está em uso por outro funcionário.'); return; }
-                lista[i].loginUsuario = usuario;
-                lista[i].loginSenha = senha;
-                lista[i].atualizadoEm = new Date().toISOString();
-                salvarFuncionariosInterno(lista);
-                toast('Login/senha salvos para ' + (lista[i].nome || 'funcionário') + '.');
+                if (!salvarCredencialLoginFunc(lista[i], usuario, senha)) {
+                    toast('Falha ao salvar login.');
+                    return;
+                }
+                toast('Login/senha salvos para ' + (lista[i].nome || 'funcionário') + '. Use na aba Funcionário.');
                 document.getElementById('cfgLoginUsuario').value = '';
                 document.getElementById('cfgLoginSenha').value = '';
                 document.getElementById('cfgLoginFuncId').value = '';
