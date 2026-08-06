@@ -3112,7 +3112,7 @@
 
             <div class="box">
                 <h2>Despesas por OS (Modo Interno)</h2>
-                <p class="hint">Lista as OS do balcão oficial. Lance aqui as <strong>despesas internas</strong> do serviço (só no banco interno) para fechar o lucro: bruto − despesas.</p>
+                <p class="hint">Lista as OS do balcão oficial. Lance aqui as <strong>despesas internas</strong> do serviço (só no banco interno) para fechar o lucro: bruto − despesas. Use <strong>Excluir</strong> para tirar a OS desta lista e apagar as despesas internas dela.</p>
                 <div class="toolbar">
                     <input type="search" id="buscaDespesasOs" class="search" placeholder="Buscar OS por cliente, placa, veículo...">
                     <button type="button" class="btn btn-secondary" id="btnAtualizarDespesasOs">🔄 Atualizar</button>
@@ -3154,6 +3154,7 @@
                     </div>
                     <div class="row" style="margin-top:14px">
                         <button type="submit" class="btn btn-primary">Lançar despesa interna</button>
+                        <button type="button" class="btn btn-danger" id="btnLimparDespesasOs">🧹 Limpar despesas desta OS</button>
                         <button type="button" class="btn btn-secondary" id="btnCancelarDespesaOs">Fechar</button>
                     </div>
                 </form>
@@ -6041,6 +6042,22 @@
                     db.caixaBanco = mesclarListaPorId(db.caixaBanco, baseNuv.caixaBanco, ex.caixaBanco);
                     db.pendentes = mesclarListaPorId(db.pendentes, baseNuv.pendentes, ex.pendentes);
                     db.caixaConfig = mesclarCaixaConfig(db.caixaConfig, baseNuv.caixaConfig);
+                    /* Remove da nuvem qualquer OS que o usuário já excluiu do caixa */
+                    var bloq = (db.caixaConfig && db.caixaConfig.osBloqueadasCaixa) || {};
+                    if (Object.keys(bloq).length) {
+                        db.caixa = (db.caixa || []).filter(function (x) {
+                            if (!x || !x.atendimentoId) return true;
+                            if (!bloq[x.atendimentoId] && !bloq[String(x.atendimentoId)]) return true;
+                            marcarExcluido(db, 'caixa', x.id);
+                            return false;
+                        });
+                        db.caixaBanco = (db.caixaBanco || []).filter(function (x) {
+                            if (!x || !x.atendimentoId) return true;
+                            if (!bloq[x.atendimentoId] && !bloq[String(x.atendimentoId)]) return true;
+                            marcarExcluido(db, 'caixaBanco', x.id);
+                            return false;
+                        });
+                    }
                 } else {
                     db.excluidos = garantirExcluidos(db);
                     db.empresa = await hidratarLogoEmpresa(db.empresa);
@@ -8603,6 +8620,57 @@
         /* ---------- Despesas por OS (Modo Interno) ---------- */
         var despesaOsSelecionadaId = null;
 
+        function obterOsOcultasDespesas() {
+            var intDb = carregarInternoRaw();
+            if (!intDb.despesasOsOcultas || typeof intDb.despesasOsOcultas !== 'object') {
+                return {};
+            }
+            return intDb.despesasOsOcultas;
+        }
+
+        function ocultarOsDespesas(atendimentoId) {
+            if (!atendimentoId) return;
+            var intDb = carregarInternoRaw();
+            if (!intDb.despesasOsOcultas || typeof intDb.despesasOsOcultas !== 'object') {
+                intDb.despesasOsOcultas = {};
+            }
+            intDb.despesasOsOcultas[String(atendimentoId)] = new Date().toISOString();
+            salvarInternoRaw(intDb);
+        }
+
+        function limparDespesasInternasDaOs(atendimentoId) {
+            if (!atendimentoId) return 0;
+            var canalAntes = canalVendas;
+            canalVendas = 'interno';
+            var db = carregar();
+            var antes = (db.caixa || []).length;
+            db.caixa = (db.caixa || []).filter(function (x) {
+                return !(x && x.tipo === 'saida' && String(x.atendimentoId) === String(atendimentoId));
+            });
+            var removidos = antes - (db.caixa || []).length;
+            if (removidos > 0) salvar(db);
+            canalVendas = canalAntes;
+            return removidos;
+        }
+
+        function excluirOsDaListaDespesas(atendimentoId) {
+            if (!atendimentoId) return;
+            if (!confirm(
+                'Excluir esta OS da lista Despesas por OS?\n\n' +
+                '• Apaga as despesas internas lançadas nela\n' +
+                '• Remove a OS desta tela\n' +
+                '(A OS oficial no Histórico / Oficina NÃO é apagada.)'
+            )) return;
+            var n = limparDespesasInternasDaOs(atendimentoId);
+            ocultarOsDespesas(atendimentoId);
+            if (despesaOsSelecionadaId === atendimentoId) fecharBoxDespesaOs();
+            toast(n > 0
+                ? 'OS removida da lista e ' + n + ' despesa(s) apagada(s).'
+                : 'OS removida da lista Despesas por OS.');
+            renderDespesasOs();
+            if (typeof gerarArvorePastasDespesasOs === 'function') gerarArvorePastasDespesasOs();
+        }
+
         function listarDespesasInternasPorOs(atendimentoId) {
             var intDb = carregarInternoRaw();
             return (intDb.caixa || []).filter(function (x) {
@@ -8703,8 +8771,13 @@
             var panel = document.getElementById('painelDespesasOs');
             if (!panel) return;
             var main = carregarMain();
+            var ocultas = obterOsOcultasDespesas();
             var q = (document.getElementById('buscaDespesasOs').value || '').toLowerCase().trim();
-            var lista = (main.atendimentos || []).slice().sort(function (a, b) {
+            var lista = (main.atendimentos || []).slice().filter(function (a) {
+                if (!a || !a.id) return false;
+                if (ocultas[a.id] || ocultas[String(a.id)]) return false;
+                return true;
+            }).sort(function (a, b) {
                 return String(b.entrada || b.criadoEm || '').localeCompare(String(a.entrada || a.criadoEm || ''));
             });
             if (q) {
@@ -8747,14 +8820,20 @@
                     '<td>' + moeda(r.bruto) + '</td>' +
                     '<td>' + moeda(r.despesas) + '</td>' +
                     '<td><strong>' + moeda(r.lucro) + '</strong></td>' +
-                    '<td class="actions">' +
-                    '<button type="button" class="btn btn-primary" data-dos-abrir="' + esc(a.id) + '">Despesas</button>' +
+                    '<td class="actions" style="white-space:nowrap">' +
+                    '<button type="button" class="btn btn-primary" data-dos-abrir="' + esc(a.id) + '">Despesas</button> ' +
+                    '<button type="button" class="btn btn-danger" data-dos-excluir-os="' + esc(a.id) + '">Excluir</button>' +
                     '</td>';
                 tb.appendChild(tr);
             });
             tb.querySelectorAll('[data-dos-abrir]').forEach(function (b) {
                 b.addEventListener('click', function () {
                     abrirLancarDespesaOs(b.getAttribute('data-dos-abrir'));
+                });
+            });
+            tb.querySelectorAll('[data-dos-excluir-os]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    excluirOsDaListaDespesas(b.getAttribute('data-dos-excluir-os'));
                 });
             });
 
@@ -8770,6 +8849,8 @@
                             '</strong> · Lucro: <strong>' + moeda(resumo.lucro) + '</strong>';
                         renderDespesasOsDetalhe(despesaOsSelecionadaId);
                     }
+                } else {
+                    fecharBoxDespesaOs();
                 }
             }
         }
@@ -8831,6 +8912,18 @@
 
         document.getElementById('formDespesaOs').addEventListener('submit', lancarDespesaOs);
         document.getElementById('btnCancelarDespesaOs').addEventListener('click', fecharBoxDespesaOs);
+        document.getElementById('btnLimparDespesasOs').addEventListener('click', function () {
+            var id = despesaOsSelecionadaId || document.getElementById('dosAtendimentoId').value;
+            if (!id) {
+                toast('Nenhuma OS selecionada.');
+                return;
+            }
+            if (!confirm('Apagar TODAS as despesas internas desta OS?')) return;
+            var n = limparDespesasInternasDaOs(id);
+            toast(n > 0 ? n + ' despesa(s) apagada(s).' : 'Esta OS não tinha despesas internas.');
+            renderDespesasOsDetalhe(id);
+            renderDespesasOs();
+        });
         document.getElementById('btnAtualizarDespesasOs').addEventListener('click', function () {
             renderDespesasOs();
             toast('Lista de OS atualizada.');
@@ -9480,6 +9573,83 @@
         document.getElementById('btnZerarCaixa').addEventListener('click', zerarPainelCaixa);
         document.getElementById('btnSincronizarPainelCaixa').addEventListener('click', sincronizarPainelCaixa);
 
+        function bloquearOsNoCaixa(db, atendimentoId) {
+            if (!db || !atendimentoId) return;
+            var cfg = getCaixaConfig(db);
+            if (!cfg.osBloqueadasCaixa || typeof cfg.osBloqueadasCaixa !== 'object') {
+                cfg.osBloqueadasCaixa = {};
+            }
+            cfg.osBloqueadasCaixa[String(atendimentoId)] = new Date().toISOString();
+            cfg.atualizadoEm = new Date().toISOString();
+            db.caixaConfig = cfg;
+        }
+
+        function excluirLancamentoCaixaBalcao(idLanc, atendimentoIdHint) {
+            var db = carregarMain();
+            var idEx = String(idLanc || '').trim();
+            var atId = String(atendimentoIdHint || '').trim();
+            var removidos = [];
+
+            function coletar(lista, nomeLista) {
+                return (lista || []).filter(function (x) {
+                    if (!x) return false;
+                    var mesmoId = idEx && String(x.id) === idEx;
+                    var mesmaOs = atId && x.atendimentoId && String(x.atendimentoId) === atId;
+                    if (mesmoId || mesmaOs) {
+                        removidos.push({ id: x.id, atendimentoId: x.atendimentoId, lista: nomeLista });
+                        return false;
+                    }
+                    return true;
+                });
+            }
+
+            /* Se não achou pelo hint, tenta descobrir a OS pelo id do lançamento */
+            if (!atId && idEx) {
+                var achado = (db.caixa || []).concat(db.caixaBanco || []).find(function (x) {
+                    return x && String(x.id) === idEx;
+                });
+                if (achado && achado.atendimentoId) atId = String(achado.atendimentoId);
+            }
+
+            db.caixa = coletar(db.caixa, 'caixa');
+            db.caixaBanco = coletar(db.caixaBanco, 'caixaBanco');
+
+            if (!removidos.length && idEx) {
+                /* fallback: remove só pelo id em qualquer lista */
+                db.caixa = (db.caixa || []).filter(function (x) {
+                    if (x && String(x.id) === idEx) {
+                        removidos.push({ id: x.id, atendimentoId: x.atendimentoId, lista: 'caixa' });
+                        return false;
+                    }
+                    return true;
+                });
+                db.caixaBanco = (db.caixaBanco || []).filter(function (x) {
+                    if (x && String(x.id) === idEx) {
+                        removidos.push({ id: x.id, atendimentoId: x.atendimentoId, lista: 'caixaBanco' });
+                        return false;
+                    }
+                    return true;
+                });
+            }
+
+            if (!removidos.length) {
+                toast('Não encontrei esse lançamento para excluir.');
+                return false;
+            }
+
+            removidos.forEach(function (r) {
+                if (r.lista === 'caixaBanco') marcarExcluido(db, 'caixaBanco', r.id);
+                else marcarExcluido(db, 'caixa', r.id);
+                if (r.atendimentoId) bloquearOsNoCaixa(db, r.atendimentoId);
+            });
+            if (atId) bloquearOsNoCaixa(db, atId);
+
+            salvarMain(db);
+            agendarSyncAutomatico('salvar');
+            toast('Excluído do caixa (' + removidos.length + ').');
+            return true;
+        }
+
         function classificarTipoCaixaFh(x) {
             if (x.tipo === 'saida' || x.tipo === 'DESPESA') return { sigla: 'DESPESAS', cls: 'despesas' };
             if (x.tipo === 'fechamento' || x.origemFechamento) return { sigla: 'FECH.CAIXA', cls: 'fech' };
@@ -9504,7 +9674,13 @@
             /* Sempre lê o caixa oficial da empresa (não o banco interno) */
             var db = carregarMain();
             var cfg = getCaixaConfig(db);
-            var lista = db.caixa || [];
+            var exCx = garantirExcluidos(db).caixa || {};
+            var lista = aplicarExcluidosNaLista(db.caixa || [], exCx);
+            /* Se ficou algum excluído no array, limpa de vez */
+            if (lista.length !== (db.caixa || []).length) {
+                db.caixa = lista;
+                salvarMain(db);
+            }
             var entradasBrutas = somarLista(lista, 'entrada');
             var saidasBrutas = somarLista(lista, 'saida');
             var entradas = Math.max(0, entradasBrutas - (Number(cfg.basePainelEntradas) || 0));
@@ -9578,15 +9754,6 @@
                     else assHtml = '<span style="color:#e74c3c">❌ Pend</span>';
                 }
 
-                var acoes = '<div class="cx-acoes-fh">';
-                if (x.atendimentoId) {
-                    acoes += '<button type="button" class="btn btn-secondary" data-cx-ver="' + esc(x.atendimentoId) + '">Ver</button>';
-                    acoes += '<button type="button" class="btn btn-pdf" data-cx-pdf="' + esc(x.atendimentoId) + '">PDF</button>';
-                    acoes += '<button type="button" class="btn btn-assinar" data-cx-link="' + esc(x.atendimentoId) + '">Link</button>';
-                }
-                acoes += '<button type="button" class="btn btn-danger" data-ex="' + esc(x.id) + '">🗑️</button>';
-                acoes += '</div>';
-
                 var tr = document.createElement('tr');
                 tr.innerHTML =
                     '<td style="font-weight:800">' + esc(doc) + '</td>' +
@@ -9597,44 +9764,75 @@
                     '<td style="color:' + valorCor + ';font-weight:800">' + moeda(x.valor) + '</td>' +
                     '<td style="text-align:center">' + statusHtml + '</td>' +
                     '<td style="text-align:center;font-size:0.8rem">' + assHtml + '</td>' +
-                    '<td>' + acoes + '</td>';
+                    '<td class="cx-acoes-cell"></td>';
+                var acoesCell = tr.querySelector('.cx-acoes-cell');
+                var wrap = document.createElement('div');
+                wrap.className = 'cx-acoes-fh';
+                if (x.atendimentoId) {
+                    var bVer = document.createElement('button');
+                    bVer.type = 'button';
+                    bVer.className = 'btn btn-secondary';
+                    bVer.textContent = 'Ver';
+                    bVer.setAttribute('data-cx-ver', String(x.atendimentoId));
+                    wrap.appendChild(bVer);
+                    var bPdf = document.createElement('button');
+                    bPdf.type = 'button';
+                    bPdf.className = 'btn btn-pdf';
+                    bPdf.textContent = 'PDF';
+                    bPdf.setAttribute('data-cx-pdf', String(x.atendimentoId));
+                    wrap.appendChild(bPdf);
+                    var bLink = document.createElement('button');
+                    bLink.type = 'button';
+                    bLink.className = 'btn btn-assinar';
+                    bLink.textContent = 'Link';
+                    bLink.setAttribute('data-cx-link', String(x.atendimentoId));
+                    wrap.appendChild(bLink);
+                }
+                var bEx = document.createElement('button');
+                bEx.type = 'button';
+                bEx.className = 'btn btn-danger';
+                bEx.textContent = 'Excluir';
+                bEx.setAttribute('data-ex', String(x.id || ''));
+                if (x.atendimentoId) bEx.setAttribute('data-ex-at', String(x.atendimentoId));
+                wrap.appendChild(bEx);
+                acoesCell.appendChild(wrap);
                 tb.appendChild(tr);
             });
 
-            tb.querySelectorAll('[data-ex]').forEach(function (b) {
-                b.addEventListener('click', function () {
-                    if (!confirm('Excluir lançamento do balcão?')) return;
-                    var db2 = carregarMain();
-                    var idEx = b.getAttribute('data-ex');
-                    var lanc = (db2.caixa || []).find(function (x) { return x.id === idEx; });
-                    marcarExcluido(db2, 'caixa', idEx);
-                    db2.caixa = (db2.caixa || []).filter(function (x) { return x.id !== idEx; });
-                    /* Impede a sync da oficina recolocar a mesma OS paga */
-                    if (lanc && lanc.atendimentoId) {
-                        var cfg = getCaixaConfig(db2);
-                        if (!cfg.osBloqueadasCaixa || typeof cfg.osBloqueadasCaixa !== 'object') {
-                            cfg.osBloqueadasCaixa = {};
+            if (!tb._cxClickLigado) {
+                tb._cxClickLigado = true;
+                tb.addEventListener('click', function (e) {
+                    var bEx = e.target.closest('[data-ex]');
+                    if (bEx) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!confirm('Excluir este lançamento do caixa / balcão?')) return;
+                        var ok = excluirLancamentoCaixaBalcao(
+                            bEx.getAttribute('data-ex'),
+                            bEx.getAttribute('data-ex-at')
+                        );
+                        if (ok) {
+                            renderCaixa();
+                            atualizarKPIs(carregarMain());
                         }
-                        cfg.osBloqueadasCaixa[lanc.atendimentoId] = new Date().toISOString();
-                        cfg.atualizadoEm = new Date().toISOString();
-                        db2.caixaConfig = cfg;
+                        return;
                     }
-                    salvarMain(db2);
-                    agendarSyncAutomatico('salvar');
-                    toast('Lançamento excluído do balcão.');
-                    renderCaixa();
-                    atualizarKPIs(db2);
+                    var bVer = e.target.closest('[data-cx-ver]');
+                    if (bVer) {
+                        abrirNota(bVer.getAttribute('data-cx-ver'));
+                        return;
+                    }
+                    var bPdf = e.target.closest('[data-cx-pdf]');
+                    if (bPdf) {
+                        imprimirNotaPdf(bPdf.getAttribute('data-cx-pdf'));
+                        return;
+                    }
+                    var bLink = e.target.closest('[data-cx-link]');
+                    if (bLink) {
+                        abrirLinkAssinatura(bLink.getAttribute('data-cx-link'));
+                    }
                 });
-            });
-            tb.querySelectorAll('[data-cx-ver]').forEach(function (b) {
-                b.addEventListener('click', function () { abrirNota(b.getAttribute('data-cx-ver')); });
-            });
-            tb.querySelectorAll('[data-cx-pdf]').forEach(function (b) {
-                b.addEventListener('click', function () { imprimirNotaPdf(b.getAttribute('data-cx-pdf')); });
-            });
-            tb.querySelectorAll('[data-cx-link]').forEach(function (b) {
-                b.addEventListener('click', function () { abrirLinkAssinatura(b.getAttribute('data-cx-link')); });
-            });
+            }
         }
 
         (function ligarBuscaCaixaBalcao() {
@@ -9685,7 +9883,25 @@
         function renderCaixaBanco() {
             var db = carregarMain();
             var cfg = getCaixaConfig(db);
-            var lista = db.caixaBanco || [];
+            var exBk = garantirExcluidos(db).caixaBanco || {};
+            var lista = aplicarExcluidosNaLista(db.caixaBanco || [], exBk);
+            var bloq = (cfg.osBloqueadasCaixa && typeof cfg.osBloqueadasCaixa === 'object') ? cfg.osBloqueadasCaixa : {};
+            if (Object.keys(bloq).length) {
+                var antes = lista.length;
+                lista = lista.filter(function (x) {
+                    if (!x || !x.atendimentoId) return true;
+                    if (!bloq[x.atendimentoId] && !bloq[String(x.atendimentoId)]) return true;
+                    marcarExcluido(db, 'caixaBanco', x.id);
+                    return false;
+                });
+                if (lista.length !== antes || lista.length !== (db.caixaBanco || []).length) {
+                    db.caixaBanco = lista;
+                    salvarMain(db);
+                }
+            } else if (lista.length !== (db.caixaBanco || []).length) {
+                db.caixaBanco = lista;
+                salvarMain(db);
+            }
             var entradas = somarLista(lista, 'entrada');
             var saidas = somarLista(lista, 'saida');
             var inicial = Number(cfg.inicialBanco) || 0;
@@ -9705,27 +9921,43 @@
             }
             lista.slice().reverse().forEach(function (x) {
                 var tr = document.createElement('tr');
+                var tdAcoes = document.createElement('td');
+                tdAcoes.className = 'actions';
+                var bEx = document.createElement('button');
+                bEx.type = 'button';
+                bEx.className = 'btn btn-danger';
+                bEx.textContent = 'Excluir';
+                bEx.setAttribute('data-ex', String(x.id || ''));
+                if (x.atendimentoId) bEx.setAttribute('data-ex-at', String(x.atendimentoId));
+                tdAcoes.appendChild(bEx);
                 tr.innerHTML =
                     '<td>' + esc(fmtData(x.criadoEm)) + '</td>' +
                     '<td>' + esc(x.tipo) + '</td>' +
                     '<td>' + esc(x.descricao) + '</td>' +
                     '<td>' + esc(x.forma) + '</td>' +
-                    '<td>' + moeda(x.valor) + '</td>' +
-                    '<td class="actions"><button type="button" class="btn btn-danger" data-ex="' + x.id + '">Excluir</button></td>';
+                    '<td>' + moeda(x.valor) + '</td>';
+                tr.appendChild(tdAcoes);
                 tb.appendChild(tr);
             });
-            tb.querySelectorAll('[data-ex]').forEach(function (b) {
-                b.addEventListener('click', function () {
-                    if (!confirm('Excluir lançamento do banco?')) return;
-                    var db2 = carregar();
-                    var idEx = b.getAttribute('data-ex');
-                    if (canalVendas !== 'interno') marcarExcluido(db2, 'caixaBanco', idEx);
-                    db2.caixaBanco = (db2.caixaBanco || []).filter(function (x) { return x.id !== idEx; });
-                    salvar(db2);
-                    renderCaixaBanco();
-                    atualizarKPIs(db2);
+            if (!tb._bkClickLigado) {
+                tb._bkClickLigado = true;
+                tb.addEventListener('click', function (e) {
+                    var b = e.target.closest('[data-ex]');
+                    if (!b) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!confirm('Excluir lançamento do caixa do banco (PIX / cartões)?')) return;
+                    var ok = excluirLancamentoCaixaBalcao(
+                        b.getAttribute('data-ex'),
+                        b.getAttribute('data-ex-at')
+                    );
+                    if (ok) {
+                        renderCaixaBanco();
+                        renderCaixa();
+                        atualizarKPIs(carregarMain());
+                    }
                 });
-            });
+            }
         }
 
         document.getElementById('formPendente').addEventListener('submit', function (e) {
@@ -10429,7 +10661,10 @@
         /* ---------- Pastas mensais — Despesas por OS (Modo Interno) ---------- */
         function listarOsDoMes(mesAno) {
             var main = carregarMain();
+            var ocultas = obterOsOcultasDespesas();
             return (main.atendimentos || []).filter(function (a) {
+                if (!a || !a.id) return false;
+                if (ocultas[a.id] || ocultas[String(a.id)]) return false;
                 return mesAnoDeIso(a.entrada || a.criadoEm) === mesAno;
             }).map(function (a) {
                 var r = resumoLucroOs(a);
@@ -11764,7 +11999,7 @@
                 if (!a || !a.id) return;
                 if (String(a.statusPagamento || '').toUpperCase() !== 'PAGO') return;
                 if (idsLanc[a.id]) return;
-                if (bloqueadas[a.id]) return; /* excluída manualmente do caixa */
+                if (bloqueadas[a.id] || bloqueadas[String(a.id)]) return; /* excluída manualmente do caixa */
                 var valor = Number(a.total) || 0;
                 if (!(valor > 0)) return;
                 var nome = nomeAtendimento(main, a);
