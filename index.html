@@ -3410,7 +3410,7 @@
         <section id="painelConfigLoginFunc" class="panel">
             <div class="box">
                 <h2>Acesso do funcionário ao painel</h2>
-                <p class="hint">Cadastre <strong>login e senha</strong> para a aba <strong>Funcionário</strong>. Ao salvar (com internet), o acesso sobe na <strong>nuvem</strong> e vale no celular. No celular: aba Funcionário → <strong>Atualizar logins da nuvem</strong> → entrar. O funcionário precisa estar em <strong>FUNCIONÁRIO → Cadastro</strong>.</p>
+                <p class="hint">1) Salve login/senha abaixo. 2) Clique em <strong>Enviar logins ao celular</strong> (obrigatório). 3) No celular: aba Funcionário → <strong>Atualizar logins da nuvem</strong> → entrar com o mesmo login/senha.</p>
                 <form id="formLoginFuncCfg">
                     <div class="row">
                         <div class="col" style="flex:1.4">
@@ -3430,8 +3430,10 @@
                     </div>
                     <div class="row" style="margin-top:14px">
                         <button type="submit" class="btn btn-primary" id="btnSalvarLoginFunc">Salvar login / senha</button>
+                        <button type="button" class="btn btn-ok" id="btnEnviarLoginsCelular">☁ Enviar logins ao celular</button>
                         <button type="button" class="btn btn-secondary" id="btnLimparLoginFuncCfg">Limpar</button>
                     </div>
+                    <p class="hint" id="statusEnvioLoginFunc" style="margin-top:10px;margin-bottom:0"></p>
                 </form>
                 <table style="margin-top:16px">
                     <thead>
@@ -3635,9 +3637,10 @@
         var STORAGE_KEY = 'joninha_suspensoes_v1';
         var STORAGE_INTERNO = 'joninha_suspensoes_interno_v1';
         var STORAGE_LOGINS_FUNC = 'joninha_suspensoes_logins_func_v1';
-        /* Mesma coleção pública das assinaturas — celular lê sem login admin */
+        /* Mesma coleção pública das assinaturas — celular lê sem login admin.
+           NÃO use IDs com __ no início/fim (Firestore reserva esses nomes). */
         var COL_LOGINS_FUNC_NUVEM = 'joninha_assinaturas';
-        var DOC_LOGINS_FUNC_NUVEM = '__acesso_funcionarios__';
+        var DOC_LOGINS_FUNC_NUVEM = 'acesso_funcionarios_joninha';
         var ASSIN_KEY = 'joninha_suspensoes_assinaturas';
         var atendimentoNotaAtual = null;
         var canalVendas = 'normal'; /* normal | interno */
@@ -12401,25 +12404,38 @@
 
         async function enviarLoginsFuncNuvem() {
             var cfg = carregarConfigNuvem();
-            if (!cfg || !cfg.apiKey || !cfg.projectId) return false;
+            if (!cfg || !cfg.apiKey || !cfg.projectId) {
+                return { ok: false, erro: 'Nuvem sem configuração Firebase.' };
+            }
             var pack = payloadLoginsFuncNuvem();
+            if (!(pack.funcionarios || []).length) {
+                return { ok: false, erro: 'Nenhum login de funcionário para enviar.' };
+            }
             pack.tipo = 'logins_funcionarios';
             pack.token = DOC_LOGINS_FUNC_NUVEM;
+            var ultimoErro = null;
             try {
-                /* Escrita pública na coleção de assinaturas (celular consegue ler depois) */
                 var sessao = await initFirebaseApp();
                 await sessao.fsMod.setDoc(
                     sessao.fsMod.doc(sessao.dbFs, COL_LOGINS_FUNC_NUVEM, DOC_LOGINS_FUNC_NUVEM),
                     pack
                 );
             } catch (e1) {
-                console.warn('enviar logins_func público:', e1);
-                if (!usuarioNuvemLogado()) return false;
-                var sAuth = await obterSessaonuvem();
-                await sAuth.fsMod.setDoc(
-                    sAuth.fsMod.doc(sAuth.dbFs, COL_LOGINS_FUNC_NUVEM, DOC_LOGINS_FUNC_NUVEM),
-                    pack
-                );
+                ultimoErro = e1;
+                console.warn('enviar logins_func:', e1);
+                try {
+                    if (!usuarioNuvemLogado()) {
+                        return { ok: false, erro: (e1 && (e1.message || e1.code)) || 'Falha ao enviar (faça login Admin).' };
+                    }
+                    var sAuth = await obterSessaonuvem();
+                    await sAuth.fsMod.setDoc(
+                        sAuth.fsMod.doc(sAuth.dbFs, COL_LOGINS_FUNC_NUVEM, DOC_LOGINS_FUNC_NUVEM),
+                        pack
+                    );
+                    ultimoErro = null;
+                } catch (eAuth) {
+                    return { ok: false, erro: (eAuth && (eAuth.message || eAuth.code)) || 'Falha ao enviar.' };
+                }
             }
             if (usuarioNuvemLogado()) {
                 try {
@@ -12431,13 +12447,44 @@
                     );
                 } catch (e2) { /* ok */ }
             }
-            return true;
+            return {
+                ok: true,
+                qtd: pack.funcionarios.length,
+                logins: pack.funcionarios.map(function (f) { return f.loginUsuario; })
+            };
+        }
+
+        function forcarAplicarFuncionariosNuvem(remotos) {
+            if (!Array.isArray(remotos) || !remotos.length) return [];
+            var lista = listarFuncionariosInterno();
+            var byId = {};
+            lista.forEach(function (f) {
+                if (f && f.id) byId[f.id] = Object.assign({}, f);
+            });
+            remotos.forEach(function (r) {
+                if (!r || !r.id) return;
+                var cur = byId[r.id] || { id: r.id, criadoEm: r.atualizadoEm || new Date().toISOString() };
+                var u = normalizarLoginFunc(r.loginUsuario);
+                var s = normalizarSenhaFunc(r.loginSenha);
+                byId[r.id] = Object.assign({}, cur, {
+                    id: r.id,
+                    nome: r.nome || cur.nome || u || 'Funcionário',
+                    ativo: r.ativo !== false,
+                    loginUsuario: u || cur.loginUsuario || '',
+                    loginSenha: s || cur.loginSenha || '',
+                    atualizadoEm: r.atualizadoEm || new Date().toISOString()
+                });
+            });
+            salvarFuncionariosInterno(Object.keys(byId).map(function (k) { return byId[k]; }));
+            return Object.keys(sincronizarMapaLoginsFuncLimpo());
         }
 
         /* Lê logins na nuvem sem login admin (mesma regra pública das assinaturas) */
         async function puxarLoginsFuncNuvem() {
             var cfg = carregarConfigNuvem();
-            if (!cfg || !cfg.apiKey || !cfg.projectId) return false;
+            if (!cfg || !cfg.apiKey || !cfg.projectId) {
+                return { ok: false, erro: 'Nuvem sem configuração Firebase.' };
+            }
             try {
                 var sessao = await initFirebaseApp();
                 var snap = await sessao.fsMod.getDoc(
@@ -12446,25 +12493,27 @@
                 if (snap.exists()) {
                     var data = snap.data() || {};
                     var remotos = data.funcionarios || [];
-                    if (!remotos.length) return false;
-                    aplicarFuncionariosDaNuvem(remotos);
-                    sincronizarMapaLoginsFuncLimpo();
-                    return true;
+                    if (!remotos.length) {
+                        return { ok: false, erro: 'Documento na nuvem está vazio. No PC, envie os logins de novo.' };
+                    }
+                    var logins = forcarAplicarFuncionariosNuvem(remotos);
+                    return { ok: true, logins: logins, qtd: logins.length };
                 }
             } catch (e1) {
                 console.warn('puxar logins_func:', e1);
-            }
-            try {
-                if (usuarioNuvemLogado()) {
-                    var base = await baixarBaseNuvemSilencioso();
-                    if (base && base.funcionarios) {
-                        return aplicarFuncionariosDaNuvem(base.funcionarios);
+                var msg = (e1 && (e1.message || e1.code)) || 'erro';
+                try {
+                    if (usuarioNuvemLogado()) {
+                        var base = await baixarBaseNuvemSilencioso();
+                        if (base && base.funcionarios && base.funcionarios.length) {
+                            var logins2 = forcarAplicarFuncionariosNuvem(base.funcionarios);
+                            if (logins2.length) return { ok: true, logins: logins2, qtd: logins2.length };
+                        }
                     }
-                }
-            } catch (e2) {
-                console.warn('puxar funcionarios base:', e2);
+                } catch (e2) { /* ok */ }
+                return { ok: false, erro: msg };
             }
-            return false;
+            return { ok: false, erro: 'Ainda não há logins na nuvem. No PC: clique em “Enviar logins ao celular”.' };
         }
 
         function normalizarLoginFunc(s) {
@@ -12745,8 +12794,12 @@
                     document.getElementById('loginBoxEntrar').style.display = 'none';
                     document.getElementById('loginBoxFunc').style.display = '';
                     atualizarHintLoginsFuncTela();
-                    puxarLoginsFuncNuvem().then(function () {
+                    puxarLoginsFuncNuvem().then(function (res) {
                         atualizarHintLoginsFuncTela();
+                        if (res && res.ok && res.logins && res.logins.length) {
+                            var el = document.getElementById('loginFuncHintQtd');
+                            if (el) el.textContent = 'Logins neste navegador: ' + res.logins.join(', ');
+                        }
                     }).catch(function () { /* offline */ });
                     var u = document.getElementById('loginFuncUser');
                     if (u) setTimeout(function () { u.focus(); }, 50);
@@ -12779,9 +12832,13 @@
                     var f = autenticarFuncionarioLogin(user, senha);
                     if (!f) {
                         mostrarErroLogin('Buscando login na nuvem…');
-                        try { await puxarLoginsFuncNuvem(); } catch (eN) { /* ok */ }
+                        var pull = null;
+                        try { pull = await puxarLoginsFuncNuvem(); } catch (eN) { pull = { ok: false, erro: (eN && eN.message) || 'falha' }; }
                         atualizarHintLoginsFuncTela();
                         f = autenticarFuncionarioLogin(user, senha);
+                        if (!f && pull && !pull.ok) {
+                            /* segue para mensagem abaixo com detalhe */
+                        }
                     }
                     if (!f) {
                         var map = sincronizarMapaLoginsFuncLimpo();
@@ -12790,7 +12847,7 @@
                         if (map[uNorm]) {
                             mostrarErroLogin('Senha incorreta para o login "' + uNorm + '".');
                         } else if (!disponiveis.length) {
-                            mostrarErroLogin('Nenhum login neste celular. No PC: salve o acesso de novo (sobe na nuvem). Aqui: toque em “Atualizar logins da nuvem” e tente outra vez.');
+                            mostrarErroLogin('Nenhum login neste celular. No PC clique em “Enviar logins ao celular”. Depois aqui: “Atualizar logins da nuvem”.');
                         } else {
                             mostrarErroLogin(
                                 'Login "' + uNorm + '" não encontrado. Neste aparelho: ' +
@@ -12818,16 +12875,14 @@
                 btnPuxarLF.textContent = 'Buscando…';
                 mostrarErroLogin('');
                 try {
-                    var ok = await puxarLoginsFuncNuvem();
+                    var res = await puxarLoginsFuncNuvem();
                     atualizarHintLoginsFuncTela();
-                    var logins = listarLoginsFuncDisponiveis();
-                    if (ok && logins.length) {
+                    var logins = (res && res.logins) || listarLoginsFuncDisponiveis();
+                    if (res && res.ok && logins.length) {
                         toast('Logins da nuvem OK: ' + logins.join(', '));
-                        mostrarErroLogin('');
-                    } else if (logins.length) {
-                        toast('Logins locais: ' + logins.join(', '));
+                        mostrarErroLogin('Pronto! Logins: ' + logins.join(', ') + '. Agora entre com login e senha.');
                     } else {
-                        mostrarErroLogin('Nuvem sem login ainda. No computador: entre como Admin, salve o acesso do funcionário de novo (ou sincronize) e volte aqui.');
+                        mostrarErroLogin((res && res.erro) || 'Nuvem sem login. No PC: Acesso do funcionário → Enviar logins ao celular.');
                     }
                 } catch (err) {
                     mostrarErroLogin('Não deu para buscar na nuvem. Verifique a internet.');
@@ -12871,21 +12926,44 @@
                 var uSalvo = normalizarLoginFunc(usuario);
                 var sSalvo = normalizarSenhaFunc(senha);
                 var teste = autenticarFuncionarioLogin(uSalvo, sSalvo);
+                var st = document.getElementById('statusEnvioLoginFunc');
                 if (!teste) {
                     toast('Salvou, mas o teste falhou. Atualize a página (Ctrl+F5) e salve de novo.');
                 } else {
-                    toast('Pronto! Login: ' + uSalvo + ' | Senha: ' + sSalvo + ' — enviando à nuvem para o celular…');
-                    enviarLoginsFuncNuvem().then(function (ok) {
-                        if (ok) toast('Nuvem OK — no celular use a aba Funcionário (Atualizar logins da nuvem se precisar).');
-                        else toast('Salvo neste PC. Se o celular não achar, sincronize a nuvem como Admin e salve o login de novo.');
-                    }).catch(function () {
-                        toast('Salvo neste PC (sem internet para a nuvem).');
-                    });
+                    toast('Salvo! Agora clique em “Enviar logins ao celular”.');
+                    if (st) st.textContent = 'Login salvo: ' + uSalvo + '. Clique em “Enviar logins ao celular”.';
                 }
                 document.getElementById('cfgLoginUsuario').value = '';
                 document.getElementById('cfgLoginSenha').value = '';
                 document.getElementById('cfgLoginFuncId').value = '';
                 renderLoginsFuncCfg();
+            });
+            var btnEnviarCel = document.getElementById('btnEnviarLoginsCelular');
+            if (btnEnviarCel) btnEnviarCel.addEventListener('click', async function () {
+                var st = document.getElementById('statusEnvioLoginFunc');
+                btnEnviarCel.disabled = true;
+                btnEnviarCel.textContent = 'Enviando…';
+                if (st) st.textContent = 'Enviando logins para a nuvem…';
+                try {
+                    var res = await enviarLoginsFuncNuvem();
+                    if (res && res.ok) {
+                        var msg = 'Nuvem OK (' + res.qtd + '): ' + (res.logins || []).join(', ') +
+                            '. No celular: Atualizar logins da nuvem → entrar.';
+                        if (st) st.textContent = msg;
+                        toast(msg);
+                    } else {
+                        var er = (res && res.erro) || 'Falha ao enviar.';
+                        if (st) st.textContent = er;
+                        toast(er);
+                    }
+                } catch (err) {
+                    var m = 'Erro: ' + ((err && (err.message || err.code)) || 'sem internet');
+                    if (st) st.textContent = m;
+                    toast(m);
+                } finally {
+                    btnEnviarCel.disabled = false;
+                    btnEnviarCel.textContent = '☁ Enviar logins ao celular';
+                }
             });
             var btnLimparCfg = document.getElementById('btnLimparLoginFuncCfg');
             if (btnLimparCfg) btnLimparCfg.addEventListener('click', function () {
