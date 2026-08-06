@@ -2178,9 +2178,13 @@
             </div>
             <div id="loginBoxFunc" style="display:none">
                 <label>Login do funcionário</label>
-                <input type="text" id="loginFuncUser" autocomplete="username" placeholder="Usuário cadastrado">
+                <input type="text" id="loginFuncUser" autocomplete="username" placeholder="Usuário cadastrado" autocapitalize="off" spellcheck="false">
                 <label style="margin-top:10px;display:block">Senha</label>
-                <input type="password" id="loginFuncSenha" autocomplete="current-password" placeholder="Senha cadastrada">
+                <div style="display:flex;gap:8px;align-items:center">
+                    <input type="password" id="loginFuncSenha" autocomplete="current-password" placeholder="Senha cadastrada" style="flex:1">
+                    <button type="button" class="btn btn-secondary" id="btnVerSenhaLoginFunc" style="padding:8px 10px;white-space:nowrap">Mostrar</button>
+                </div>
+                <p class="hint" id="loginFuncHintQtd" style="margin-top:8px;margin-bottom:0;text-align:left;font-size:0.8rem"></p>
                 <div class="row" style="margin-top:14px">
                     <button type="button" class="btn btn-ok" id="btnLoginFunc" style="width:100%">Entrar no painel</button>
                 </div>
@@ -12325,28 +12329,28 @@
         }
 
         function normalizarLoginFunc(s) {
-            return String(s || '')
+            var t = String(s == null ? '' : s);
+            try { t = t.normalize('NFKC'); } catch (e) { /* ok */ }
+            return t
                 .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                .replace(/\s+/g, '')
                 .trim()
                 .toLowerCase();
         }
 
         function normalizarSenhaFunc(s) {
-            return String(s || '')
+            var t = String(s == null ? '' : s);
+            try { t = t.normalize('NFKC'); } catch (e) { /* ok */ }
+            return t
                 .replace(/[\u200B-\u200D\uFEFF]/g, '')
                 .trim();
         }
 
-        function carregarMapaLoginsFunc() {
+        /* Mapa limpo só com o que está nos funcionários agora (sem login antigo preso) */
+        function sincronizarMapaLoginsFuncLimpo() {
             var map = {};
-            try {
-                var raw = localStorage.getItem(STORAGE_LOGINS_FUNC);
-                if (raw) map = JSON.parse(raw) || {};
-            } catch (e) { map = {}; }
-            if (!map || typeof map !== 'object') map = {};
-            /* Reconstrói a partir dos funcionários (caso o mapa esteja vazio/desatualizado) */
             listarFuncionariosInterno().forEach(function (f) {
-                if (!f || !f.id) return;
+                if (!f || !f.id || f.ativo === false) return;
                 var u = normalizarLoginFunc(f.loginUsuario);
                 var s = normalizarSenhaFunc(f.loginSenha);
                 if (!u || !s) return;
@@ -12357,7 +12361,12 @@
                     atualizadoEm: f.atualizadoEm || new Date().toISOString()
                 };
             });
+            persistirMapaLoginsFunc(map);
             return map;
+        }
+
+        function carregarMapaLoginsFunc() {
+            return sincronizarMapaLoginsFuncLimpo();
         }
 
         function persistirMapaLoginsFunc(map) {
@@ -12368,31 +12377,23 @@
             }
         }
 
+        function listarLoginsFuncDisponiveis() {
+            return Object.keys(sincronizarMapaLoginsFuncLimpo()).sort();
+        }
+
         function salvarCredencialLoginFunc(funcionario, usuario, senha) {
             var u = normalizarLoginFunc(usuario);
             var s = normalizarSenhaFunc(senha);
             if (!funcionario || !funcionario.id || !u || !s) return false;
-            var map = {};
-            try { map = JSON.parse(localStorage.getItem(STORAGE_LOGINS_FUNC) || '{}') || {}; } catch (e) { map = {}; }
-            Object.keys(map).forEach(function (k) {
-                if (map[k] && String(map[k].funcionarioId) === String(funcionario.id)) delete map[k];
-            });
-            map[u] = {
-                funcionarioId: funcionario.id,
-                senha: s,
-                nome: funcionario.nome || '',
-                atualizadoEm: new Date().toISOString()
-            };
-            persistirMapaLoginsFunc(map);
 
             var lista = listarFuncionariosInterno();
             var i = lista.findIndex(function (x) { return x.id === funcionario.id; });
-            if (i >= 0) {
-                lista[i].loginUsuario = u;
-                lista[i].loginSenha = s;
-                lista[i].atualizadoEm = new Date().toISOString();
-                salvarFuncionariosInterno(lista);
-            }
+            if (i < 0) return false;
+            lista[i].loginUsuario = u;
+            lista[i].loginSenha = s;
+            lista[i].atualizadoEm = new Date().toISOString();
+            salvarFuncionariosInterno(lista);
+            sincronizarMapaLoginsFuncLimpo();
             return true;
         }
 
@@ -12401,7 +12402,7 @@
             var s = normalizarSenhaFunc(senha);
             if (!u || !s) return null;
 
-            var map = carregarMapaLoginsFunc();
+            var map = sincronizarMapaLoginsFuncLimpo();
             var cred = map[u];
             if (cred && normalizarSenhaFunc(cred.senha) === s) {
                 var f = listarFuncionariosInterno().find(function (x) {
@@ -12418,6 +12419,7 @@
                 };
             }
 
+            /* 2ª tentativa: compara direto na lista (mesmo se mapa falhar) */
             return listarFuncionariosInterno().find(function (x) {
                 if (!x || x.ativo === false) return false;
                 return normalizarLoginFunc(x.loginUsuario) === u &&
@@ -12439,7 +12441,9 @@
             if (cur) sel.value = cur;
 
             var comLogin = listarFuncionariosInterno().filter(function (f) {
-                return f && String(f.loginUsuario || '').trim();
+                return f && f.ativo !== false &&
+                    String(f.loginUsuario || '').trim() &&
+                    String(f.loginSenha || '').trim();
             }).sort(function (a, b) {
                 return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR');
             });
@@ -12450,17 +12454,58 @@
             }
             if (vaz) vaz.style.display = 'none';
             comLogin.forEach(function (f) {
+                var senha = f.loginSenha ? String(f.loginSenha) : '';
+                var loginVisivel = normalizarLoginFunc(f.loginUsuario);
                 var tr = document.createElement('tr');
                 tr.innerHTML =
                     '<td style="color:#fff;font-weight:800">' + esc(f.nome || '—') + '</td>' +
-                    '<td style="color:#fff;font-weight:700">' + esc(f.loginUsuario || '—') + '</td>' +
-                    '<td style="color:#fff;font-weight:700">' + (f.loginSenha ? '••••••••' : '—') + '</td>' +
-                    '<td style="color:#fff;font-weight:700">' + (f.ativo === false ? 'Inativo' : 'Ativo') + '</td>' +
+                    '<td style="color:#fff;font-weight:700">' + esc(loginVisivel || '—') + '</td>' +
+                    '<td style="color:#fff;font-weight:700;white-space:nowrap">' +
+                    (senha
+                        ? '<code class="senha-login-func" data-senha="' + esc(senha) + '" style="color:#ffe08a;font-size:0.95rem">••••••••</code> ' +
+                          '<button type="button" class="btn btn-secondary" data-ver-senha-func="' + esc(f.id) + '" style="padding:3px 8px;font-size:0.72rem">Mostrar</button>'
+                        : '—') +
+                    '</td>' +
+                    '<td style="color:#fff;font-weight:700">Ativo</td>' +
                     '<td class="actions">' +
-                    '<button type="button" class="btn btn-secondary" data-ed-login-func="' + esc(f.id) + '">Editar</button>' +
+                    '<button type="button" class="btn btn-ok" data-testar-login-func="' + esc(f.id) + '" style="padding:3px 8px;font-size:0.72rem">Testar entrada</button> ' +
+                    '<button type="button" class="btn btn-secondary" data-ed-login-func="' + esc(f.id) + '">Editar</button> ' +
                     '<button type="button" class="btn btn-danger" data-rm-login-func="' + esc(f.id) + '">Remover acesso</button>' +
                     '</td>';
                 tb.appendChild(tr);
+            });
+            tb.querySelectorAll('[data-ver-senha-func]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var cell = b.closest('td');
+                    var code = cell ? cell.querySelector('.senha-login-func') : null;
+                    if (!code) return;
+                    var senhaReal = code.getAttribute('data-senha') || '';
+                    var oculto = code.getAttribute('data-oculto') !== '0';
+                    if (oculto) {
+                        code.textContent = senhaReal;
+                        code.setAttribute('data-oculto', '0');
+                        b.textContent = 'Ocultar';
+                    } else {
+                        code.textContent = '••••••••';
+                        code.setAttribute('data-oculto', '1');
+                        b.textContent = 'Mostrar';
+                    }
+                });
+            });
+            tb.querySelectorAll('[data-testar-login-func]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var id = b.getAttribute('data-testar-login-func');
+                    var f = listarFuncionariosInterno().find(function (x) { return x && String(x.id) === String(id); });
+                    if (!f) { toast('Funcionário não encontrado.'); return; }
+                    var ok = autenticarFuncionarioLogin(f.loginUsuario, f.loginSenha);
+                    if (!ok) {
+                        toast('Falha no teste. Salve de novo o login/senha deste funcionário.');
+                        return;
+                    }
+                    if (!confirm('Login OK. Entrar agora como ' + (f.nome || 'funcionário') + '?')) return;
+                    liberarApp({ funcionarioId: f.id });
+                    toast('Entrou como ' + (f.nome || 'funcionário') + '.');
+                });
             });
             tb.querySelectorAll('[data-ed-login-func]').forEach(function (b) {
                 b.addEventListener('click', function () {
@@ -12468,7 +12513,7 @@
                     var f = listarFuncionariosInterno().find(function (x) { return x.id === id; });
                     if (!f) return;
                     document.getElementById('cfgLoginFuncId').value = f.id;
-                    document.getElementById('cfgLoginUsuario').value = f.loginUsuario || '';
+                    document.getElementById('cfgLoginUsuario').value = normalizarLoginFunc(f.loginUsuario) || '';
                     document.getElementById('cfgLoginSenha').value = f.loginSenha || '';
                     document.getElementById('cfgLoginUsuario').focus();
                 });
@@ -12483,17 +12528,12 @@
                     delete lista[i].loginUsuario;
                     delete lista[i].loginSenha;
                     salvarFuncionariosInterno(lista);
-                    var map = {};
-                    try { map = JSON.parse(localStorage.getItem(STORAGE_LOGINS_FUNC) || '{}') || {}; } catch (e) { map = {}; }
-                    Object.keys(map).forEach(function (k) {
-                        if (map[k] && String(map[k].funcionarioId) === String(id)) delete map[k];
-                    });
-                    persistirMapaLoginsFunc(map);
+                    sincronizarMapaLoginsFuncLimpo();
                     toast('Acesso removido.');
                     renderLoginsFuncCfg();
                 });
             });
-            persistirMapaLoginsFunc(carregarMapaLoginsFunc());
+            sincronizarMapaLoginsFuncLimpo();
         }
 
         function preencherSelectLoginFunc() {
@@ -12564,13 +12604,27 @@
                     tabF.classList.add('active'); tabA.classList.remove('active');
                     document.getElementById('loginBoxEntrar').style.display = 'none';
                     document.getElementById('loginBoxFunc').style.display = '';
+                    atualizarHintLoginsFuncTela();
                     var u = document.getElementById('loginFuncUser');
                     if (u) setTimeout(function () { u.focus(); }, 50);
                 });
             }
+
+            function atualizarHintLoginsFuncTela() {
+                var el = document.getElementById('loginFuncHintQtd');
+                if (!el) return;
+                var logins = listarLoginsFuncDisponiveis();
+                if (!logins.length) {
+                    el.textContent = 'Nenhum login de funcionário neste navegador. Cadastre em Sistema → Acesso do funcionário.';
+                    return;
+                }
+                el.textContent = 'Logins neste navegador: ' + logins.join(', ');
+            }
+
             var btnLF = document.getElementById('btnLoginFunc');
             if (btnLF) btnLF.addEventListener('click', function () {
                 try {
+                    atualizarHintLoginsFuncTela();
                     var user = document.getElementById('loginFuncUser').value;
                     var senha = document.getElementById('loginFuncSenha').value;
                     if (!normalizarLoginFunc(user) || !normalizarSenhaFunc(senha)) {
@@ -12579,12 +12633,19 @@
                     }
                     var f = autenticarFuncionarioLogin(user, senha);
                     if (!f) {
-                        var map = carregarMapaLoginsFunc();
+                        var map = sincronizarMapaLoginsFuncLimpo();
                         var uNorm = normalizarLoginFunc(user);
+                        var disponiveis = Object.keys(map);
                         if (map[uNorm]) {
-                            mostrarErroLogin('Senha incorreta para este login.');
+                            mostrarErroLogin('Senha incorreta para o login "' + uNorm + '".');
+                        } else if (!disponiveis.length) {
+                            mostrarErroLogin('Nenhum login cadastrado neste navegador. Salve o acesso em Sistema → Acesso do funcionário e tente de novo aqui (mesmo site).');
                         } else {
-                            mostrarErroLogin('Login não encontrado neste aparelho. Cadastre de novo em Sistema → Acesso do funcionário (no mesmo navegador/site).');
+                            mostrarErroLogin(
+                                'Login "' + uNorm + '" não encontrado. Neste navegador existem: ' +
+                                disponiveis.join(', ') +
+                                '. Digite exatamente um desses logins.'
+                            );
                         }
                         return;
                     }
@@ -12633,7 +12694,14 @@
                     toast('Falha ao salvar login.');
                     return;
                 }
-                toast('Login/senha salvos para ' + (lista[i].nome || 'funcionário') + '. Use na aba Funcionário.');
+                var uSalvo = normalizarLoginFunc(usuario);
+                var sSalvo = normalizarSenhaFunc(senha);
+                var teste = autenticarFuncionarioLogin(uSalvo, sSalvo);
+                if (!teste) {
+                    toast('Salvou, mas o teste falhou. Atualize a página (Ctrl+F5) e salve de novo.');
+                } else {
+                    toast('Pronto! Login: ' + uSalvo + ' | Senha: ' + sSalvo + ' — na tela de entrada use a aba Funcionário.');
+                }
                 document.getElementById('cfgLoginUsuario').value = '';
                 document.getElementById('cfgLoginSenha').value = '';
                 document.getElementById('cfgLoginFuncId').value = '';
@@ -12642,6 +12710,18 @@
             var btnLimparCfg = document.getElementById('btnLimparLoginFuncCfg');
             if (btnLimparCfg) btnLimparCfg.addEventListener('click', function () {
                 document.getElementById('formLoginFuncCfg').reset();
+            });
+            var btnVerSenhaLF = document.getElementById('btnVerSenhaLoginFunc');
+            if (btnVerSenhaLF) btnVerSenhaLF.addEventListener('click', function () {
+                var inp = document.getElementById('loginFuncSenha');
+                if (!inp) return;
+                if (inp.type === 'password') {
+                    inp.type = 'text';
+                    btnVerSenhaLF.textContent = 'Ocultar';
+                } else {
+                    inp.type = 'password';
+                    btnVerSenhaLF.textContent = 'Mostrar';
+                }
             });
             var loginSenhaEl = document.getElementById('loginFuncSenha');
             if (loginSenhaEl) loginSenhaEl.addEventListener('keydown', function (e) {
