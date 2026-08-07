@@ -3468,14 +3468,8 @@
                 <div class="row" style="margin-top:12px">
                     <button type="button" class="btn btn-primary" id="btnRodarBlindagem">Rodar checklist agora</button>
                     <button type="button" class="btn btn-ok" id="btnEnviarLoginsBlindagem">Enviar logins à nuvem</button>
-                    <button type="button" class="btn btn-secondary" id="btnCopiarRegrasFirebase">Copiar regras Firebase</button>
                 </div>
                 <ul id="listaBlindagem" style="margin-top:14px;padding-left:18px;line-height:1.7"></ul>
-                <div class="box" style="margin-top:16px;background:rgba(0,0,0,0.25)">
-                    <h2 style="font-size:1rem">Firebase → Firestore → Regras (cole isto)</h2>
-                    <p class="hint">Sem esta regra, o celular <strong>não lê</strong> a coleção nova <code>joninha_logins_func</code>. Assinaturas continuam públicas; o resto exige login admin.</p>
-                    <textarea id="txtRegrasFirebase" readonly rows="18" style="width:100%;font-family:ui-monospace,monospace;font-size:0.75rem;background:#0b1220;color:#d7e3ff;border:1px solid var(--line);border-radius:8px;padding:10px"></textarea>
-                </div>
             </div>
         </section>
 
@@ -3698,7 +3692,7 @@
             painelConfigLogo: ['Logo da empresa', 'Arquivo ou link da logo'],
             painelConfigPasta: ['Pasta no PC', 'Fotos e atendimento no computador'],
             painelConfigLoginFunc: ['Acesso do funcionário ao painel', 'Login e senha do funcionário'],
-            painelConfigBlindagem: ['Blindagem / Diagnóstico', 'Checklist · versão · regras Firebase'],
+            painelConfigBlindagem: ['Blindagem / Diagnóstico', 'Checklist · versão · nuvem'],
             painelConfigBackup: ['Backup e limpeza', 'Exportar · importar · zerar dados']
         };
 
@@ -13368,24 +13362,6 @@
             });
 
             /* —— Blindagem / Diagnóstico —— */
-            var REGRAS_FIREBASE_TEXTO =
-                'rules_version = \'2\';\n' +
-                'service cloud.firestore {\n' +
-                '  match /databases/{database}/documents {\n' +
-                '    match /joninha_assinaturas/{token} {\n' +
-                '      allow read, write: if true;\n' +
-                '    }\n' +
-                '    /* Login funcionário no celular (só hash, sem senha em texto) */\n' +
-                '    match /joninha_logins_func/{doc} {\n' +
-                '      allow read: if true;\n' +
-                '      allow write: if request.auth != null;\n' +
-                '    }\n' +
-                '    match /{document=**} {\n' +
-                '      allow read, write: if request.auth != null;\n' +
-                '    }\n' +
-                '  }\n' +
-                '}\n';
-
             function aplicarVersaoUI() {
                 var elVer = document.getElementById('loginAppVersion');
                 if (elVer) elVer.textContent = 'Build ' + APP_VERSION;
@@ -13393,8 +13369,6 @@
                 if (badgeVer) badgeVer.textContent = APP_VERSION;
                 var bl = document.getElementById('blindagemVersao');
                 if (bl) bl.textContent = APP_VERSION;
-                var ta = document.getElementById('txtRegrasFirebase');
-                if (ta && !ta.value) ta.value = REGRAS_FIREBASE_TEXTO;
             }
             aplicarVersaoUI();
 
@@ -13459,24 +13433,6 @@
                     await rodarChecklistBlindagem();
                 } finally {
                     btnEnvBl.disabled = false;
-                }
-            });
-            var btnCop = document.getElementById('btnCopiarRegrasFirebase');
-            if (btnCop) btnCop.addEventListener('click', function () {
-                var ta = document.getElementById('txtRegrasFirebase');
-                if (ta) ta.value = REGRAS_FIREBASE_TEXTO;
-                var txt = REGRAS_FIREBASE_TEXTO;
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(txt).then(function () {
-                        toast('Regras copiadas. Cole no Firebase Console → Firestore → Regras.');
-                    }).catch(function () {
-                        if (ta) { ta.focus(); ta.select(); }
-                        toast('Selecione o texto e copie (Ctrl+C).');
-                    });
-                } else if (ta) {
-                    ta.focus();
-                    ta.select();
-                    toast('Ctrl+C para copiar as regras.');
                 }
             });
         })();
