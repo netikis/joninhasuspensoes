@@ -2488,7 +2488,7 @@
 
                 <div class="box">
                     <h2>Valores — Peças e Mão de Obra</h2>
-                    <p class="hint">Peça: informe <strong>custo</strong> (ex. R$ 55 no careca) e <strong>venda</strong> (ex. R$ 60). O ganho de R$ 5 entra no relatório. Mão de obra: vincule o funcionário para gerar a comissão %.</p>
+                    <p class="hint">Peça: informe <strong>custo</strong> e <strong>venda</strong>. Mão de obra: vincule o funcionário — a comissão é calculada na hora (em R$) e fica salva em <strong>Comissões</strong> para o balanço do mês. A % não aparece aqui.</p>
                     <div class="row">
                         <div class="col" style="flex:2"><label>Descrição peça</label><input id="itemDesc" placeholder="Ex: Amortecedor dianteiro"></div>
                         <div class="col"><label>Custo (R$)</label><input id="itemCusto" inputmode="decimal" placeholder="55,00"></div>
@@ -2498,11 +2498,12 @@
                     <div class="row" style="margin-top:10px">
                         <div class="col" style="flex:2"><label>Descrição mão de obra</label><input id="maoDesc" placeholder="Ex: Troca amortecedor, alinhamento..."></div>
                         <div class="col"><label>Valor (R$)</label><input id="maoValor" inputmode="decimal" placeholder="0,00"></div>
-                        <div class="col"><label>Funcionário (comissão)</label>
-                            <select id="maoFuncId"><option value="">— sem comissão —</option></select>
+                        <div class="col"><label>Funcionário</label>
+                            <select id="maoFuncId"><option value="">— sem funcionário —</option></select>
                         </div>
                         <div class="col" style="flex:0.7;align-self:end"><button type="button" class="btn btn-ok" id="btnAddMao" style="width:100%">+ Mão de obra</button></div>
                     </div>
+                    <p class="hint" id="maoComissaoPreview" style="margin-top:8px;margin-bottom:0;color:#8fe0b8;font-weight:700"></p>
                     <div id="listaItens" style="margin-top:12px"></div>
                     <div class="total-line" style="border-top:none;padding-top:4px;margin-top:4px">
                         <span class="muted">Peças (venda)</span>
@@ -3070,7 +3071,7 @@
         <section id="painelComissoes" class="panel">
             <div class="box">
                 <h2>💵 Comissões dos funcionários</h2>
-                <p class="hint" id="comHint">Cadastre a % de comissão no funcionário. Na OS, vincule a mão de obra a ele — aqui aparece só o valor da comissão (ganho dele).</p>
+                <p class="hint" id="comHint">Filtre pelo <strong>mês</strong> para o balanço. A % fica no cadastro do funcionário; na OS a comissão é calculada e gravada — aqui soma o que cada um tem a receber no período.</p>
                 <div class="row" style="margin-bottom:12px" id="comFiltrosAdmin">
                     <div class="col"><label>Funcionário</label>
                         <select id="comFuncFiltro"><option value="">Todos</option></select>
@@ -6633,8 +6634,18 @@
                     var extra = '';
                     if (tipo === 'peca') {
                         extra = '<div class="muted" style="font-size:0.78rem">Custo ' + moeda(it.custo || 0) + ' · Ganho <span class="ganho-linha">' + moeda(ganhoItem(it)) + '</span></div>';
-                    } else if (it.funcionarioNome || it.comissaoPct) {
-                        extra = '<div class="muted" style="font-size:0.78rem">Comissão ' + esc(String(it.comissaoPct || 0)) + '% — ' + esc(it.funcionarioNome || '') + ' = <span class="ganho-linha">' + moeda(((Number(it.valor)||0) * (Number(it.comissaoPct)||0) / 100)) + '</span></div>';
+                    } else if (it.funcionarioId || it.funcionarioNome) {
+                        var pctLinha = Number(it.comissaoPct);
+                        if (isNaN(pctLinha)) pctLinha = 0;
+                        var comVal = it.comissaoValor != null
+                            ? Number(it.comissaoValor)
+                            : +((Number(it.valor) || 0) * pctLinha / 100).toFixed(2);
+                        extra = '<div class="muted" style="font-size:0.78rem">' +
+                            esc(it.funcionarioNome || 'Funcionário') +
+                            (comVal > 0
+                                ? ' · Comissão: <span class="ganho-linha">' + moeda(comVal) + '</span> <span style="opacity:0.75">(salva no mês)</span>'
+                                : '') +
+                            '</div>';
                     }
                     return '<div class="row" style="margin-bottom:6px;align-items:center">' +
                         '<div class="col" style="flex:2">' + tag + esc(it.desc) + extra + '</div>' +
@@ -6684,37 +6695,92 @@
             renderItens();
         });
 
+        function obterDadosComissaoFuncionario(fid) {
+            var out = { nome: '', pct: 0 };
+            if (!fid) return out;
+            var f = null;
+            try {
+                f = listarFuncionariosInterno().find(function (x) { return x && String(x.id) === String(fid); }) || null;
+            } catch (e0) { f = null; }
+            if (!f) {
+                try {
+                    comCanalInterno(function () {
+                        f = (carregar().funcionarios || []).find(function (x) { return x && String(x.id) === String(fid); }) || null;
+                    });
+                } catch (e1) { /* ok */ }
+            }
+            if (f) {
+                out.nome = f.nome || '';
+                out.pct = Number(f.comissaoPct);
+                if (isNaN(out.pct) || out.pct < 0) out.pct = 0;
+            }
+            return out;
+        }
+
+        function calcularValorComissaoMao(valorMo, pct) {
+            var base = Number(valorMo) || 0;
+            var p = Number(pct) || 0;
+            if (base <= 0 || p <= 0) return 0;
+            return +(base * p / 100).toFixed(2);
+        }
+
+        function atualizarPreviewComissaoMao() {
+            var el = document.getElementById('maoComissaoPreview');
+            if (!el) return;
+            var fid = document.getElementById('maoFuncId') && document.getElementById('maoFuncId').value;
+            var valor = parseMoeda(document.getElementById('maoValor') && document.getElementById('maoValor').value);
+            if (!fid) {
+                el.textContent = '';
+                return;
+            }
+            var dados = obterDadosComissaoFuncionario(fid);
+            var com = calcularValorComissaoMao(valor, dados.pct);
+            if (!dados.pct) {
+                el.textContent = (dados.nome || 'Funcionário') + ' — sem % cadastrada no funcionário.';
+                el.style.color = '#ffb4b4';
+                return;
+            }
+            el.style.color = '#8fe0b8';
+            el.textContent = (dados.nome || 'Funcionário') + ' — comissão agora: ' + moeda(com) +
+                ' (grava na OS e entra no balanço do mês em Comissões)';
+        }
+
         document.getElementById('btnAddMao').addEventListener('click', function () {
             var desc = document.getElementById('maoDesc').value.trim();
             var valor = parseMoeda(document.getElementById('maoValor').value);
             if (!desc) { toast('Informe a descrição da mão de obra.'); return; }
             var fid = document.getElementById('maoFuncId').value;
-            var funcionarioNome = '';
-            var comissaoPct = 0;
-            if (fid) {
-                try {
-                    comCanalInterno(function () {
-                        var f = (carregar().funcionarios || []).find(function (x) { return x.id === fid; });
-                        if (f) {
-                            funcionarioNome = f.nome || '';
-                            comissaoPct = Number(f.comissaoPct);
-                            if (isNaN(comissaoPct)) comissaoPct = 0;
-                        }
-                    });
-                } catch (e) {}
-            }
+            var dados = obterDadosComissaoFuncionario(fid);
+            var comissaoPct = dados.pct;
+            var comissaoValor = calcularValorComissaoMao(valor, comissaoPct);
             itensTemp.push({
                 tipo: 'mao',
                 desc: desc,
                 valor: valor,
                 funcionarioId: fid || '',
-                funcionarioNome: funcionarioNome,
-                comissaoPct: comissaoPct
+                funcionarioNome: dados.nome || '',
+                comissaoPct: comissaoPct,
+                comissaoValor: comissaoValor
             });
             document.getElementById('maoDesc').value = '';
             document.getElementById('maoValor').value = '';
+            document.getElementById('maoFuncId').value = '';
+            atualizarPreviewComissaoMao();
             renderItens();
+            if (fid && comissaoValor > 0) {
+                toast('Mão de obra ok · comissão ' + moeda(comissaoValor) + ' — vai para Comissões do mês ao salvar a OS.');
+            }
         });
+
+        (function ligarPreviewComissaoMao() {
+            var v = document.getElementById('maoValor');
+            var s = document.getElementById('maoFuncId');
+            if (v) {
+                v.addEventListener('input', atualizarPreviewComissaoMao);
+                v.addEventListener('change', atualizarPreviewComissaoMao);
+            }
+            if (s) s.addEventListener('change', atualizarPreviewComissaoMao);
+        })();
 
         function limparAtendimento() {
             document.getElementById('formAtendimento').reset();
@@ -6766,6 +6832,18 @@
                 return;
             }
             var id = document.getElementById('atId').value;
+            /* Garante comissão calculada e gravada em cada mão de obra */
+            itensTemp.forEach(function (it) {
+                if (!it || (it.tipo || '') !== 'mao') return;
+                if (it.funcionarioId) {
+                    var dCom = obterDadosComissaoFuncionario(it.funcionarioId);
+                    if (!it.funcionarioNome) it.funcionarioNome = dCom.nome;
+                    if (!(Number(it.comissaoPct) > 0) && dCom.pct > 0) it.comissaoPct = dCom.pct;
+                }
+                var pctSave = Number(it.comissaoPct) || 0;
+                it.comissaoPct = pctSave;
+                it.comissaoValor = calcularValorComissaoMao(it.valor, pctSave);
+            });
             var tots = totaisItens(itensTemp);
             var pecas = tots.pecas;
             var mao = tots.mao;
@@ -6938,14 +7016,28 @@
             document.getElementById('atServicos').value = a.servicos || '';
             preencherSelectMaoFunc();
             itensTemp = (a.itens || []).map(function (it) {
+                var fid = it.funcionarioId || '';
+                var pct = it.comissaoPct != null ? Number(it.comissaoPct) : NaN;
+                var nome = it.funcionarioNome || '';
+                if (fid && ((it.tipo || '') === 'mao')) {
+                    var dados = obterDadosComissaoFuncionario(fid);
+                    if (!nome) nome = dados.nome;
+                    if (isNaN(pct) || pct <= 0) pct = dados.pct;
+                }
+                if (isNaN(pct)) pct = 0;
+                var valorMo = Number(it.valor) || 0;
+                var comVal = it.comissaoValor != null
+                    ? Number(it.comissaoValor)
+                    : calcularValorComissaoMao(valorMo, pct);
                 return {
                     tipo: it.tipo || 'peca',
                     desc: it.desc || '',
-                    valor: Number(it.valor) || 0,
+                    valor: valorMo,
                     custo: Number(it.custo) || 0,
-                    funcionarioId: it.funcionarioId || '',
-                    funcionarioNome: it.funcionarioNome || '',
-                    comissaoPct: it.comissaoPct != null ? Number(it.comissaoPct) : 0
+                    funcionarioId: fid,
+                    funcionarioNome: nome,
+                    comissaoPct: pct,
+                    comissaoValor: comVal
                 };
             });
             /* Compatibilidade: valor único antigo de mão de obra vira um item */
@@ -11807,10 +11899,8 @@
                     funcs = (int.funcionarios || []).filter(function (f) { return f.ativo !== false; });
                 } catch (e2) { funcs = []; }
             }
-            sel.innerHTML = '<option value="">— sem comissão —</option>' + funcs.map(function (f) {
-                var pct = Number(f.comissaoPct);
-                if (isNaN(pct)) pct = 0;
-                return '<option value="' + esc(f.id) + '">' + esc(f.nome || '') + ' (' + pct + '%)</option>';
+            sel.innerHTML = '<option value="">— sem funcionário —</option>' + funcs.map(function (f) {
+                return '<option value="' + esc(f.id) + '">' + esc(f.nome || '') + '</option>';
             }).join('');
             if (cur) sel.value = cur;
         }
@@ -12489,7 +12579,9 @@
                     var pct = it.comissaoPct != null ? Number(it.comissaoPct) : Number(f.comissaoPct);
                     if (isNaN(pct)) pct = 0;
                     var base = Number(it.valor) || 0;
-                    var valor = +(base * pct / 100).toFixed(2);
+                    var valor = it.comissaoValor != null && !isNaN(Number(it.comissaoValor))
+                        ? +(Number(it.comissaoValor)).toFixed(2)
+                        : +(base * pct / 100).toFixed(2);
                     out.push({
                         data: d,
                         cliente: a.clienteNome || nomeAtendimento(db, a),
@@ -12526,7 +12618,7 @@
                 var fa = document.getElementById('comFiltrosAdmin');
                 if (fa) fa.style.display = 'none';
             } else {
-                hint.textContent = 'Cadastre a % de comissão no funcionário. Na OS, vincule a mão de obra a ele — aqui aparece o valor da comissão (ganho dele).';
+                hint.textContent = 'Balanço do mês: escolha o mês abaixo. Soma a comissão de cada OS (mão de obra vinculada ao funcionário). A % fica só no cadastro do funcionário.';
                 var fa2 = document.getElementById('comFiltrosAdmin');
                 if (fa2) fa2.style.display = '';
                 var sel = document.getElementById('comFuncFiltro');
