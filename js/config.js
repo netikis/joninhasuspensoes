@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.2.5-split-auth';
+var APP_VERSION = '1.2.7-split-nuvem';
 var STORAGE_KEY = 'joninha_suspensoes_v1';
 var STORAGE_INTERNO = 'joninha_suspensoes_interno_v1';
 var STORAGE_LOGINS_FUNC = 'joninha_suspensoes_logins_func_v1';
