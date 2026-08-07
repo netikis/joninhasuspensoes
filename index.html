@@ -2163,6 +2163,7 @@
             <img src="logo-joninha.jpg" alt="Joninha Suspensões">
             <h2 id="loginTitulo">Entrar no sistema</h2>
             <p class="hint" id="loginHint">Oficina / Admin: e-mail e senha. Funcionário: login e senha cadastrados em Configurações.</p>
+            <p class="hint" id="loginAppVersion" style="margin-top:-6px;opacity:0.85;font-size:0.78rem"></p>
             <div class="login-tabs">
                 <button type="button" class="active" id="tabLoginAdmin">Oficina / Admin</button>
                 <button type="button" id="tabLoginFunc">Funcionário</button>
@@ -2275,6 +2276,7 @@
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelConfigLogo" data-canal="normal">🖼️ Logo da empresa</button>
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelConfigPasta" data-canal="normal">📁 Pasta no PC (fotos e atendimento)</button>
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelConfigLoginFunc" data-canal="normal">🔑 Acesso do funcionário ao painel</button>
+                <button type="button" class="nav-btn submenu-btn" data-panel="painelConfigBlindagem" data-canal="normal">🛡️ Blindagem / Diagnóstico</button>
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelConfigBackup" data-canal="normal">💾 Backup e limpeza</button>
             </div>
         </div>
@@ -2290,6 +2292,7 @@
                 </div>
             </div>
             <span class="badge-db" id="badgeDb">DB isolado · joninha_suspensoes_v1</span>
+            <span class="badge-db" id="badgeAppVersion" style="margin-left:6px">v?</span>
         </div>
         <div class="banner-canal" id="bannerCanal" style="display:none" aria-hidden="true"></div>
 
@@ -3451,6 +3454,25 @@
             </div>
         </section>
 
+        <section id="painelConfigBlindagem" class="panel">
+            <div class="box">
+                <h2>🛡️ Blindagem / Diagnóstico</h2>
+                <p class="hint">Rode isto no PC e no celular. Se algum item falhar, <strong>não invente feature</strong> — corrija o item vermelho.</p>
+                <p><strong>Versão deste build:</strong> <span id="blindagemVersao">—</span></p>
+                <div class="row" style="margin-top:12px">
+                    <button type="button" class="btn btn-primary" id="btnRodarBlindagem">Rodar checklist agora</button>
+                    <button type="button" class="btn btn-ok" id="btnEnviarLoginsBlindagem">Enviar logins à nuvem</button>
+                    <button type="button" class="btn btn-secondary" id="btnCopiarRegrasFirebase">Copiar regras Firebase</button>
+                </div>
+                <ul id="listaBlindagem" style="margin-top:14px;padding-left:18px;line-height:1.7"></ul>
+                <div class="box" style="margin-top:16px;background:rgba(0,0,0,0.25)">
+                    <h2 style="font-size:1rem">Firebase → Firestore → Regras (cole isto)</h2>
+                    <p class="hint">Sem esta regra, o celular <strong>não lê</strong> a coleção nova <code>joninha_logins_func</code>. Assinaturas continuam públicas; o resto exige login admin.</p>
+                    <textarea id="txtRegrasFirebase" readonly rows="18" style="width:100%;font-family:ui-monospace,monospace;font-size:0.75rem;background:#0b1220;color:#d7e3ff;border:1px solid var(--line);border-radius:8px;padding:10px"></textarea>
+                </div>
+            </div>
+        </section>
+
         <section id="painelConfigBackup" class="panel">
             <div class="box">
                 <h2>Backup e limpeza</h2>
@@ -3634,13 +3656,14 @@
         'use strict';
 
         /** Banco exclusivo deste index — não usa chaves dos outros sistemas */
+        var APP_VERSION = '1.2.0-blindagem';
         var STORAGE_KEY = 'joninha_suspensoes_v1';
         var STORAGE_INTERNO = 'joninha_suspensoes_interno_v1';
         var STORAGE_LOGINS_FUNC = 'joninha_suspensoes_logins_func_v1';
-        /* Mesma coleção pública das assinaturas — celular lê sem login admin.
-           NÃO use IDs com __ no início/fim (Firestore reserva esses nomes). */
-        var COL_LOGINS_FUNC_NUVEM = 'joninha_assinaturas';
-        var DOC_LOGINS_FUNC_NUVEM = 'acesso_funcionarios_joninha';
+        /* Coleção própria (NÃO usar joninha_assinaturas). Celular lê sem login admin. */
+        var COL_LOGINS_FUNC_NUVEM = 'joninha_logins_func';
+        var DOC_LOGINS_FUNC_NUVEM = 'acessos';
+        var SENHA_FUNC_SALT = 'joninha_suspensoes_v1_salt';
         var ASSIN_KEY = 'joninha_suspensoes_assinaturas';
         var atendimentoNotaAtual = null;
         var canalVendas = 'normal'; /* normal | interno */
@@ -3669,6 +3692,7 @@
             painelConfigLogo: ['Logo da empresa', 'Arquivo ou link da logo'],
             painelConfigPasta: ['Pasta no PC', 'Fotos e atendimento no computador'],
             painelConfigLoginFunc: ['Acesso do funcionário ao painel', 'Login e senha do funcionário'],
+            painelConfigBlindagem: ['Blindagem / Diagnóstico', 'Checklist · versão · regras Firebase'],
             painelConfigBackup: ['Backup e limpeza', 'Exportar · importar · zerar dados']
         };
 
@@ -6128,6 +6152,7 @@
                 }
 
                 salvar(db);
+                try { blindarCaixaContraOsBloqueadas(db); salvar(db); } catch (eBl) { /* ok */ }
                 canalVendas = canalAntes;
                 _syncUltimaOkEm = Date.now();
                 try { localStorage.setItem(SYNC_ULTIMA_KEY, String(_syncUltimaOkEm)); } catch (eUlt) { /* ok */ }
@@ -6251,6 +6276,10 @@
 
         function prepararTelaLogin() {
             document.getElementById('loginTitulo').textContent = 'Entrar no sistema';
+            var elVer = document.getElementById('loginAppVersion');
+            if (elVer) elVer.textContent = 'Build ' + APP_VERSION;
+            var badgeVer = document.getElementById('badgeAppVersion');
+            if (badgeVer) badgeVer.textContent = APP_VERSION;
             var cfg = carregarConfigNuvem();
             if (cfg && cfg.apiKey && cfg.projectId) {
                 document.getElementById('loginHint').textContent = 'Use o e-mail e a senha do Firebase Authentication (nuvem Joninha).';
@@ -9646,6 +9675,27 @@
             db.caixaConfig = cfg;
         }
 
+        /* Blindagem: OS bloqueada não volta ao caixa após sync */
+        function blindarCaixaContraOsBloqueadas(db) {
+            if (!db) return;
+            var cfg = getCaixaConfig(db);
+            var bloq = (cfg && cfg.osBloqueadasCaixa && typeof cfg.osBloqueadasCaixa === 'object')
+                ? cfg.osBloqueadasCaixa
+                : {};
+            var keys = Object.keys(bloq);
+            if (!keys.length) return;
+            function filtrar(lista, nome) {
+                return (lista || []).filter(function (x) {
+                    if (!x || !x.atendimentoId) return true;
+                    if (!bloq[x.atendimentoId] && !bloq[String(x.atendimentoId)]) return true;
+                    marcarExcluido(db, nome, x.id);
+                    return false;
+                });
+            }
+            db.caixa = filtrar(db.caixa, 'caixa');
+            db.caixaBanco = filtrar(db.caixaBanco, 'caixaBanco');
+        }
+
         function excluirLancamentoCaixaBalcao(idLanc, atendimentoIdHint) {
             var db = carregarMain();
             var idEx = String(idLanc || '').trim();
@@ -12341,65 +12391,47 @@
         }
 
         function aplicarFuncionariosDaNuvem(remotos) {
-            if (!Array.isArray(remotos) || !remotos.length) return false;
-            var lista = listarFuncionariosInterno();
-            var byId = {};
-            lista.forEach(function (f) {
-                if (f && f.id) byId[f.id] = f;
-            });
-            var mudou = false;
-            remotos.forEach(function (r) {
-                if (!r || !r.id) return;
-                var cur = byId[r.id];
-                var tR = new Date(r.atualizadoEm || r.criadoEm || 0).getTime();
-                var tL = cur ? new Date(cur.atualizadoEm || cur.criadoEm || 0).getTime() : 0;
-                var loginR = normalizarLoginFunc(r.loginUsuario);
-                var senhaR = normalizarSenhaFunc(r.loginSenha);
-                if (!cur) {
-                    byId[r.id] = Object.assign({}, r, {
-                        loginUsuario: loginR || undefined,
-                        loginSenha: senhaR || undefined
-                    });
-                    mudou = true;
-                    return;
-                }
-                /* Nuvem mais nova, ou local sem login e nuvem tem */
-                var localSemLogin = !normalizarLoginFunc(cur.loginUsuario) || !normalizarSenhaFunc(cur.loginSenha);
-                if (tR >= tL || (localSemLogin && loginR && senhaR)) {
-                    byId[r.id] = Object.assign({}, cur, r, {
-                        loginUsuario: loginR || cur.loginUsuario,
-                        loginSenha: senhaR || cur.loginSenha,
-                        atualizadoEm: tR >= tL ? (r.atualizadoEm || cur.atualizadoEm) : cur.atualizadoEm
-                    });
-                    mudou = true;
-                }
-            });
-            if (mudou) {
-                salvarFuncionariosInterno(Object.keys(byId).map(function (k) { return byId[k]; }));
-                sincronizarMapaLoginsFuncLimpo();
-            }
-            return mudou;
+            var logins = forcarAplicarFuncionariosNuvem(remotos || []);
+            return logins.length > 0;
         }
 
-        function payloadLoginsFuncNuvem() {
-            var funcs = listarFuncionariosInterno().filter(function (f) {
-                return f && f.id && f.ativo !== false &&
-                    normalizarLoginFunc(f.loginUsuario) &&
-                    normalizarSenhaFunc(f.loginSenha);
-            }).map(function (f) {
-                return {
-                    id: f.id,
-                    nome: f.nome || '',
-                    ativo: f.ativo !== false,
-                    loginUsuario: normalizarLoginFunc(f.loginUsuario),
-                    loginSenha: normalizarSenhaFunc(f.loginSenha),
-                    atualizadoEm: f.atualizadoEm || new Date().toISOString()
-                };
-            });
+        function payloadLoginsFuncNuvemSyncFromLista(funcsReady) {
             return {
-                funcionarios: funcs,
+                tipo: 'logins_funcionarios',
+                token: DOC_LOGINS_FUNC_NUVEM,
+                versaoApp: APP_VERSION,
+                funcionarios: funcsReady || [],
                 atualizadoEm: new Date().toISOString()
             };
+        }
+
+        async function payloadLoginsFuncNuvem() {
+            var funcs = [];
+            var lista = listarFuncionariosInterno();
+            for (var i = 0; i < lista.length; i++) {
+                var f = lista[i];
+                if (!f || !f.id || f.ativo === false) continue;
+                var u = normalizarLoginFunc(f.loginUsuario);
+                var s = normalizarSenhaFunc(f.loginSenha);
+                var h = f.loginSenhaHash || '';
+                if (!u) continue;
+                if (!h && s) {
+                    h = await hashSenhaFunc(u, s);
+                    lista[i].loginSenhaHash = h;
+                }
+                if (!h) continue;
+                funcs.push({
+                    id: f.id,
+                    nome: f.nome || '',
+                    ativo: true,
+                    loginUsuario: u,
+                    loginSenhaHash: h,
+                    atualizadoEm: f.atualizadoEm || new Date().toISOString()
+                });
+            }
+            salvarFuncionariosInterno(lista);
+            sincronizarMapaLoginsFuncLimpo();
+            return payloadLoginsFuncNuvemSyncFromLista(funcs);
         }
 
         async function enviarLoginsFuncNuvem() {
@@ -12407,13 +12439,10 @@
             if (!cfg || !cfg.apiKey || !cfg.projectId) {
                 return { ok: false, erro: 'Nuvem sem configuração Firebase.' };
             }
-            var pack = payloadLoginsFuncNuvem();
+            var pack = await payloadLoginsFuncNuvem();
             if (!(pack.funcionarios || []).length) {
                 return { ok: false, erro: 'Nenhum login de funcionário para enviar.' };
             }
-            pack.tipo = 'logins_funcionarios';
-            pack.token = DOC_LOGINS_FUNC_NUVEM;
-            var ultimoErro = null;
             try {
                 var sessao = await initFirebaseApp();
                 await sessao.fsMod.setDoc(
@@ -12421,20 +12450,18 @@
                     pack
                 );
             } catch (e1) {
-                ultimoErro = e1;
                 console.warn('enviar logins_func:', e1);
                 try {
                     if (!usuarioNuvemLogado()) {
-                        return { ok: false, erro: (e1 && (e1.message || e1.code)) || 'Falha ao enviar (faça login Admin).' };
+                        return { ok: false, erro: (e1 && (e1.message || e1.code)) || 'Falha ao enviar. Atualize as regras Firebase (Blindagem).' };
                     }
                     var sAuth = await obterSessaonuvem();
                     await sAuth.fsMod.setDoc(
                         sAuth.fsMod.doc(sAuth.dbFs, COL_LOGINS_FUNC_NUVEM, DOC_LOGINS_FUNC_NUVEM),
                         pack
                     );
-                    ultimoErro = null;
                 } catch (eAuth) {
-                    return { ok: false, erro: (eAuth && (eAuth.message || eAuth.code)) || 'Falha ao enviar.' };
+                    return { ok: false, erro: (eAuth && (eAuth.message || eAuth.code)) || 'Falha ao enviar. Veja Blindagem → regras.' };
                 }
             }
             if (usuarioNuvemLogado()) {
@@ -12442,7 +12469,16 @@
                     var s2 = await obterSessaonuvem();
                     await s2.fsMod.setDoc(
                         s2.fsMod.doc(s2.dbFs, 'joninha_suspensoes_base', 'principal'),
-                        { funcionarios: listarFuncionariosInterno(), atualizadoEm: pack.atualizadoEm },
+                        { funcionarios: listarFuncionariosInterno().map(function (f) {
+                            return {
+                                id: f.id,
+                                nome: f.nome,
+                                ativo: f.ativo !== false,
+                                loginUsuario: f.loginUsuario || '',
+                                loginSenhaHash: f.loginSenhaHash || '',
+                                atualizadoEm: f.atualizadoEm || null
+                            };
+                        }), atualizadoEm: pack.atualizadoEm },
                         { merge: true }
                     );
                 } catch (e2) { /* ok */ }
@@ -12465,21 +12501,24 @@
                 if (!r || !r.id) return;
                 var cur = byId[r.id] || { id: r.id, criadoEm: r.atualizadoEm || new Date().toISOString() };
                 var u = normalizarLoginFunc(r.loginUsuario);
-                var s = normalizarSenhaFunc(r.loginSenha);
                 byId[r.id] = Object.assign({}, cur, {
                     id: r.id,
                     nome: r.nome || cur.nome || u || 'Funcionário',
                     ativo: r.ativo !== false,
                     loginUsuario: u || cur.loginUsuario || '',
-                    loginSenha: s || cur.loginSenha || '',
+                    loginSenhaHash: r.loginSenhaHash || cur.loginSenhaHash || '',
                     atualizadoEm: r.atualizadoEm || new Date().toISOString()
                 });
+                /* Nuvem não manda senha em texto — preserva local se existir */
+                if (r.loginSenha && !byId[r.id].loginSenha) {
+                    byId[r.id].loginSenha = normalizarSenhaFunc(r.loginSenha);
+                }
             });
             salvarFuncionariosInterno(Object.keys(byId).map(function (k) { return byId[k]; }));
             return Object.keys(sincronizarMapaLoginsFuncLimpo());
         }
 
-        /* Lê logins na nuvem sem login admin (mesma regra pública das assinaturas) */
+        /* Lê logins na nuvem sem login admin */
         async function puxarLoginsFuncNuvem() {
             var cfg = carregarConfigNuvem();
             if (!cfg || !cfg.apiKey || !cfg.projectId) {
@@ -12502,6 +12541,9 @@
             } catch (e1) {
                 console.warn('puxar logins_func:', e1);
                 var msg = (e1 && (e1.message || e1.code)) || 'erro';
+                if (String(msg).indexOf('permission') >= 0 || String(msg).indexOf('Permission') >= 0) {
+                    msg = 'Sem permissão na coleção joninha_logins_func. Cole as regras em Sistema → Blindagem.';
+                }
                 try {
                     if (usuarioNuvemLogado()) {
                         var base = await baixarBaseNuvemSilencioso();
@@ -12513,7 +12555,7 @@
                 } catch (e2) { /* ok */ }
                 return { ok: false, erro: msg };
             }
-            return { ok: false, erro: 'Ainda não há logins na nuvem. No PC: clique em “Enviar logins ao celular”.' };
+            return { ok: false, erro: 'Ainda não há logins na nuvem. No PC: Enviar logins ao celular (e atualize regras Firebase).' };
         }
 
         function normalizarLoginFunc(s) {
@@ -12534,17 +12576,43 @@
                 .trim();
         }
 
+        async function hashSenhaFunc(login, senha) {
+            var u = normalizarLoginFunc(login);
+            var s = normalizarSenhaFunc(senha);
+            var raw = SENHA_FUNC_SALT + '|' + u + '|' + s;
+            try {
+                if (window.crypto && crypto.subtle) {
+                    var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+                    return Array.from(new Uint8Array(buf)).map(function (b) {
+                        return b.toString(16).padStart(2, '0');
+                    }).join('');
+                }
+            } catch (e) { /* fallback abaixo */ }
+            var h = 2166136261;
+            for (var i = 0; i < raw.length; i++) {
+                h ^= raw.charCodeAt(i);
+                h = Math.imul(h, 16777619);
+            }
+            return 'fb_' + (h >>> 0).toString(16);
+        }
+
+        function funcionarioTemCredencial(f) {
+            if (!f) return false;
+            if (!normalizarLoginFunc(f.loginUsuario)) return false;
+            return !!(normalizarSenhaFunc(f.loginSenha) || f.loginSenhaHash);
+        }
+
         /* Mapa limpo só com o que está nos funcionários agora (sem login antigo preso) */
         function sincronizarMapaLoginsFuncLimpo() {
             var map = {};
             listarFuncionariosInterno().forEach(function (f) {
                 if (!f || !f.id || f.ativo === false) return;
+                if (!funcionarioTemCredencial(f)) return;
                 var u = normalizarLoginFunc(f.loginUsuario);
-                var s = normalizarSenhaFunc(f.loginSenha);
-                if (!u || !s) return;
                 map[u] = {
                     funcionarioId: f.id,
-                    senha: s,
+                    senha: normalizarSenhaFunc(f.loginSenha),
+                    senhaHash: f.loginSenhaHash || '',
                     nome: f.nome || '',
                     atualizadoEm: f.atualizadoEm || new Date().toISOString()
                 };
@@ -12569,7 +12637,7 @@
             return Object.keys(sincronizarMapaLoginsFuncLimpo()).sort();
         }
 
-        function salvarCredencialLoginFunc(funcionario, usuario, senha) {
+        async function salvarCredencialLoginFunc(funcionario, usuario, senha) {
             var u = normalizarLoginFunc(usuario);
             var s = normalizarSenhaFunc(senha);
             if (!funcionario || !funcionario.id || !u || !s) return false;
@@ -12577,8 +12645,10 @@
             var lista = listarFuncionariosInterno();
             var i = lista.findIndex(function (x) { return x.id === funcionario.id; });
             if (i < 0) return false;
+            var h = await hashSenhaFunc(u, s);
             lista[i].loginUsuario = u;
             lista[i].loginSenha = s;
+            lista[i].loginSenhaHash = h;
             lista[i].atualizadoEm = new Date().toISOString();
             salvarFuncionariosInterno(lista);
             sincronizarMapaLoginsFuncLimpo();
@@ -12586,34 +12656,46 @@
             return true;
         }
 
-        function autenticarFuncionarioLogin(usuario, senha) {
+        async function autenticarFuncionarioLogin(usuario, senha) {
             var u = normalizarLoginFunc(usuario);
             var s = normalizarSenhaFunc(senha);
             if (!u || !s) return null;
+            var h = await hashSenhaFunc(u, s);
+
+            var lista = listarFuncionariosInterno();
+            var hit = null;
+            for (var i = 0; i < lista.length; i++) {
+                var x = lista[i];
+                if (!x || x.ativo === false) continue;
+                if (normalizarLoginFunc(x.loginUsuario) !== u) continue;
+                if (x.loginSenhaHash && x.loginSenhaHash === h) {
+                    hit = x;
+                    break;
+                }
+                if (normalizarSenhaFunc(x.loginSenha) === s) {
+                    lista[i].loginSenhaHash = h;
+                    lista[i].atualizadoEm = new Date().toISOString();
+                    salvarFuncionariosInterno(lista);
+                    sincronizarMapaLoginsFuncLimpo();
+                    hit = lista[i];
+                    break;
+                }
+            }
+            if (hit) return hit;
 
             var map = sincronizarMapaLoginsFuncLimpo();
             var cred = map[u];
-            if (cred && normalizarSenhaFunc(cred.senha) === s) {
-                var f = listarFuncionariosInterno().find(function (x) {
-                    return x && String(x.id) === String(cred.funcionarioId);
-                });
-                if (f && f.ativo === false) return null;
-                if (f) return f;
+            if (cred && ((cred.senhaHash && cred.senhaHash === h) || (cred.senha && cred.senha === s))) {
                 return {
                     id: cred.funcionarioId,
                     nome: cred.nome || u,
                     ativo: true,
                     loginUsuario: u,
-                    loginSenha: s
+                    loginSenha: s,
+                    loginSenhaHash: h
                 };
             }
-
-            /* 2ª tentativa: compara direto na lista (mesmo se mapa falhar) */
-            return listarFuncionariosInterno().find(function (x) {
-                if (!x || x.ativo === false) return false;
-                return normalizarLoginFunc(x.loginUsuario) === u &&
-                    normalizarSenhaFunc(x.loginSenha) === s;
-            }) || null;
+            return null;
         }
 
         function renderLoginsFuncCfg() {
@@ -12630,9 +12712,7 @@
             if (cur) sel.value = cur;
 
             var comLogin = listarFuncionariosInterno().filter(function (f) {
-                return f && f.ativo !== false &&
-                    String(f.loginUsuario || '').trim() &&
-                    String(f.loginSenha || '').trim();
+                return f && f.ativo !== false && funcionarioTemCredencial(f);
             }).sort(function (a, b) {
                 return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR');
             });
@@ -12645,16 +12725,17 @@
             comLogin.forEach(function (f) {
                 var senha = f.loginSenha ? String(f.loginSenha) : '';
                 var loginVisivel = normalizarLoginFunc(f.loginUsuario);
+                var senhaCell = senha
+                    ? '<code class="senha-login-func" data-senha="' + esc(senha) + '" style="color:#ffe08a;font-size:0.95rem">••••••••</code> ' +
+                      '<button type="button" class="btn btn-secondary" data-ver-senha-func="' + esc(f.id) + '" style="padding:3px 8px;font-size:0.72rem">Mostrar</button>'
+                    : (f.loginSenhaHash
+                        ? '<span style="color:#8fe0b8">hash na nuvem</span> <span class="hint">(redefina p/ ver)</span>'
+                        : '—');
                 var tr = document.createElement('tr');
                 tr.innerHTML =
                     '<td style="color:#fff;font-weight:800">' + esc(f.nome || '—') + '</td>' +
                     '<td style="color:#fff;font-weight:700">' + esc(loginVisivel || '—') + '</td>' +
-                    '<td style="color:#fff;font-weight:700;white-space:nowrap">' +
-                    (senha
-                        ? '<code class="senha-login-func" data-senha="' + esc(senha) + '" style="color:#ffe08a;font-size:0.95rem">••••••••</code> ' +
-                          '<button type="button" class="btn btn-secondary" data-ver-senha-func="' + esc(f.id) + '" style="padding:3px 8px;font-size:0.72rem">Mostrar</button>'
-                        : '—') +
-                    '</td>' +
+                    '<td style="color:#fff;font-weight:700;white-space:nowrap">' + senhaCell + '</td>' +
                     '<td style="color:#fff;font-weight:700">Ativo</td>' +
                     '<td class="actions">' +
                     '<button type="button" class="btn btn-ok" data-testar-login-func="' + esc(f.id) + '" style="padding:3px 8px;font-size:0.72rem">Testar entrada</button> ' +
@@ -12682,11 +12763,15 @@
                 });
             });
             tb.querySelectorAll('[data-testar-login-func]').forEach(function (b) {
-                b.addEventListener('click', function () {
+                b.addEventListener('click', async function () {
                     var id = b.getAttribute('data-testar-login-func');
                     var f = listarFuncionariosInterno().find(function (x) { return x && String(x.id) === String(id); });
                     if (!f) { toast('Funcionário não encontrado.'); return; }
-                    var ok = autenticarFuncionarioLogin(f.loginUsuario, f.loginSenha);
+                    if (!f.loginSenha) {
+                        toast('Neste PC só há hash. Digite a senha em Editar, salve, e teste de novo.');
+                        return;
+                    }
+                    var ok = await autenticarFuncionarioLogin(f.loginUsuario, f.loginSenha);
                     if (!ok) {
                         toast('Falha no teste. Salve de novo o login/senha deste funcionário.');
                         return;
@@ -12716,8 +12801,10 @@
                     if (i < 0) return;
                     delete lista[i].loginUsuario;
                     delete lista[i].loginSenha;
+                    delete lista[i].loginSenhaHash;
                     salvarFuncionariosInterno(lista);
                     sincronizarMapaLoginsFuncLimpo();
+                    enviarLoginsFuncNuvem().catch(function () { /* ok */ });
                     toast('Acesso removido.');
                     renderLoginsFuncCfg();
                 });
@@ -12829,13 +12916,13 @@
                     }
                     btnLF.disabled = true;
                     btnLF.textContent = 'Verificando…';
-                    var f = autenticarFuncionarioLogin(user, senha);
+                    var f = await autenticarFuncionarioLogin(user, senha);
                     if (!f) {
                         mostrarErroLogin('Buscando login na nuvem…');
                         var pull = null;
                         try { pull = await puxarLoginsFuncNuvem(); } catch (eN) { pull = { ok: false, erro: (eN && eN.message) || 'falha' }; }
                         atualizarHintLoginsFuncTela();
-                        f = autenticarFuncionarioLogin(user, senha);
+                        f = await autenticarFuncionarioLogin(user, senha);
                         if (!f && pull && !pull.ok) {
                             /* segue para mensagem abaixo com detalhe */
                         }
@@ -12897,7 +12984,7 @@
                 toast('Saiu do painel do funcionário.');
             });
             var formLoginCfg = document.getElementById('formLoginFuncCfg');
-            if (formLoginCfg) formLoginCfg.addEventListener('submit', function (e) {
+            if (formLoginCfg) formLoginCfg.addEventListener('submit', async function (e) {
                 e.preventDefault();
                 var fid = document.getElementById('cfgLoginFuncId').value;
                 var usuario = document.getElementById('cfgLoginUsuario').value;
@@ -12919,13 +13006,13 @@
                     conflito = true;
                 }
                 if (conflito) { toast('Este login já está em uso por outro funcionário.'); return; }
-                if (!salvarCredencialLoginFunc(lista[i], usuario, senha)) {
+                if (!(await salvarCredencialLoginFunc(lista[i], usuario, senha))) {
                     toast('Falha ao salvar login.');
                     return;
                 }
                 var uSalvo = normalizarLoginFunc(usuario);
                 var sSalvo = normalizarSenhaFunc(senha);
-                var teste = autenticarFuncionarioLogin(uSalvo, sSalvo);
+                var teste = await autenticarFuncionarioLogin(uSalvo, sSalvo);
                 var st = document.getElementById('statusEnvioLoginFunc');
                 if (!teste) {
                     toast('Salvou, mas o teste falhou. Atualize a página (Ctrl+F5) e salve de novo.');
@@ -13022,6 +13109,117 @@
             var modalWa = document.getElementById('modalWaEnvio');
             if (modalWa) modalWa.addEventListener('click', function (e) {
                 if (e.target.id === 'modalWaEnvio') fecharModalWaEnvio();
+            });
+
+            /* —— Blindagem / Diagnóstico —— */
+            var REGRAS_FIREBASE_TEXTO =
+                'rules_version = \'2\';\n' +
+                'service cloud.firestore {\n' +
+                '  match /databases/{database}/documents {\n' +
+                '    match /joninha_assinaturas/{token} {\n' +
+                '      allow read, write: if true;\n' +
+                '    }\n' +
+                '    /* Login funcionário no celular (só hash, sem senha em texto) */\n' +
+                '    match /joninha_logins_func/{doc} {\n' +
+                '      allow read: if true;\n' +
+                '      allow write: if request.auth != null;\n' +
+                '    }\n' +
+                '    match /{document=**} {\n' +
+                '      allow read, write: if request.auth != null;\n' +
+                '    }\n' +
+                '  }\n' +
+                '}\n';
+
+            function aplicarVersaoUI() {
+                var elVer = document.getElementById('loginAppVersion');
+                if (elVer) elVer.textContent = 'Build ' + APP_VERSION;
+                var badgeVer = document.getElementById('badgeAppVersion');
+                if (badgeVer) badgeVer.textContent = APP_VERSION;
+                var bl = document.getElementById('blindagemVersao');
+                if (bl) bl.textContent = APP_VERSION;
+                var ta = document.getElementById('txtRegrasFirebase');
+                if (ta && !ta.value) ta.value = REGRAS_FIREBASE_TEXTO;
+            }
+            aplicarVersaoUI();
+
+            async function rodarChecklistBlindagem() {
+                var ul = document.getElementById('listaBlindagem');
+                if (!ul) return;
+                ul.innerHTML = '<li>Rodando…</li>';
+                var itens = [];
+                function add(ok, titulo, detalhe) {
+                    itens.push({ ok: !!ok, titulo: titulo, detalhe: detalhe || '' });
+                }
+                add(!!APP_VERSION, 'Versão do build', APP_VERSION);
+                var cfg = carregarConfigNuvem();
+                add(!!(cfg && cfg.apiKey && cfg.projectId), 'Firebase configurado', cfg && cfg.projectId ? cfg.projectId : 'sem projectId');
+                add(!!usuarioNuvemLogado(), 'Admin logado na nuvem', usuarioNuvemLogado() ? 'sim' : 'não — sync completo exige login');
+                var logins = listarLoginsFuncDisponiveis();
+                add(logins.length > 0, 'Login funcionário neste aparelho', logins.length ? logins.join(', ') : 'nenhum');
+                var comHash = listarFuncionariosInterno().filter(function (f) { return f && f.loginSenhaHash; }).length;
+                add(comHash > 0 || !logins.length, 'Senhas com hash (blindagem)', comHash + ' funcionário(s) com hash');
+                var db = carregarMain();
+                var bloq = (db.caixaConfig && db.caixaConfig.osBloqueadasCaixa) || {};
+                add(true, 'OS bloqueadas no caixa', Object.keys(bloq).length + ' registro(s)');
+                try {
+                    blindarCaixaContraOsBloqueadas(db);
+                    add(true, 'Blindagem de caixa aplicada', 'ok');
+                } catch (e) {
+                    add(false, 'Blindagem de caixa', (e && e.message) || 'falhou');
+                }
+                var pull = { ok: false, erro: 'não testado' };
+                try {
+                    pull = await puxarLoginsFuncNuvem();
+                } catch (eP) {
+                    pull = { ok: false, erro: (eP && eP.message) || 'erro' };
+                }
+                add(!!(pull && pull.ok), 'Leitura joninha_logins_func na nuvem',
+                    pull && pull.ok
+                        ? ('ok · ' + ((pull.logins || []).join(', ') || pull.qtd || ''))
+                        : ((pull && pull.erro) || 'falhou — atualize regras Firebase'));
+                ul.innerHTML = itens.map(function (it) {
+                    return '<li style="color:' + (it.ok ? '#8fe0b8' : '#ff8f8f') + '">' +
+                        (it.ok ? '✓' : '✗') + ' <strong>' + esc(it.titulo) + '</strong> — ' +
+                        esc(it.detalhe) + '</li>';
+                }).join('');
+                var falhas = itens.filter(function (x) { return !x.ok; }).length;
+                toast(falhas ? (falhas + ' item(ns) vermelho(s) — corrija antes de nova feature') : 'Checklist OK');
+            }
+
+            var btnBlind = document.getElementById('btnRodarBlindagem');
+            if (btnBlind) btnBlind.addEventListener('click', function () {
+                rodarChecklistBlindagem().catch(function (e) {
+                    toast('Falha no checklist: ' + ((e && e.message) || 'erro'));
+                });
+            });
+            var btnEnvBl = document.getElementById('btnEnviarLoginsBlindagem');
+            if (btnEnvBl) btnEnvBl.addEventListener('click', async function () {
+                btnEnvBl.disabled = true;
+                try {
+                    var res = await enviarLoginsFuncNuvem();
+                    toast(res && res.ok ? ('Nuvem OK: ' + (res.logins || []).join(', ')) : ((res && res.erro) || 'Falha'));
+                    await rodarChecklistBlindagem();
+                } finally {
+                    btnEnvBl.disabled = false;
+                }
+            });
+            var btnCop = document.getElementById('btnCopiarRegrasFirebase');
+            if (btnCop) btnCop.addEventListener('click', function () {
+                var ta = document.getElementById('txtRegrasFirebase');
+                if (ta) ta.value = REGRAS_FIREBASE_TEXTO;
+                var txt = REGRAS_FIREBASE_TEXTO;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(txt).then(function () {
+                        toast('Regras copiadas. Cole no Firebase Console → Firestore → Regras.');
+                    }).catch(function () {
+                        if (ta) { ta.focus(); ta.select(); }
+                        toast('Selecione o texto e copie (Ctrl+C).');
+                    });
+                } else if (ta) {
+                    ta.focus();
+                    ta.select();
+                    toast('Ctrl+C para copiar as regras.');
+                }
             });
         })();
 

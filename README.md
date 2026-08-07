@@ -48,7 +48,7 @@ Confirme que `.env` e `firebase-env.js` **não** entraram no commit.
 
 - Authentication → método **E-mail/senha** → criar usuário admin
 - Firestore Database → criar banco
-- Regras sugeridas (sistema + assinatura do cliente no celular):
+- **Regras obrigatórias** (assinatura + login funcionário + resto autenticado). Cole isto em Firestore → Regras → Publicar:
   ```
   rules_version = '2';
   service cloud.firestore {
@@ -56,6 +56,11 @@ Confirme que `.env` e `firebase-env.js` **não** entraram no commit.
       /* Assinatura: cliente abre o link sem login e assina */
       match /joninha_assinaturas/{token} {
         allow read, write: if true;
+      }
+      /* Login do funcionário no celular: leitura pública (só hash), escrita só admin */
+      match /joninha_logins_func/{doc} {
+        allow read: if true;
+        allow write: if request.auth != null;
       }
       /* Resto do sistema: só com login */
       match /{document=**} {
@@ -65,8 +70,17 @@ Confirme que `.env` e `firebase-env.js` **não** entraram no commit.
   }
   ```
 - Authentication → Settings → **Authorized domains**: adicionar o domínio da Vercel
+- Depois de publicar as regras: no sistema, **Sistema → Blindagem** → **Enviar logins à nuvem**, e no celular **Atualizar logins da nuvem**.
 
-## 5) Assinatura do cliente (`assinar-joninha.html`)
+## 5) Blindagem (checklist no próprio sistema)
+
+Menu **Sistema → Blindagem / Diagnóstico**:
+- mostra a versão do build (`1.2.0-blindagem`)
+- testa Firebase, login funcionário, leitura da coleção `joninha_logins_func`
+- copia as regras Firebase
+- reenvia logins com **hash** (senha em texto **não** sobe mais na nuvem)
+
+## 6) Assinatura do cliente (`assinar-joninha.html`)
 
 **Sim — esse arquivo também sobe no GitHub** (e vai para a Vercel no deploy).
 
@@ -79,3 +93,4 @@ Fluxo:
 ## Observação
 
 Chaves Web do Firebase aparecem no navegador depois do deploy (é normal). O que importa é **não versionar o `.env`** e proteger o banco com **login + regras**.
+**Não deixe** `FIREBASE CHAVE.txt` no GitHub.
