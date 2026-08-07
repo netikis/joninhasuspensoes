@@ -47,6 +47,7 @@ Confirme que `.env` e `firebase-env.js` **não** entraram no commit.
 ## 4) Firebase Console
 
 - Authentication → método **E-mail/senha** → criar usuário admin
+- Authentication → método **Anônimo** → **ativar** (obrigatório para funcionário subir OS/fotos no celular)
 - Firestore Database → criar banco
 - **Regras obrigatórias** (assinatura + login funcionário + resto autenticado). Cole isto em Firestore → Regras → Publicar:
   ```
@@ -72,10 +73,19 @@ Confirme que `.env` e `firebase-env.js` **não** entraram no commit.
 - Authentication → Settings → **Authorized domains**: adicionar o domínio da Vercel
 - Depois de publicar as regras: no sistema, **Sistema → Blindagem** → **Enviar logins à nuvem**, e no celular **Atualizar logins da nuvem**.
 
+### Fotos PC ↔ Celular (Admin e Funcionário)
+
+1. Ative **Authentication → Anonymous**
+2. Deploy com build `1.2.1-fotos-sync` (versão na tela de login)
+3. No celular (Admin ou Funcionário): tirar foto → salvar OS → deve aparecer `nuvem OK (fotos comprimidas)`
+4. No PC (Admin): sync / abrir histórico → fotos da OS
+
+Fotos são comprimidas (~720px, JPEG ~0.68) antes de gravar e de subir, para não estourar o Firestore.
+
 ## 5) Blindagem (checklist no próprio sistema)
 
 Menu **Sistema → Blindagem / Diagnóstico**:
-- mostra a versão do build (`1.2.0-blindagem`)
+- mostra a versão do build
 - testa Firebase, login funcionário, leitura da coleção `joninha_logins_func`
 - copia as regras Firebase
 - reenvia logins com **hash** (senha em texto **não** sobe mais na nuvem)

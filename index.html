@@ -2467,7 +2467,7 @@
 
                 <div class="box photo-zone">
                     <h2>Fotos do veículo (uso interno)</h2>
-                    <p class="hint">As fotos ficam guardadas na ficha/pasta do cliente (só para você). Na hora de <strong>imprimir ou enviar ao cliente</strong>, o sistema pergunta se inclui as fotos ou não.</p>
+                    <p class="hint">Fotos já saem <strong>comprimidas</strong> (máx. ~720px). Ao salvar a OS com internet, sobem na <strong>nuvem</strong> (Admin e Funcionário) e aparecem no outro aparelho após sync. Na impressão/envio ao cliente, o sistema pergunta se inclui as fotos.</p>
                     <div class="photo-buttons">
                         <button type="button" class="btn btn-primary" id="btnTirarFoto">📷 Tirar foto</button>
                         <button type="button" class="btn btn-secondary" id="btnGaleriaFoto">🖼️ Galeria / arquivo</button>
@@ -3656,7 +3656,7 @@
         'use strict';
 
         /** Banco exclusivo deste index — não usa chaves dos outros sistemas */
-        var APP_VERSION = '1.2.0-blindagem';
+        var APP_VERSION = '1.2.1-fotos-sync';
         var STORAGE_KEY = 'joninha_suspensoes_v1';
         var STORAGE_INTERNO = 'joninha_suspensoes_interno_v1';
         var STORAGE_LOGINS_FUNC = 'joninha_suspensoes_logins_func_v1';
@@ -3721,7 +3721,10 @@
         var NUVEM_KEY = 'joninha_suspensoes_nuvem';
         var LOGIN_EMAIL_KEY = 'joninha_suspensoes_login_email';
         var SYNC_ULTIMA_KEY = 'joninha_suspensoes_sync_ultima';
-        var FOTOS_MAX = 12;
+        var FOTOS_MAX = 10;
+        var FOTO_MAX_LADO = 720;
+        var FOTO_JPEG_QUALIDADE = 0.68;
+        var FOTO_MAX_CHARS = 220000; /* ~165KB — evita estourar doc Firestore */
 
         function empresaPadrao() {
             return {
@@ -5336,6 +5339,66 @@
             if (e.target === this) this.classList.remove('aberto');
         });
 
+        function desenharFotoCanvas(img, maxLado, qualidade) {
+            var w = img.naturalWidth || img.width;
+            var h = img.naturalHeight || img.height;
+            if (!w || !h) return null;
+            var max = maxLado || FOTO_MAX_LADO;
+            if (w > max || h > max) {
+                if (w > h) { h = (h * max) / w; w = max; }
+                else { w = (w * max) / h; h = max; }
+            }
+            var canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(w));
+            canvas.height = Math.max(1, Math.round(h));
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL('image/jpeg', qualidade != null ? qualidade : FOTO_JPEG_QUALIDADE);
+        }
+
+        function carregarImagemDeSrc(src) {
+            return new Promise(function (resolve, reject) {
+                var img = new Image();
+                img.onerror = reject;
+                img.onload = function () { resolve(img); };
+                img.src = src;
+            });
+        }
+
+        /* Recomprime até caber no limite (nuvem / Firestore) */
+        async function garantirFotoComprimida(dataUrl) {
+            if (!dataUrl || String(dataUrl).indexOf('data:image') !== 0) return dataUrl || null;
+            if (String(dataUrl).length <= FOTO_MAX_CHARS) {
+                /* Mesmo abaixo do limite, normaliza para JPEG compacto */
+                try {
+                    var img0 = await carregarImagemDeSrc(dataUrl);
+                    var n0 = desenharFotoCanvas(img0, FOTO_MAX_LADO, FOTO_JPEG_QUALIDADE);
+                    if (n0 && n0.length <= String(dataUrl).length) return n0;
+                    if (n0 && String(dataUrl).length > FOTO_MAX_CHARS) return n0;
+                    return n0 || dataUrl;
+                } catch (e) {
+                    return dataUrl;
+                }
+            }
+            var lados = [FOTO_MAX_LADO, 640, 540, 480, 400];
+            var quals = [FOTO_JPEG_QUALIDADE, 0.6, 0.52, 0.45, 0.38];
+            var atual = dataUrl;
+            try {
+                var img = await carregarImagemDeSrc(dataUrl);
+                for (var i = 0; i < lados.length; i++) {
+                    for (var q = 0; q < quals.length; q++) {
+                        var out = desenharFotoCanvas(img, lados[i], quals[q]);
+                        if (!out) continue;
+                        atual = out;
+                        if (out.length <= FOTO_MAX_CHARS) return out;
+                    }
+                }
+            } catch (e2) { /* mantém atual */ }
+            return atual;
+        }
+
         function comprimirImagemArquivo(file) {
             return new Promise(function (resolve, reject) {
                 var reader = new FileReader();
@@ -5343,23 +5406,15 @@
                 reader.onload = function () {
                     var img = new Image();
                     img.onerror = reject;
-                    img.onload = function () {
-                        var max = 960;
-                        var w = img.naturalWidth || img.width;
-                        var h = img.naturalHeight || img.height;
-                        if (!w || !h) { reject(new Error('imagem inválida')); return; }
-                        if (w > max || h > max) {
-                            if (w > h) { h = (h * max) / w; w = max; }
-                            else { w = (w * max) / h; h = max; }
+                    img.onload = async function () {
+                        try {
+                            var base = desenharFotoCanvas(img, FOTO_MAX_LADO, FOTO_JPEG_QUALIDADE);
+                            if (!base) { reject(new Error('imagem inválida')); return; }
+                            var final = await garantirFotoComprimida(base);
+                            resolve(final);
+                        } catch (err) {
+                            reject(err);
                         }
-                        var canvas = document.createElement('canvas');
-                        canvas.width = Math.round(w);
-                        canvas.height = Math.round(h);
-                        var ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#fff';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.85));
                     };
                     img.src = reader.result;
                 };
@@ -5636,19 +5691,52 @@
             return !!(!_fbSessao || !_fbSessao.auth ? false : _fbSessao.auth.currentUser);
         }
 
+        function usuarioNuvemEhAnonimo() {
+            var u = _fbSessao && _fbSessao.auth && _fbSessao.auth.currentUser;
+            return !!(u && u.isAnonymous);
+        }
+
+        /* Admin e-mail OU anônimo (funcionário no celular) */
+        async function garantirSessaoNuvemQualquer() {
+            var cfg = carregarConfigNuvem();
+            if (!cfg || !cfg.apiKey || !cfg.projectId) return false;
+            try {
+                var sessao = await initFirebaseApp();
+                if (sessao.auth.currentUser) return true;
+                await sessao.authMod.signInAnonymously(sessao.auth);
+                return !!(sessao.auth.currentUser);
+            } catch (e) {
+                console.warn('garantirSessaoNuvemQualquer:', e);
+                return false;
+            }
+        }
+
         function agendarSyncAutomatico(motivo) {
             if (_syncEmAndamento) return;
-            if (!usuarioNuvemLogado()) return;
             var cfg = carregarConfigNuvem();
             if (!cfg || !cfg.apiKey || !cfg.projectId) return;
             /* Ao salvar, agenda mesmo com aba em segundo plano (envia o que acabou de mudar) */
             if (motivo !== 'salvar' && document.hidden) return;
             clearTimeout(_syncDebounceTimer);
             _syncDebounceTimer = setTimeout(function () {
-                if (_syncEmAndamento || !usuarioNuvemLogado()) return;
+                if (_syncEmAndamento) return;
                 if (motivo !== 'salvar' && document.hidden) return;
-                sincronizarTodosNuvem({ silencioso: true, motivo: motivo || 'auto' }).catch(function () { /* offline */ });
+                dispararSyncConformeSessao({ silencioso: true, motivo: motivo || 'auto' }).catch(function () { /* offline */ });
             }, motivo === 'salvar' ? 2800 : 800);
+        }
+
+        async function dispararSyncConformeSessao(opts) {
+            opts = opts || {};
+            var okAuth = usuarioNuvemLogado() || await garantirSessaoNuvemQualquer();
+            if (!okAuth) return;
+            if (sessaoFuncionarioId && usuarioNuvemEhAnonimo()) {
+                return sincronizarOficinaNuvem(opts);
+            }
+            if (sessaoFuncionarioId) {
+                /* Funcionário com sessão Admin já logada: sync oficina (não mexe caixa no push cego) */
+                return sincronizarOficinaNuvem(opts);
+            }
+            return sincronizarTodosNuvem(opts);
         }
 
         function iniciarSyncAutomatico() {
@@ -5656,8 +5744,7 @@
             /* A cada 60s, se a aba estiver aberta */
             _syncIntervalId = setInterval(function () {
                 if (document.hidden) return;
-                if (!usuarioNuvemLogado()) return;
-                sincronizarTodosNuvem({ silencioso: true, motivo: 'intervalo' }).catch(function () { /* offline */ });
+                dispararSyncConformeSessao({ silencioso: true, motivo: 'intervalo' }).catch(function () { /* offline */ });
             }, 60000);
 
             if (_syncListenersLigados) return;
@@ -5761,10 +5848,15 @@
                 var fotoId = f.id || ('f' + i);
                 f.id = fotoId;
                 try {
+                    f.data = await garantirFotoComprimida(f.data);
+                    if (!f.data || String(f.data).length > FOTO_MAX_CHARS * 1.35) {
+                        return { ok: false, motivo: 'foto ainda grande demais após compressão' };
+                    }
                     await fsMod.setDoc(fsMod.doc(dbFs, 'joninha_suspensoes_midia', atendimento.id + '_' + fotoId), {
                         atendimentoId: atendimento.id,
                         fotoId: fotoId,
                         data: f.data,
+                        comprimida: true,
                         atualizadoEm: new Date().toISOString()
                     });
                     delete f.data;
@@ -5772,6 +5864,7 @@
                     return { ok: false, motivo: 'falha ao enviar foto: ' + (midErr.message || midErr.code || '') };
                 }
             }
+            docOut.fotos = fotos;
             docOut.atualizadoEm = new Date().toISOString();
             await fsMod.setDoc(fsMod.doc(dbFs, 'joninha_suspensoes_atendimentos', atendimento.id), docOut);
             return { ok: true, atendimento: docOut };
@@ -6040,6 +6133,115 @@
             return snap.data() || null;
         }
 
+        /* Sync seguro p/ funcionário (e Admin no celular): OS + fotos + clientes. Não empurra caixa. */
+        async function sincronizarOficinaNuvem(opts) {
+            opts = opts || {};
+            var silencioso = !!opts.silencioso;
+            var mostrarToast = opts.mostrarToast != null ? !!opts.mostrarToast : !silencioso;
+            if (_syncEmAndamento) {
+                if (!silencioso) toast('Sincronização já em andamento…');
+                return;
+            }
+            var cfg = carregarConfigNuvem();
+            if (!cfg || !cfg.apiKey || !cfg.projectId) {
+                if (!silencioso) toast('Modo local — nuvem desativada.');
+                return;
+            }
+            if (!usuarioNuvemLogado()) {
+                var okA = await garantirSessaoNuvemQualquer();
+                if (!okA) {
+                    if (!silencioso) toast('Ative Authentication → Anônimo no Firebase (Blindagem).');
+                    return;
+                }
+            }
+
+            _syncEmAndamento = true;
+            atualizarStatusNuvemUI();
+            if (!silencioso) toast('Sincronizando oficina (OS + fotos)…');
+
+            try {
+                await obterSessaonuvem();
+                var canalAntes = canalVendas;
+                canalVendas = 'normal';
+                var db = carregar();
+                var ok = 0, falha = 0;
+
+                try {
+                    var baseNuv = await baixarBaseNuvem();
+                    if (baseNuv) {
+                        db.excluidos = mesclarExcluidos(db.excluidos, baseNuv.excluidos);
+                        var ex = garantirExcluidos(db);
+                        db.clientes = mesclarListaPorId(db.clientes, baseNuv.clientes, ex.clientes);
+                        if (baseNuv.funcionarios) aplicarFuncionariosDaNuvem(baseNuv.funcionarios);
+                    }
+                } catch (eBase) { /* offline parcial */ }
+
+                var nuvemLista = await baixarAtendimentosNuvem();
+                var exAt = garantirExcluidos(db).atendimentos;
+                db.atendimentos = mesclarAtendimentosComExcluidos(db.atendimentos, nuvemLista, exAt);
+
+                for (var i = 0; i < (db.atendimentos || []).length; i++) {
+                    var at = db.atendimentos[i];
+                    if (!at || !at.id) continue;
+                    /* Comprime fotos locais antes do upload */
+                    if (at.fotos && at.fotos.length) {
+                        for (var fi = 0; fi < at.fotos.length; fi++) {
+                            if (at.fotos[fi] && at.fotos[fi].data) {
+                                at.fotos[fi].data = await garantirFotoComprimida(at.fotos[fi].data);
+                            }
+                        }
+                    }
+                    var r = await enviarAtendimentoNuvem(at);
+                    if (r.ok) {
+                        ok++;
+                        if (r.atendimento) {
+                            var locais = at.fotos || [];
+                            var nuvFotos = r.atendimento.fotos || [];
+                            db.atendimentos[i].syncNuvemEm = new Date().toISOString();
+                            db.atendimentos[i].fotos = nuvFotos.map(function (fn, idx) {
+                                var fl = locais.find(function (x) { return x && fn && x.id === fn.id; }) || locais[idx] || {};
+                                return {
+                                    id: (fn && fn.id) || fl.id || uid(),
+                                    data: fl.data || null,
+                                    url: fl.url || (fn && fn.url) || null
+                                };
+                            });
+                            if (!db.atendimentos[i].fotos.length && locais.length) {
+                                db.atendimentos[i].fotos = locais;
+                            }
+                        }
+                    } else falha++;
+                }
+
+                /* Sobe só clientes (merge), sem reescrever caixa */
+                try {
+                    var sessao = await obterSessaonuvem();
+                    await sessao.fsMod.setDoc(
+                        sessao.fsMod.doc(sessao.dbFs, 'joninha_suspensoes_base', 'principal'),
+                        {
+                            clientes: db.clientes || [],
+                            atualizadoEm: new Date().toISOString()
+                        },
+                        { merge: true }
+                    );
+                } catch (eCli) { /* ok */ }
+
+                salvar(db);
+                canalVendas = canalAntes;
+                _syncUltimaOkEm = Date.now();
+                try { localStorage.setItem(SYNC_ULTIMA_KEY, String(_syncUltimaOkEm)); } catch (eUlt) { /* ok */ }
+
+                if (mostrarToast) {
+                    toast('Oficina nuvem: ' + ok + ' OS' + (falha ? ' · ' + falha + ' falha(s)' : '') + '.');
+                }
+                try { renderHistorico(); } catch (eH) { /* ok */ }
+                try { renderTudo(); } catch (eR) { /* ok */ }
+            } finally {
+                _syncEmAndamento = false;
+                atualizarStatusNuvemUI();
+            }
+        }
+
         async function sincronizarTodosNuvem(opts) {
             opts = opts || {};
             var silencioso = !!opts.silencioso;
@@ -6202,9 +6404,18 @@
 
                 if (sessaoFuncionarioId) {
                     localStorage.setItem(SESS_LOCAL_KEY, 'func:' + sessaoFuncionarioId);
-                    pararSyncAutomatico();
                     aplicarModoFuncionario(sessaoFuncionarioId);
                     atualizarStatusNuvemUI();
+                    garantirSessaoNuvemQualquer().then(function (ok) {
+                        iniciarSyncAutomatico();
+                        if (!ok) {
+                            toast('Fotos/OS ficam só neste celular até ativar Auth Anônimo no Firebase.');
+                            atualizarStatusNuvemUI();
+                            return;
+                        }
+                        sincronizarOficinaNuvem({ silencioso: true, mostrarToast: true }).catch(function () { /* offline */ });
+                        atualizarStatusNuvemUI();
+                    });
                     return;
                 }
 
@@ -6592,6 +6803,19 @@
                 total: tots.total,
                 atualizadoEm: new Date().toISOString()
             };
+
+            /* Comprime todas as fotos antes de gravar/subir */
+            if (payload.fotos && payload.fotos.length) {
+                for (var pf = 0; pf < payload.fotos.length; pf++) {
+                    if (payload.fotos[pf] && payload.fotos[pf].data) {
+                        payload.fotos[pf].data = await garantirFotoComprimida(payload.fotos[pf].data);
+                    }
+                }
+                fotosAtuais = payload.fotos.map(function (f) {
+                    return { id: f.id, data: f.data || null, url: f.url || null };
+                });
+            }
+
             if (id) {
                 var i = db.atendimentos.findIndex(function (a) { return a.id === id; });
                 if (i >= 0) db.atendimentos[i] = Object.assign({}, db.atendimentos[i], payload);
@@ -6609,34 +6833,60 @@
             } catch (errPasta) { /* opcional */ }
 
             var cfgN = carregarConfigNuvem();
-            if (cfgN && cfgN.apiKey && cfgN.projectId && _fbSessao && _fbSessao.auth && _fbSessao.auth.currentUser) {
+            if (cfgN && cfgN.apiKey && cfgN.projectId) {
                 try {
-                    await enviarBaseNuvem(carregar());
-                    var nuv = await enviarAtendimentoNuvem(payload);
-                    if (nuv.ok) {
-                        extras.push('nuvem OK');
-                        if (nuv.atendimento && nuv.atendimento.fotos) {
-                            var db2 = carregar();
-                            var ix = db2.atendimentos.findIndex(function (a) { return a.id === payload.id; });
-                            if (ix >= 0) {
-                                var locais = db2.atendimentos[ix].fotos || payload.fotos || [];
-                                var nuvFotos = nuv.atendimento.fotos || [];
-                                db2.atendimentos[ix].fotos = nuvFotos.map(function (fn, idx) {
-                                    var fl = locais.find(function (x) { return x && fn && x.id === fn.id; }) || locais[idx] || {};
+                    var okSess = usuarioNuvemLogado() || await garantirSessaoNuvemQualquer();
+                    if (!okSess) {
+                        extras.push('nuvem: sem auth (ative Anônimo no Firebase)');
+                    } else if (sessaoFuncionarioId) {
+                        var nuvF = await enviarAtendimentoNuvem(payload);
+                        if (nuvF.ok) {
+                            extras.push('nuvem OK (fotos comprimidas)');
+                            var dbF = carregar();
+                            var ixF = dbF.atendimentos.findIndex(function (a) { return a.id === payload.id; });
+                            if (ixF >= 0 && nuvF.atendimento) {
+                                var locF = dbF.atendimentos[ixF].fotos || payload.fotos || [];
+                                var nuvFotosF = nuvF.atendimento.fotos || [];
+                                dbF.atendimentos[ixF].fotos = nuvFotosF.map(function (fn, idx) {
+                                    var fl = locF.find(function (x) { return x && fn && x.id === fn.id; }) || locF[idx] || {};
                                     return {
                                         id: (fn && fn.id) || fl.id || uid(),
                                         data: fl.data || null,
                                         url: fl.url || (fn && fn.url) || null
                                     };
                                 });
-                                if (!db2.atendimentos[ix].fotos.length && locais.length) {
-                                    db2.atendimentos[ix].fotos = locais;
-                                }
-                                db2.atendimentos[ix].syncNuvemEm = new Date().toISOString();
-                                salvar(db2);
+                                dbF.atendimentos[ixF].syncNuvemEm = new Date().toISOString();
+                                salvar(dbF);
                             }
-                        }
-                    } else extras.push('nuvem: ' + (nuv.motivo || 'falhou'));
+                        } else extras.push('nuvem: ' + (nuvF.motivo || 'falhou'));
+                    } else {
+                        await enviarBaseNuvem(carregar());
+                        var nuv = await enviarAtendimentoNuvem(payload);
+                        if (nuv.ok) {
+                            extras.push('nuvem OK (fotos comprimidas)');
+                            if (nuv.atendimento && nuv.atendimento.fotos) {
+                                var db2 = carregar();
+                                var ix = db2.atendimentos.findIndex(function (a) { return a.id === payload.id; });
+                                if (ix >= 0) {
+                                    var locais = db2.atendimentos[ix].fotos || payload.fotos || [];
+                                    var nuvFotos = nuv.atendimento.fotos || [];
+                                    db2.atendimentos[ix].fotos = nuvFotos.map(function (fn, idx) {
+                                        var fl = locais.find(function (x) { return x && fn && x.id === fn.id; }) || locais[idx] || {};
+                                        return {
+                                            id: (fn && fn.id) || fl.id || uid(),
+                                            data: fl.data || null,
+                                            url: fl.url || (fn && fn.url) || null
+                                        };
+                                    });
+                                    if (!db2.atendimentos[ix].fotos.length && locais.length) {
+                                        db2.atendimentos[ix].fotos = locais;
+                                    }
+                                    db2.atendimentos[ix].syncNuvemEm = new Date().toISOString();
+                                    salvar(db2);
+                                }
+                            }
+                        } else extras.push('nuvem: ' + (nuv.motivo || 'falhou'));
+                    }
                 } catch (errN) {
                     extras.push('nuvem: erro');
                 }
@@ -13153,7 +13403,9 @@
                 add(!!APP_VERSION, 'Versão do build', APP_VERSION);
                 var cfg = carregarConfigNuvem();
                 add(!!(cfg && cfg.apiKey && cfg.projectId), 'Firebase configurado', cfg && cfg.projectId ? cfg.projectId : 'sem projectId');
-                add(!!usuarioNuvemLogado(), 'Admin logado na nuvem', usuarioNuvemLogado() ? 'sim' : 'não — sync completo exige login');
+                add(!!usuarioNuvemLogado(), 'Sessão nuvem (Admin ou Anônimo)', usuarioNuvemLogado()
+                    ? (usuarioNuvemEhAnonimo() ? 'anônimo (func/celular)' : 'admin')
+                    : 'não — ative Auth Anônimo no Firebase');
                 var logins = listarLoginsFuncDisponiveis();
                 add(logins.length > 0, 'Login funcionário neste aparelho', logins.length ? logins.join(', ') : 'nenhum');
                 var comHash = listarFuncionariosInterno().filter(function (f) { return f && f.loginSenhaHash; }).length;
