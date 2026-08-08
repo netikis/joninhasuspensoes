@@ -3466,16 +3466,7 @@ document.getElementById('btnAtualizarDespesasOs').addEventListener('click', func
     toast('Lista de OS atualizada.');
 });
 document.getElementById('buscaDespesasOs').addEventListener('input', renderDespesasOs);
-document.getElementById('btnAtualizarPastasDos').addEventListener('click', function () {
-    if (typeof gerarArvorePastasDespesasOs === 'function') gerarArvorePastasDespesasOs();
-    toast('Pastas de despesas atualizadas.');
-});
-document.getElementById('btnRelMesDespesasOs').addEventListener('click', function () {
-    if (typeof gerarRelatorioMensalDespesasOsPDF === 'function') gerarRelatorioMensalDespesasOsPDF();
-});
-document.getElementById('btnArquivarMesDosPc').addEventListener('click', function () {
-    if (typeof arquivarMesDespesasOsPastaPC === 'function') arquivarMesDespesasOsPastaPC();
-});
+/* Pastas Ano→Mês de despesas por OS removidas da UI (1.3.1) */
 
 /* comissoes/funcionarios: ver js/comissoes.js */
 

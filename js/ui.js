@@ -111,7 +111,6 @@ function abrirPainel(id, btn) {
         renderCarrinhoVenda();
     }
     if (id === 'painelRelatorioCaixa') renderRelatorioCaixa();
-    if (id === 'painelRelatorioDespesas') renderRelatorioDespesas();
     if (id === 'painelRelatorioOficina') renderRelatorioOficina();
     if (id === 'painelComissoes') renderComissoes();
     if (id === 'painelVeiculo') preencherSelectMaoFunc();
@@ -163,8 +162,7 @@ var PAINEIS_CANAL = {
     painelCaixa: true,
     painelCaixaBanco: true,
     painelPendentes: true,
-    painelRelatorioCaixa: true,
-    painelRelatorioDespesas: true
+    painelRelatorioCaixa: true
 };
 
 function abrirMenuMobile() {
@@ -238,10 +236,6 @@ function renderTudo() {
     renderCaixaBanco();
     renderPendentes();
     renderRelatorioCaixa();
-    if (document.getElementById('painelRelatorioDespesas') &&
-        document.getElementById('painelRelatorioDespesas').classList.contains('active')) {
-        renderRelatorioDespesas();
-    }
     if (document.getElementById('painelDespesasOs') &&
         document.getElementById('painelDespesasOs').classList.contains('active')) {
         renderDespesasOs();

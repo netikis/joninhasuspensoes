@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.3.0-split-css';
+var APP_VERSION = '1.3.1-caixa-simples';
 var STORAGE_KEY = 'joninha_suspensoes_v1';
 var STORAGE_INTERNO = 'joninha_suspensoes_interno_v1';
 var STORAGE_LOGINS_FUNC = 'joninha_suspensoes_logins_func_v1';
@@ -21,12 +21,11 @@ var TITULOS = {
     painelHistorico: ['Histórico de Atendimentos', 'Veículos e serviços registrados'],
     painelProdutos: ['Cadastro de Produtos', 'Estoque local simplificado'],
     painelOrcamento: ['Venda / Orçamento', 'Documentos do balcão local'],
-    painelCaixa: ['Caixa / Balcão', 'Entradas · saídas · movimentações'],
-    painelCaixaBanco: ['Caixa do Banco', 'Pastas mensais · PIX · cartões'],
-    painelPendentes: ['Contas a Receber', 'Pastas mensais · a receber'],
-    painelRelatorioCaixa: ['Relatório Caixa', 'Pastas mensais · entradas · saídas · relatório geral'],
-    painelRelatorioDespesas: ['Relatório de Despesas', 'Pastas mensais · todas as saídas / despesas'],
-    painelDespesasOs: ['Despesas por OS', 'Pastas mensais · bruto · despesas · lucro'],
+    painelCaixa: ['Caixa / Balcão', 'Caixa do dia · entradas · saídas · fechar dia'],
+    painelCaixaBanco: ['Caixa do Banco', 'PIX · cartões · transferências'],
+    painelPendentes: ['Contas a Receber', 'Valores em aberto'],
+    painelRelatorioCaixa: ['Relatório Caixa', 'Resumo balcão · banco · pendentes · PDF mensal'],
+    painelDespesasOs: ['Despesas por OS', 'Bruto · despesas internas · lucro'],
     painelFuncionarios: ['Cadastro de Funcionários', 'Comissão % · PIN · modo interno'],
     painelListaFuncionarios: ['Funcionários Cadastrados', 'Ver · editar · excluir'],
     painelPagFuncionarios: ['Pagamento funcionários', 'Controle semanal interno · sem impressão'],

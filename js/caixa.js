@@ -1788,47 +1788,7 @@ document.querySelectorAll('[data-rel-mes]').forEach(function (b) {
         gerarRelatorioMensalPDF(b.getAttribute('data-rel-mes') || 'geral');
     });
 });
-document.getElementById('btnAtualizarPastasCx').addEventListener('click', function () {
-    gerarArvorePastasCaixa({ elId: 'arvorePastasCaixa', filtro: 'geral', idPrefix: 'pasta_cx' });
-    toast('Pastas atualizadas.');
-});
-document.getElementById('btnArquivarMesPc').addEventListener('click', function () {
-    arquivarMesPastaPC(null, 'geral');
-});
-
-document.getElementById('btnAtualizarPastasDespesas').addEventListener('click', function () {
-    renderRelatorioDespesas();
-    toast('Pastas de despesas atualizadas.');
-});
-document.getElementById('btnRelMesDespesas').addEventListener('click', function () {
-    gerarRelatorioMensalPDF('despesas');
-});
-document.getElementById('btnArquivarMesDespesas').addEventListener('click', function () {
-    arquivarMesPastaPC(null, 'despesas');
-});
-
-document.getElementById('btnAtualizarPastasBanco').addEventListener('click', function () {
-    gerarArvorePastasCaixa({ elId: 'arvorePastasBanco', filtro: 'banco', idPrefix: 'pasta_ban' });
-    toast('Pastas do banco atualizadas.');
-});
-document.getElementById('btnRelMesBanco').addEventListener('click', function () {
-    gerarRelatorioMensalPDF('banco');
-});
-document.getElementById('btnArquivarMesBanco').addEventListener('click', function () {
-    arquivarMesPastaPC(null, 'banco');
-});
-
-document.getElementById('btnAtualizarPastasPend').addEventListener('click', function () {
-    gerarArvorePastasCaixa({ elId: 'arvorePastasPendentes', filtro: 'pendentes', idPrefix: 'pasta_pen' });
-    toast('Pastas a receber atualizadas.');
-});
-document.getElementById('btnRelMesPend').addEventListener('click', function () {
-    gerarRelatorioMensalPDF('pendentes');
-});
-document.getElementById('btnArquivarMesPend').addEventListener('click', function () {
-    arquivarMesPastaPC(null, 'pendentes');
-});
-
+/* Pastas Ano→Mês removidas da UI (1.3.1) — listeners desligados de propósito */
 
 function fecharCaixaDoDia() {
     var db = carregar();
