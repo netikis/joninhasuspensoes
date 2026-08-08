@@ -4327,37 +4327,177 @@ function dataAtendimentoISO(a) {
     return String(a.entrada || a.saida || (a.criadoEm || '').slice(0, 10) || '').slice(0, 10);
 }
 
+/** Datas de pagamento pelo caixa (entrada com atendimentoId / vendaId) */
+function mapaDatasPagamentoCaixa(db) {
+    var at = {};
+    var vd = {};
+    function sweep(lista) {
+        (lista || []).forEach(function (l) {
+            if (!l || l.tipo !== 'entrada') return;
+            var d = String(l.criadoEm || '').slice(0, 10);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+            if (l.atendimentoId) {
+                var ka = String(l.atendimentoId);
+                if (!at[ka] || d < at[ka]) at[ka] = d;
+            }
+            if (l.vendaId) {
+                var kv = String(l.vendaId);
+                if (!vd[kv] || d < vd[kv]) vd[kv] = d;
+            }
+        });
+    }
+    sweep(db && db.caixa);
+    sweep(db && db.caixaBanco);
+    return { at: at, vd: vd };
+}
+
+function dataCorteOsISO(a, mapaPag) {
+    if (!a) return '';
+    var id = a.id != null ? String(a.id) : '';
+    if (id && mapaPag && mapaPag.at && mapaPag.at[id]) return mapaPag.at[id];
+    var rec = String(a.recebidoEm || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(rec)) return rec;
+    return dataAtendimentoISO(a);
+}
+
+function dataCorteVendaISO(o, mapaPag) {
+    if (!o) return '';
+    var id = o.id != null ? String(o.id) : '';
+    if (id && mapaPag && mapaPag.vd && mapaPag.vd[id]) return mapaPag.vd[id];
+    var em = String(o.dataEmissao || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(em)) return em;
+    return String(o.criadoEm || '').slice(0, 10);
+}
+
+function comissaoMaoAtendimento(a) {
+    var total = 0;
+    (a && a.itens || []).forEach(function (it) {
+        if (!it || (it.tipo || 'peca') !== 'mao') return;
+        if (!it.funcionarioId) return;
+        var pct = it.comissaoPct != null ? Number(it.comissaoPct) : NaN;
+        if ((isNaN(pct) || pct <= 0) && typeof obterDadosComissaoFuncionario === 'function') {
+            var d = obterDadosComissaoFuncionario(it.funcionarioId, it.tipoMao || 'servico');
+            if (d && d.pct > 0) pct = d.pct;
+        }
+        if (isNaN(pct) || pct < 0) pct = 0;
+        var base = Number(it.valor) || 0;
+        var valorSalvo = it.comissaoValor != null ? Number(it.comissaoValor) : NaN;
+        var valor = (!isNaN(valorSalvo) && valorSalvo > 0)
+            ? +valorSalvo.toFixed(2)
+            : (typeof calcularValorComissaoMao === 'function'
+                ? calcularValorComissaoMao(base, pct)
+                : +(base * pct / 100).toFixed(2));
+        if (!(valor > 0) && pct > 0 && base > 0) {
+            valor = +(base * pct / 100).toFixed(2);
+        }
+        total += valor || 0;
+    });
+    return +total.toFixed(2);
+}
+
+function totaisLucroVendaDoc(o) {
+    var pecas = 0, ganho = 0, mao = 0, custo = 0;
+    (o.itens || []).forEach(function (it) {
+        if (!it) return;
+        var tot = Number(it.total);
+        if (isNaN(tot)) tot = (Number(it.qtd) || 1) * (Number(it.venda) || 0);
+        var qtd = Number(it.qtd) || 1;
+        var custoUnit = Number(it.custo) || 0;
+        var custoLinha = +(custoUnit * qtd).toFixed(2);
+        if (it.origem === 'mao') {
+            mao += tot;
+        } else {
+            pecas += tot;
+            custo += custoLinha;
+            ganho += Math.max(0, tot - custoLinha);
+        }
+    });
+    var sub = Number(o.subtotal);
+    if (!(sub > 0)) sub = pecas + mao;
+    var valorFinal = Number(o.valor);
+    if (isNaN(valorFinal)) valorFinal = sub;
+    var fator = (sub > 0.0001) ? (valorFinal / sub) : 1;
+    if (fator < 0) fator = 0;
+    return {
+        pecas: +(pecas * fator).toFixed(2),
+        ganhoPecas: +(ganho * fator).toFixed(2),
+        custoPecas: +(custo * fator).toFixed(2),
+        mao: +(mao * fator).toFixed(2),
+        total: +valorFinal.toFixed(2)
+    };
+}
+
 function calcularRelatorioOficina(periodo) {
-    /* Sempre usa as OS da empresa (banco principal), independente do canal do menu */
+    /* Lucro da casa: só PAGO; data = pagamento/caixa (senão OS/venda); inclui vendas balcão */
     var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
-    var pecas = 0, ganho = 0, mao = 0, despesas = 0;
+    var mapaPag = mapaDatasPagamentoCaixa(db);
+    var pecas = 0, ganho = 0, mao = 0, comissao = 0, despesas = 0;
     var linhas = [];
+
     (db.atendimentos || []).forEach(function (a) {
-        var d = dataAtendimentoISO(a);
+        if (!a) return;
+        if (String(a.statusPagamento || '').toUpperCase() !== 'PAGO') return;
+        var d = dataCorteOsISO(a, mapaPag);
         if (!d || d < periodo.inicio || d > periodo.fim) return;
         var t = totaisItens(a.itens || []);
-        /* compat: se não houver itens tipados, usa totais salvos */
         if (!(a.itens || []).length) {
             t.pecas = Number(a.totalPecas) || 0;
             t.mao = Number(a.maoObra) || 0;
             t.ganhoPecas = 0;
             t.total = Number(a.total) || (t.pecas + t.mao);
         }
+        var com = comissaoMaoAtendimento(a);
+        var maoCasaLinha = Math.max(0, t.mao - com);
         pecas += t.pecas;
         ganho += t.ganhoPecas;
         mao += t.mao;
+        comissao += com;
         linhas.push({
+            origem: 'OS',
             data: d,
             cliente: a.clienteNome || nomeAtendimento(db, a),
             placa: a.placa || '',
             pecas: t.pecas,
             ganho: t.ganhoPecas,
             mao: t.mao,
+            comissao: com,
+            maoCasa: maoCasaLinha,
             total: Number(a.total) || (t.pecas + t.mao),
-            pago: String(a.statusPagamento || '').toUpperCase() === 'PAGO',
+            pago: true,
             atendimentoId: a.id
         });
     });
+
+    (db.orcamentos || []).forEach(function (o) {
+        if (!o || String(o.tipo || '').toUpperCase() !== 'VENDA') return;
+        if (String(o.statusPagamento || '').toUpperCase() !== 'PAGO') return;
+        var d = dataCorteVendaISO(o, mapaPag);
+        if (!d || d < periodo.inicio || d > periodo.fim) return;
+        var t = totaisLucroVendaDoc(o);
+        pecas += t.pecas;
+        ganho += t.ganhoPecas;
+        mao += t.mao;
+        linhas.push({
+            origem: 'VENDA',
+            data: d,
+            cliente: o.funcionarioNome || o.clienteNome || nomeCliente(db, o.clienteId) || '—',
+            placa: o.placa || '',
+            pecas: t.pecas,
+            ganho: t.ganhoPecas,
+            mao: t.mao,
+            comissao: 0,
+            maoCasa: t.mao,
+            total: t.total,
+            pago: true,
+            vendaId: o.id,
+            numero: o.numero
+        });
+    });
+
+    linhas.sort(function (a, b) {
+        return String(b.data || '').localeCompare(String(a.data || ''));
+    });
+
     function somaSaidas(lista) {
         (lista || []).forEach(function (l) {
             if (l.tipo !== 'saida') return;
@@ -4378,12 +4518,16 @@ function calcularRelatorioOficina(periodo) {
             somaSaidas(di.caixaBanco);
         });
     } catch (e) { /* ok */ }
-    var resultado = ganho + mao - despesas;
+
+    var maoCasa = Math.max(0, mao - comissao);
+    var resultado = ganho + maoCasa - despesas;
     return {
         pecas: pecas,
         ganho: ganho,
         mao: mao,
-        maoLiq: mao,
+        comissao: comissao,
+        maoCasa: maoCasa,
+        maoLiq: maoCasa,
         despesas: despesas,
         resultado: resultado,
         linhas: linhas
@@ -4476,18 +4620,26 @@ function renderRelatorioOficina() {
     document.getElementById('rofPecasBruto').textContent = moeda(r.pecas);
     document.getElementById('rofPecasLucro').textContent = moeda(r.ganho);
     document.getElementById('rofMaoBruta').textContent = moeda(r.mao);
-    document.getElementById('rofMaoLiq').textContent = moeda(r.maoLiq);
+    var elCom = document.getElementById('rofComissao');
+    if (elCom) elCom.textContent = moeda(r.comissao);
+    document.getElementById('rofMaoLiq').textContent = moeda(r.maoCasa);
     document.getElementById('rofDespesas').textContent = moeda(r.despesas);
     document.getElementById('rofResultado').textContent = moeda(r.resultado);
-    var html = '<p><strong>' + esc(per.label) + '</strong></p>';
-    html += '<p class="hint">Peças vendidas: <strong>' + moeda(r.pecas) + '</strong> · Lucro nas peças: <strong class="ganho-linha">' + moeda(r.ganho) + '</strong> · MO: <strong>' + moeda(r.mao) + '</strong> · Despesas: <strong>' + moeda(r.despesas) + '</strong> · Resultado (lucro peça + MO − despesas): <strong>' + moeda(r.resultado) + '</strong></p>';
-    html += '<p class="hint">OS pagas entram automaticamente no <strong>Caixa / Balcão</strong> da empresa (CAIXA/RELATÓRIO).</p>';
+    var html = '<p><strong>' + esc(per.label) + '</strong> · apenas documentos <strong>PAGO</strong></p>';
+    html += '<p class="hint">Lucro peças <strong class="ganho-linha">' + moeda(r.ganho) + '</strong> + MO casa <strong>' + moeda(r.maoCasa) + '</strong> − despesas <strong>' + moeda(r.despesas) + '</strong> = <strong>' + moeda(r.resultado) + '</strong> · Comissão funcionários (fora do lucro da casa): <strong>' + moeda(r.comissao) + '</strong></p>';
+    html += '<p class="hint">Data de cada linha = pagamento no caixa (quando existir). Inclui OS e vendas do balcão.</p>';
     if (!r.linhas.length) {
-        html += '<div class="empty">Nenhuma OS no período.</div>';
+        html += '<div class="empty">Nenhuma OS/venda paga no período.</div>';
     } else {
-        html += '<table><thead><tr><th>Data</th><th>Cliente</th><th>Placa</th><th>Peças</th><th>Ganho peça</th><th>MO</th><th>Pagamento</th></tr></thead><tbody>';
+        html += '<table><thead><tr><th>Data pgto</th><th>Tipo</th><th>Cliente</th><th>Placa</th><th>Peças</th><th>Lucro peça</th><th>MO</th><th>Comissão</th><th>MO casa</th></tr></thead><tbody>';
         html += r.linhas.map(function (l) {
-            return '<tr><td>' + esc(fmtData(l.data)) + '</td><td>' + esc(l.cliente) + '</td><td>' + esc(l.placa) + '</td><td>' + moeda(l.pecas) + '</td><td class="ganho-linha">' + moeda(l.ganho) + '</td><td>' + moeda(l.mao) + '</td><td>' + (l.pago ? 'PAGO → caixa' : 'Pendente') + '</td></tr>';
+            var tipo = l.origem === 'VENDA'
+                ? ('VENDA' + (l.numero != null ? ' Nº ' + l.numero : ''))
+                : 'OS';
+            return '<tr><td>' + esc(fmtData(l.data)) + '</td><td>' + esc(tipo) + '</td><td>' + esc(l.cliente) + '</td><td>' + esc(l.placa) +
+                '</td><td>' + moeda(l.pecas) + '</td><td class="ganho-linha">' + moeda(l.ganho) +
+                '</td><td>' + moeda(l.mao) + '</td><td>' + moeda(l.comissao) +
+                '</td><td>' + moeda(l.maoCasa) + '</td></tr>';
         }).join('');
         html += '</tbody></table>';
     }
@@ -4500,10 +4652,15 @@ function imprimirRelatorioOficina() {
     var r = calcularRelatorioOficina(per);
     var emp = getEmpresa();
     var corpo = document.getElementById('rofDetalhe').innerHTML;
-    var html = '<html><head><title>Relatório Oficina — ' + esc(per.label) + '</title><style>body{font-family:Segoe UI,sans-serif;padding:20px;color:#111} table{width:100%;border-collapse:collapse;margin-top:12px} th,td{border:1px solid #ccc;padding:6px;font-size:12px;text-align:left} h1{font-size:18px;margin:0 0 8px} .k{color:#444}</style></head><body>';
+    var html = '<html><head><title>Lucro da casa — ' + esc(per.label) + '</title><style>body{font-family:Segoe UI,sans-serif;padding:20px;color:#111} table{width:100%;border-collapse:collapse;margin-top:12px} th,td{border:1px solid #ccc;padding:6px;font-size:12px;text-align:left} h1{font-size:18px;margin:0 0 8px} .k{color:#444}</style></head><body>';
     html += '<h1>' + esc(emp.nome || 'Joninha Suspensões') + '</h1>';
-    html += '<p class="k">Relatório Oficina — ' + esc(per.label) + ' · gerado em ' + esc(new Date().toLocaleString('pt-BR')) + '</p>';
-    html += '<p><b>Peças (bruto):</b> ' + moeda(r.pecas) + ' &nbsp;|&nbsp; <b>Ganho em peças:</b> ' + moeda(r.ganho) + ' &nbsp;|&nbsp; <b>MO bruta/líquida:</b> ' + moeda(r.mao) + ' &nbsp;|&nbsp; <b>Despesas:</b> ' + moeda(r.despesas) + ' &nbsp;|&nbsp; <b>Resultado:</b> ' + moeda(r.resultado) + '</p>';
+    html += '<p class="k">Lucro da casa — ' + esc(per.label) + ' · gerado em ' + esc(new Date().toLocaleString('pt-BR')) + '</p>';
+    html += '<p><b>Lucro peças:</b> ' + moeda(r.ganho) +
+        ' &nbsp;|&nbsp; <b>MO bruta:</b> ' + moeda(r.mao) +
+        ' &nbsp;|&nbsp; <b>Comissão:</b> ' + moeda(r.comissao) +
+        ' &nbsp;|&nbsp; <b>MO casa:</b> ' + moeda(r.maoCasa) +
+        ' &nbsp;|&nbsp; <b>Despesas:</b> ' + moeda(r.despesas) +
+        ' &nbsp;|&nbsp; <b>Lucro (casa):</b> ' + moeda(r.resultado) + '</p>';
     html += corpo;
     html += '</body></html>';
     var w = window.open('', '_blank');
