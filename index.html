@@ -133,12 +133,11 @@
             <button type="button" class="menu-grupo-btn" data-toggle-grupo="caixaRelatorio">💰 CAIXA/RELATÓRIO</button>
             <div class="submenu-lateral">
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelCaixa" data-canal="normal">💰 Caixa / Balcão</button>
-                <button type="button" class="nav-btn submenu-btn" data-panel="painelDespesasOs" data-canal="interno">🧾 Despesas por OS</button>
-                <button type="button" class="nav-btn submenu-btn" data-panel="painelRelatorioDespesas" data-canal="normal">📂 Relatório de Despesas</button>
-                <button type="button" class="nav-btn submenu-btn" data-panel="painelRelatorioOficina" data-canal="normal">📊 Relatório Oficina</button>
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelCaixaBanco" data-canal="normal">🏦 Caixa do Banco (PIX / Cartões)</button>
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelPendentes" data-canal="normal">⏳ Contas a Receber</button>
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelRelatorioCaixa" data-canal="normal">📄 Relatório Caixa</button>
+                <button type="button" class="nav-btn submenu-btn" data-panel="painelRelatorioOficina" data-canal="normal">📊 Relatório Oficina</button>
+                <button type="button" class="nav-btn submenu-btn" data-panel="painelDespesasOs" data-canal="interno">🧾 Despesas por OS</button>
             </div>
         </div>
 
@@ -706,26 +705,6 @@
             </div>
         </section>
 
-        <section id="painelRelatorioDespesas" class="panel">
-            <div class="cards" style="margin-bottom:14px">
-                <div class="card" style="background:#e74c3c"><div class="k">Despesas do mês</div><div class="v" id="rdDespesasMes">R$ 0</div></div>
-                <div class="card" style="background:#c0392b"><div class="k">Qtd. lançamentos (mês)</div><div class="v" id="rdQtdMes">0</div></div>
-                <div class="card" style="background:#34495e"><div class="k">Total despesas (todos os meses)</div><div class="v" id="rdDespesasTotal">R$ 0</div></div>
-            </div>
-            <div class="box">
-                <h2>📂 Relatório de Despesas (Ano → Mês)</h2>
-                <p class="hint">Tudo que você lançou de <strong>despesa / saída</strong> (balcão + banco) fica separado por pastas de mês. Arquive no PC ao fechar o mês.</p>
-                <div class="row" style="margin-bottom:10px">
-                    <button type="button" class="btn btn-secondary" id="btnAtualizarPastasDespesas">🔄 Atualizar pastas</button>
-                    <button type="button" class="btn btn-pdf" id="btnRelMesDespesas">📄 PDF do mês</button>
-                    <button type="button" class="btn btn-primary" id="btnArquivarMesDespesas">📂 Arquivar mês no PC…</button>
-                </div>
-                <div id="arvorePastasDespesas" class="arvore-pastas-caixa">
-                    <div class="muted" style="padding:8px;text-align:center">Carregando pastas…</div>
-                </div>
-            </div>
-        </section>
-
         <section id="painelCaixaBanco" class="panel">
             <div class="cards" style="margin-bottom:14px">
                 <div class="card" style="background:#34495e;border:1px solid #3498db"><div class="k">Saldo inicial banco</div><div class="v" id="bkInicial" style="color:#7ec8ff">R$ 0</div></div>
@@ -764,18 +743,6 @@
                 </form>
             </div>
             <div class="box">
-                <h2>📁 Pastas do banco (Ano → Mês)</h2>
-                <p class="hint">PIX, cartões e transferências agrupados por mês: <strong>Entradas</strong>, <strong>Saídas</strong> e relatório.</p>
-                <div class="row" style="margin-bottom:10px">
-                    <button type="button" class="btn btn-secondary" id="btnAtualizarPastasBanco">🔄 Atualizar pastas</button>
-                    <button type="button" class="btn btn-pdf" id="btnRelMesBanco">📄 PDF do mês</button>
-                    <button type="button" class="btn btn-primary" id="btnArquivarMesBanco">📂 Arquivar mês no PC…</button>
-                </div>
-                <div id="arvorePastasBanco" class="arvore-pastas-caixa">
-                    <div class="muted" style="padding:8px;text-align:center">Carregando pastas…</div>
-                </div>
-            </div>
-            <div class="box">
                 <h2>Movimentações digitais</h2>
                 <table>
                     <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th>Valor</th><th>Ações</th></tr></thead>
@@ -805,18 +772,6 @@
                 <div class="card"><div class="k">Qtd. abertas</div><div class="v" id="pdQtd">0</div></div>
             </div>
             <div class="box">
-                <h2>📁 Pastas a receber (Ano → Mês)</h2>
-                <p class="hint">Pendentes agrupados por mês. Use o relatório PDF ou arquive a pasta no PC ao fechar o período.</p>
-                <div class="row" style="margin-bottom:10px">
-                    <button type="button" class="btn btn-secondary" id="btnAtualizarPastasPend">🔄 Atualizar pastas</button>
-                    <button type="button" class="btn btn-pdf" id="btnRelMesPend">📄 PDF do mês</button>
-                    <button type="button" class="btn btn-primary" id="btnArquivarMesPend">📂 Arquivar mês no PC…</button>
-                </div>
-                <div id="arvorePastasPendentes" class="arvore-pastas-caixa">
-                    <div class="muted" style="padding:8px;text-align:center">Carregando pastas…</div>
-                </div>
-            </div>
-            <div class="box">
                 <h2>Pendências abertas</h2>
                 <table>
                     <thead><tr><th>Cliente</th><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Ações</th></tr></thead>
@@ -828,7 +783,7 @@
         <section id="painelRelatorioCaixa" class="panel">
             <div class="box">
                 <h2>Relatório Caixa</h2>
-                <p class="hint">Resumo unificado do balcão + banco + pendentes. Ao fechar o mês, use as pastas abaixo (Entradas / Saídas / Relatório geral) — pastas mensais do sistema.</p>
+                <p class="hint">Resumo unificado do balcão + banco + pendentes. Use os PDFs mensais abaixo quando precisar imprimir o período.</p>
                 <div class="row" style="margin-bottom:12px">
                     <button type="button" class="btn btn-secondary" id="btnAtualizarRelCx">🔄 Atualizar resumo</button>
                     <button type="button" class="btn btn-pdf" id="btnImprimirRelCx">🖨️ Imprimir resumo</button>
@@ -881,18 +836,6 @@
                             <button type="button" class="btn btn-pdf" data-rel-mes="geral">📄 PDF</button>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <div class="box">
-                <h2>📁 Pastas do caixa (Ano → Mês)</h2>
-                <p class="hint">Cada mês com movimento vira pasta com <strong>Entradas</strong>, <strong>Saídas</strong> e <strong>Pendentes</strong>. Use <strong>Arquivar mês no PC</strong> para gravar os arquivos na pasta configurada em Config (Chrome/Edge no computador).</p>
-                <div class="row" style="margin-bottom:10px">
-                    <button type="button" class="btn btn-secondary" id="btnAtualizarPastasCx">🔄 Atualizar pastas</button>
-                    <button type="button" class="btn btn-primary" id="btnArquivarMesPc">📂 Arquivar mês no PC…</button>
-                </div>
-                <div id="arvorePastasCaixa" class="arvore-pastas-caixa">
-                    <div class="muted" style="padding:8px;text-align:center">Carregando pastas…</div>
                 </div>
             </div>
 
@@ -979,29 +922,6 @@
                 <div class="card" style="background:#27ae60"><div class="k">Bruto (OS)</div><div class="v" id="dosBruto">R$ 0</div></div>
                 <div class="card" style="background:#e74c3c"><div class="k">Despesas internas</div><div class="v" id="dosDespesas">R$ 0</div></div>
                 <div class="card" style="background:#2980b9"><div class="k">Lucro estimado</div><div class="v" id="dosLucro">R$ 0</div></div>
-            </div>
-
-            <div class="box">
-                <h2>📁 Pastas de despesas por OS (Ano → Mês)</h2>
-                <p class="hint">Ao fechar o mês: ao completar o mês, a pasta do mês reúne <strong>Bruto (entradas)</strong>, <strong>Despesas (saídas)</strong> e o <strong>relatório geral de lucro</strong>. Arquive no PC para gravar os arquivos.</p>
-                <div class="lista-relatorios-mes" style="margin-bottom:14px">
-                    <div class="item-relatorio-mes">
-                        <div>
-                            <span class="titulo-relatorio">📊 Relatório Mensal — Lucro por OS</span>
-                            <span class="desc-relatorio">Bruto das OS oficiais − despesas internas do período (PDF)</span>
-                        </div>
-                        <div class="acoes-relatorio-mes">
-                            <button type="button" class="btn btn-pdf" id="btnRelMesDespesasOs">📄 PDF do mês</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="row" style="margin-bottom:10px">
-                    <button type="button" class="btn btn-secondary" id="btnAtualizarPastasDos">🔄 Atualizar pastas</button>
-                    <button type="button" class="btn btn-primary" id="btnArquivarMesDosPc">📂 Arquivar mês no PC…</button>
-                </div>
-                <div id="arvorePastasDespesasOs" class="arvore-pastas-caixa">
-                    <div class="muted" style="padding:8px;text-align:center">Carregando pastas…</div>
-                </div>
             </div>
 
             <div class="box">
