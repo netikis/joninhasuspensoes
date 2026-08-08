@@ -274,7 +274,33 @@
             try {
                 var sess = await initFirestorePublico();
                 if (!sess) return false;
-                await sess.fsMod.setDoc(sess.fsMod.doc(sess.dbFs, COL_ASSIN, token), p, { merge: true });
+                /* Só campos leves — pack completo com fotos em base64 estoura o limite 1MB do Firestore */
+                var leve = {
+                    token: token,
+                    atendimentoId: (p && p.atendimentoId) || null,
+                    assinaturaCliente: (p && p.assinaturaCliente) || null,
+                    assinadoEm: (p && p.assinadoEm) || null,
+                    atualizadoEm: (p && p.atualizadoEm) || new Date().toISOString()
+                };
+                if (!leve.assinaturaCliente) return false;
+                await sess.fsMod.setDoc(sess.fsMod.doc(sess.dbFs, COL_ASSIN, token), leve, { merge: true });
+                /* Espelha na OS para a oficina ver no sync principal */
+                if (leve.atendimentoId) {
+                    try {
+                        await sess.fsMod.setDoc(
+                            sess.fsMod.doc(sess.dbFs, 'joninha_suspensoes_atendimentos', String(leve.atendimentoId)),
+                            {
+                                tokenAssinatura: token,
+                                assinaturaCliente: leve.assinaturaCliente,
+                                assinadoEm: leve.assinadoEm,
+                                atualizadoEm: leve.atualizadoEm
+                            },
+                            { merge: true }
+                        );
+                    } catch (eAt) {
+                        console.warn('Assinatura OK na coleção; OS principal não atualizada:', eAt);
+                    }
+                }
                 return true;
             } catch (e) {
                 console.warn('Falha ao gravar assinatura na nuvem:', e);
