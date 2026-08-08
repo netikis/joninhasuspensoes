@@ -853,8 +853,8 @@
         <!-- RELATÓRIO OFICINA (áudio Joninha: peça / MO / lucros dia e mês) -->
         <section id="painelRelatorioOficina" class="panel">
             <div class="box">
-                <h2>📊 Relatório Oficina — Peças, Mão de Obra e Lucros</h2>
-                <p class="hint">Extrato pedido nos áudios: quanto entrou de peça, ganho em peça (ex.: comprou 55 vendeu 60 = +5), mão de obra bruta, mão de obra líquida (sem peça) e despesas (salários etc.).</p>
+                <h2>📊 Relatório Oficina — Lucro da casa</h2>
+                <p class="hint">Só entra o que está <strong>PAGO</strong> (OS + vendas do balcão). Data de corte = data do pagamento no caixa; se não houver, usa a data da OS/venda. Lucro da casa = lucro peças + MO da casa − despesas. Comissão do funcionário fica separada.</p>
                 <div class="row" style="margin-bottom:12px">
                     <div class="col"><label>Período</label>
                         <select id="rofPeriodo">
@@ -874,11 +874,12 @@
             </div>
             <div class="cards cards-oficina" style="margin-bottom:14px">
                 <div class="card" style="background:#34495e"><div class="k">Peças — venda (bruto)</div><div class="v" id="rofPecasBruto">R$ 0</div></div>
-                <div class="card" style="background:#16a085"><div class="k">Ganho em peças (lucro)</div><div class="v" id="rofPecasLucro">R$ 0</div></div>
-                <div class="card" style="background:#2980b9"><div class="k">Mão de obra bruta</div><div class="v" id="rofMaoBruta">R$ 0</div></div>
-                <div class="card" style="background:#8e44ad"><div class="k">MO líquida (só serviço)</div><div class="v" id="rofMaoLiq">R$ 0</div></div>
-                <div class="card" style="background:#e74c3c"><div class="k">Despesas / salários</div><div class="v" id="rofDespesas">R$ 0</div></div>
-                <div class="card" style="background:#27ae60"><div class="k">Resultado estimado</div><div class="v" id="rofResultado">R$ 0</div></div>
+                <div class="card" style="background:#16a085"><div class="k">Lucro em peças</div><div class="v" id="rofPecasLucro">R$ 0</div></div>
+                <div class="card" style="background:#2980b9"><div class="k">MO bruta (cliente)</div><div class="v" id="rofMaoBruta">R$ 0</div></div>
+                <div class="card" style="background:#c0392b"><div class="k">Comissão funcionários</div><div class="v" id="rofComissao">R$ 0</div></div>
+                <div class="card" style="background:#8e44ad"><div class="k">MO da casa</div><div class="v" id="rofMaoLiq">R$ 0</div></div>
+                <div class="card" style="background:#e74c3c"><div class="k">Despesas</div><div class="v" id="rofDespesas">R$ 0</div></div>
+                <div class="card" style="background:#27ae60"><div class="k">Lucro do período (casa)</div><div class="v" id="rofResultado">R$ 0</div></div>
             </div>
             <div class="box" id="rofConteudo">
                 <h2>Detalhamento</h2>
