@@ -137,7 +137,6 @@
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelPendentes" data-canal="normal">⏳ Contas a Receber</button>
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelRelatorioCaixa" data-canal="normal">📄 Relatório Caixa</button>
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelRelatorioOficina" data-canal="normal">📊 Relatório Oficina</button>
-                <button type="button" class="nav-btn submenu-btn" data-panel="painelDespesasOs" data-canal="interno">🧾 Despesas por OS</button>
             </div>
         </div>
 
@@ -914,72 +913,6 @@
                     <tbody id="tabelaComissoes"></tbody>
                 </table>
                 <div id="listaComVazia" class="empty" style="display:none;margin-top:10px">Nenhuma comissão neste período.</div>
-            </div>
-        </section>
-
-        <!-- DESPESAS POR OS (só Modo Interno) -->
-        <section id="painelDespesasOs" class="panel">
-            <div class="cards" style="margin-bottom:14px">
-                <div class="card"><div class="k">OS oficiais</div><div class="v" id="dosQtdOs">0</div></div>
-                <div class="card" style="background:#27ae60"><div class="k">Bruto (OS)</div><div class="v" id="dosBruto">R$ 0</div></div>
-                <div class="card" style="background:#e74c3c"><div class="k">Despesas internas</div><div class="v" id="dosDespesas">R$ 0</div></div>
-                <div class="card" style="background:#2980b9"><div class="k">Lucro estimado</div><div class="v" id="dosLucro">R$ 0</div></div>
-            </div>
-
-            <div class="box">
-                <h2>Despesas por OS (Modo Interno)</h2>
-                <p class="hint">Lista as OS do balcão oficial. Lance aqui as <strong>despesas internas</strong> do serviço (só no banco interno) para fechar o lucro: bruto − despesas. Use <strong>Excluir</strong> para tirar a OS desta lista e apagar as despesas internas dela.</p>
-                <div class="toolbar">
-                    <input type="search" id="buscaDespesasOs" class="search" placeholder="Buscar OS por cliente, placa, veículo...">
-                    <button type="button" class="btn btn-secondary" id="btnAtualizarDespesasOs">🔄 Atualizar</button>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Data</th>
-                            <th>Cliente</th>
-                            <th>Veículo / Placa</th>
-                            <th>Status</th>
-                            <th>Bruto OS</th>
-                            <th>Despesas</th>
-                            <th>Lucro</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabelaDespesasOs"></tbody>
-                </table>
-                <div id="listaDespesasOsVazia" class="empty" style="display:none;margin-top:12px">Nenhuma OS oficial encontrada.</div>
-            </div>
-
-            <div class="box" id="boxLancarDespesaOs" style="display:none;border-color:rgba(231,76,60,0.45)">
-                <h2 id="tituloLancarDespesaOs">Lançar despesa na OS</h2>
-                <p class="hint" id="hintLancarDespesaOs"></p>
-                <input type="hidden" id="dosAtendimentoId">
-                <form id="formDespesaOs">
-                    <div class="row">
-                        <div class="col" style="flex:2"><label>Descrição da despesa</label><input id="dosDesc" required placeholder="Ex: tinta, lixa, peça, mão de obra auxiliar..."></div>
-                        <div class="col"><label>Valor (R$)</label><input id="dosValor" inputmode="decimal" required placeholder="0,00"></div>
-                        <div class="col"><label>Forma</label>
-                            <select id="dosForma">
-                                <option>Dinheiro</option>
-                                <option>PIX</option>
-                                <option>Cartão</option>
-                                <option>Transferência</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="row" style="margin-top:14px">
-                        <button type="submit" class="btn btn-primary">Lançar despesa interna</button>
-                        <button type="button" class="btn btn-danger" id="btnLimparDespesasOs">🧹 Limpar despesas desta OS</button>
-                        <button type="button" class="btn btn-secondary" id="btnCancelarDespesaOs">Fechar</button>
-                    </div>
-                </form>
-                <h3 style="margin-top:18px">Despesas desta OS</h3>
-                <table>
-                    <thead><tr><th>Data</th><th>Descrição</th><th>Forma</th><th>Valor</th><th>Ações</th></tr></thead>
-                    <tbody id="tabelaDespesasOsDetalhe"></tbody>
-                </table>
-                <div id="listaDespesasOsDetalheVazia" class="empty" style="display:none;margin-top:10px">Nenhuma despesa lançada nesta OS.</div>
             </div>
         </section>
 
