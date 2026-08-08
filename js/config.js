@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.3.6-lucro-mes';
+var APP_VERSION = '1.3.9-assinatura-fix';
 var STORAGE_KEY = 'joninha_suspensoes_v1';
 var STORAGE_INTERNO = 'joninha_suspensoes_interno_v1';
 var STORAGE_LOGINS_FUNC = 'joninha_suspensoes_logins_func_v1';
@@ -10,6 +10,7 @@ var COL_LOGINS_FUNC_NUVEM = 'joninha_logins_func';
 var DOC_LOGINS_FUNC_NUVEM = 'acessos';
 var SENHA_FUNC_SALT = 'joninha_suspensoes_v1_salt';
 var ASSIN_KEY = 'joninha_suspensoes_assinaturas';
+var COL_ASSINATURAS_NUVEM = 'joninha_assinaturas';
 var atendimentoNotaAtual = null;
 var canalVendas = 'normal'; /* normal | interno */
 
@@ -25,11 +26,10 @@ var TITULOS = {
     painelCaixaBanco: ['Caixa do Banco', 'PIX · cartões · transferências'],
     painelPendentes: ['Contas a Receber', 'Valores em aberto'],
     painelRelatorioCaixa: ['Relatório Caixa', 'Resumo balcão · banco · pendentes · PDF mensal'],
-    painelDespesasOs: ['Despesas por OS', 'Bruto · despesas internas · lucro'],
     painelFuncionarios: ['Cadastro de Funcionários', 'Comissão % · PIN · modo interno'],
     painelListaFuncionarios: ['Funcionários Cadastrados', 'Ver · editar · excluir'],
     painelPagFuncionarios: ['Pagamento funcionários', 'Controle semanal interno · sem impressão'],
-    painelRelatorioOficina: ['Relatório Oficina', 'Peças · ganho em peça · mão de obra · despesas'],
+    painelRelatorioOficina: ['Relatório Oficina', 'Lucro da casa · peças · MO · comissão · mês'],
     painelComissoes: ['Comissões', 'Só o valor da comissão de cada um'],
     painelConfigEmpresa: ['Dados da Empresa', 'Razão, CNPJ, endereço e contato'],
     painelConfigSync: ['Sincronizar — PC ↔ Celular', 'Nuvem automática · forçar sync'],

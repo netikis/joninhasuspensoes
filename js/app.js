@@ -1235,14 +1235,40 @@ function sincronizarAssinaturasNoDb() {
     return mudou;
 }
 
-async function sincronizarAssinaturasDaNuvem() {
-    if (!usuarioNuvemLogado()) return false;
+async function sincronizarAssinaturasDaNuvem(opts) {
+    opts = opts || {};
+    /* Leitura pública da coleção de assinaturas (não depende de login admin) */
+    var temNuvem = !!(typeof carregarConfigNuvem === 'function' && carregarConfigNuvem());
+    if (!temNuvem) return false;
     var db = carregar();
     var mapa = carregarAssinaturas();
     var mudou = false;
     var pendentes = (db.atendimentos || []).filter(function (a) {
-        return a.tokenAssinatura && !a.assinaturaCliente;
+        if (!a || !a.tokenAssinatura || a.assinaturaCliente) return false;
+        if (opts.token && String(a.tokenAssinatura) !== String(opts.token)) return false;
+        if (opts.atendimentoId && String(a.id) !== String(opts.atendimentoId)) return false;
+        return true;
     });
+    /* Token isolado (abrir nota) — busca mesmo se o atendimento ainda não listou o token */
+    if (opts.token && !pendentes.some(function (a) { return String(a.tokenAssinatura) === String(opts.token); })) {
+        var packAvulso = await puxarAssinaturaNuvem(opts.token);
+        if (packAvulso && packAvulso.assinaturaCliente) {
+            mapa[opts.token] = Object.assign({}, mapa[opts.token] || {}, packAvulso);
+            salvarAssinaturas(mapa);
+            var alvo = (db.atendimentos || []).find(function (a) {
+                return a && (String(a.tokenAssinatura) === String(opts.token) ||
+                    (packAvulso.atendimentoId && String(a.id) === String(packAvulso.atendimentoId)));
+            });
+            if (alvo) {
+                alvo.tokenAssinatura = opts.token;
+                alvo.assinaturaCliente = packAvulso.assinaturaCliente;
+                alvo.assinadoEm = packAvulso.assinadoEm || null;
+                salvar(db);
+                return true;
+            }
+            mudou = true;
+        }
+    }
     for (var i = 0; i < pendentes.length; i++) {
         var a = pendentes[i];
         var pack = await puxarAssinaturaNuvem(a.tokenAssinatura);
@@ -1259,6 +1285,40 @@ async function sincronizarAssinaturasDaNuvem() {
     return mudou;
 }
 
+async function sincronizarAssinaturaDoAtendimento(id) {
+    if (!id) return false;
+    sincronizarAssinaturasNoDb();
+    var db = carregar();
+    var a = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(id); });
+    if (!a) return false;
+    if (a.assinaturaCliente) return true;
+
+    var mudou = false;
+    if (a.tokenAssinatura) {
+        mudou = await sincronizarAssinaturasDaNuvem({ token: a.tokenAssinatura, atendimentoId: a.id });
+    }
+    db = carregar();
+    a = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(id); }) || a;
+    if (a.assinaturaCliente) return true;
+
+    /* Fallback: busca na nuvem pelo id da OS (token antigo / reenviado) */
+    try {
+        var packId = await puxarAssinaturaNuvemPorAtendimentoId(id);
+        if (packId && packId.assinaturaCliente) {
+            var mapa = carregarAssinaturas();
+            var tok = packId.token || a.tokenAssinatura || ('joninha_os_' + id);
+            mapa[tok] = Object.assign({}, mapa[tok] || {}, packId, { token: tok, atendimentoId: id });
+            salvarAssinaturas(mapa);
+            a.tokenAssinatura = tok;
+            a.assinaturaCliente = packId.assinaturaCliente;
+            a.assinadoEm = packId.assinadoEm || null;
+            salvar(db);
+            return true;
+        }
+    } catch (eId) { /* ok */ }
+    return !!mudou;
+}
+
 function gerarTokenAssinatura() {
     return 'joninha_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
 }
@@ -1273,12 +1333,34 @@ function urlLinkAssinatura(token) {
 
 async function enviarPackAssinaturaNuvem(pack) {
     if (!pack || !pack.token) return { ok: false };
+    var col = (typeof COL_ASSINATURAS_NUVEM !== 'undefined') ? COL_ASSINATURAS_NUVEM : 'joninha_assinaturas';
     try {
-        var sessao = await obterSessaoFirebase();
+        var sessao = typeof obterFirestoreAssinaturasPublico === 'function'
+            ? await obterFirestoreAssinaturasPublico()
+            : null;
+        if (!sessao) {
+            var okAuth = (typeof usuarioNuvemLogado === 'function' && usuarioNuvemLogado()) ||
+                (typeof garantirSessaoNuvemQualquer === 'function' && await garantirSessaoNuvemQualquer());
+            if (!okAuth) return { ok: false, motivo: 'sem sessão nuvem' };
+            sessao = await obterSessaoFirebase();
+        }
         var fsMod = sessao.fsMod;
         var dbFs = sessao.dbFs;
-        await fsMod.setDoc(fsMod.doc(dbFs, 'joninha_assinaturas', pack.token), pack, { merge: true });
-        return { ok: true };
+        var payload = (typeof packAssinaturaLeveParaNuvem === 'function')
+            ? packAssinaturaLeveParaNuvem(pack)
+            : Object.assign({}, pack);
+        if (!payload.assinaturaCliente) {
+            var existente = await puxarAssinaturaNuvem(pack.token);
+            if (existente && existente.assinaturaCliente) {
+                payload.assinaturaCliente = existente.assinaturaCliente;
+                payload.assinadoEm = existente.assinadoEm || payload.assinadoEm || null;
+            } else {
+                delete payload.assinaturaCliente;
+                delete payload.assinadoEm;
+            }
+        }
+        await fsMod.setDoc(fsMod.doc(dbFs, col, pack.token), payload, { merge: true });
+        return { ok: true, pack: payload };
     } catch (e) {
         return { ok: false, motivo: (e && (e.message || e.code)) || 'falha' };
     }
@@ -1286,12 +1368,54 @@ async function enviarPackAssinaturaNuvem(pack) {
 
 async function puxarAssinaturaNuvem(token) {
     if (!token) return null;
+    var col = (typeof COL_ASSINATURAS_NUVEM !== 'undefined') ? COL_ASSINATURAS_NUVEM : 'joninha_assinaturas';
     try {
-        var sessao = await obterSessaoFirebase();
-        var snap = await sessao.fsMod.getDoc(sessao.fsMod.doc(sessao.dbFs, 'joninha_assinaturas', token));
-        if (!snap.exists()) return null;
-        return snap.data() || null;
+        var sessao = typeof obterFirestoreAssinaturasPublico === 'function'
+            ? await obterFirestoreAssinaturasPublico()
+            : null;
+        if (sessao) {
+            var snap = await sessao.fsMod.getDoc(sessao.fsMod.doc(sessao.dbFs, col, token));
+            if (snap.exists()) return snap.data() || null;
+        }
+    } catch (ePub) { /* tenta auth */ }
+    try {
+        var okAuth = (typeof usuarioNuvemLogado === 'function' && usuarioNuvemLogado()) ||
+            (typeof garantirSessaoNuvemQualquer === 'function' && await garantirSessaoNuvemQualquer());
+        if (!okAuth) return null;
+        var sessaoAuth = await obterSessaoFirebase();
+        var snap2 = await sessaoAuth.fsMod.getDoc(sessaoAuth.fsMod.doc(sessaoAuth.dbFs, col, token));
+        if (!snap2.exists()) return null;
+        return snap2.data() || null;
     } catch (e) {
+        return null;
+    }
+}
+
+async function puxarAssinaturaNuvemPorAtendimentoId(atendimentoId) {
+    if (!atendimentoId) return null;
+    var col = (typeof COL_ASSINATURAS_NUVEM !== 'undefined') ? COL_ASSINATURAS_NUVEM : 'joninha_assinaturas';
+    try {
+        var sessao = typeof obterFirestoreAssinaturasPublico === 'function'
+            ? await obterFirestoreAssinaturasPublico()
+            : null;
+        if (!sessao) return null;
+        var q = sessao.fsMod.query(
+            sessao.fsMod.collection(sessao.dbFs, col),
+            sessao.fsMod.where('atendimentoId', '==', String(atendimentoId)),
+            sessao.fsMod.limit(8)
+        );
+        var snap = await sessao.fsMod.getDocs(q);
+        var melhor = null;
+        snap.forEach(function (docSnap) {
+            var d = docSnap.data() || {};
+            if (!d.assinaturaCliente) return;
+            d.token = d.token || docSnap.id;
+            if (!melhor) melhor = d;
+            else if (String(d.assinadoEm || '') > String(melhor.assinadoEm || '')) melhor = d;
+        });
+        return melhor;
+    } catch (e) {
+        console.warn('puxarAssinaturaNuvemPorAtendimentoId:', e);
         return null;
     }
 }
@@ -1562,11 +1686,21 @@ document.getElementById('btnExportarFotosForm').addEventListener('click', functi
     abrirModalExportFotos({ lista: fotosAtuais.slice() });
 });
 
-function abrirNota(id) {
+async function abrirNota(id) {
     sincronizarAssinaturasNoDb();
     var db = carregar();
     var a = db.atendimentos.find(function (x) { return x.id === id; });
     if (!a) { toast('Atendimento não encontrado.'); return; }
+
+    if (!a.assinaturaCliente) {
+        toast('Buscando assinatura na nuvem…');
+        try {
+            await sincronizarAssinaturaDoAtendimento(id);
+        } catch (eAss) { /* offline */ }
+        db = carregar();
+        a = db.atendimentos.find(function (x) { return x.id === id; }) || a;
+    }
+
     atendimentoNotaAtual = a;
     var titulo = 'Nota — ' + (a.placa || '').toUpperCase() + ' · ' + nomeAtendimento(db, a);
     var html = htmlNotaEspelho(db, a, { incluirFotos: true }) +
@@ -1585,6 +1719,9 @@ function abrirNota(id) {
     document.getElementById('modalNotaCorpo').innerHTML = html;
     document.getElementById('btnNotaExportFotos').style.display = atendimentoTemFotos(a) ? '' : 'none';
     document.getElementById('modalNota').classList.add('aberto');
+    if (a.tokenAssinatura && !a.assinaturaCliente) {
+        toast('Assinatura ainda não chegou. Abra o Histórico e aguarde a sync, ou use Importar assinatura.');
+    }
 }
 
 function fecharNota() {
@@ -1729,11 +1866,29 @@ async function abrirLinkAssinatura(id) {
 
     var nuvMsg = '';
     var cfgN = carregarConfigNuvem();
-    if (cfgN && cfgN.apiKey && cfgN.projectId && usuarioNuvemLogado()) {
+    if (cfgN && cfgN.apiKey && cfgN.projectId) {
+        /* Antes de subir o pack, puxa assinatura já feita no celular */
+        try {
+            var packNuv = await puxarAssinaturaNuvem(a.tokenAssinatura);
+            if (packNuv && packNuv.assinaturaCliente) {
+                pack.assinaturaCliente = packNuv.assinaturaCliente;
+                pack.assinadoEm = packNuv.assinadoEm || pack.assinadoEm;
+                mapa[a.tokenAssinatura] = pack;
+                salvarAssinaturas(mapa);
+                if (i >= 0) {
+                    db.atendimentos[i].assinaturaCliente = pack.assinaturaCliente;
+                    db.atendimentos[i].assinadoEm = pack.assinadoEm;
+                    salvar(db);
+                }
+            }
+        } catch (ePull) { /* ok */ }
         var up = await enviarPackAssinaturaNuvem(pack);
+        if (up.ok && up.pack && up.pack.assinaturaCliente) {
+            pack = up.pack;
+        }
         nuvMsg = up.ok ? ' · nuvem OK (cliente assina no celular)' : ' · nuvem: ' + (up.motivo || 'falhou');
     } else {
-        nuvMsg = ' · faça login na nuvem para o cliente assinar pelo WhatsApp no celular';
+        nuvMsg = ' · configure a nuvem para o cliente assinar pelo WhatsApp no celular';
     }
 
     var link = urlLinkAssinatura(a.tokenAssinatura);
@@ -2129,6 +2284,26 @@ document.getElementById('inputNomePdf').addEventListener('keydown', function (e)
 document.getElementById('btnNotaLink').addEventListener('click', function () {
     if (atendimentoNotaAtual) abrirLinkAssinatura(atendimentoNotaAtual.id);
 });
+document.getElementById('btnNotaBuscarAssinatura').addEventListener('click', async function () {
+    if (!atendimentoNotaAtual || !atendimentoNotaAtual.id) {
+        toast('Abra uma nota primeiro.');
+        return;
+    }
+    toast('Buscando assinatura na nuvem…');
+    var ok = false;
+    try {
+        ok = await sincronizarAssinaturaDoAtendimento(atendimentoNotaAtual.id);
+    } catch (eB) { ok = false; }
+    var a = (carregar().atendimentos || []).find(function (x) {
+        return x && String(x.id) === String(atendimentoNotaAtual.id);
+    });
+    if (ok && a && a.assinaturaCliente) {
+        toast('Assinatura encontrada!');
+        abrirNota(a.id);
+    } else {
+        toast('Ainda sem assinatura na nuvem. Peça ao cliente para assinar de novo pelo link, ou use Importar assinatura (.json).');
+    }
+});
 document.getElementById('btnNotaExportFotos').addEventListener('click', function () {
     if (atendimentoNotaAtual) abrirModalExportFotos({ atendimento: atendimentoNotaAtual });
 });
@@ -2180,14 +2355,26 @@ window.addEventListener('storage', function (e) {
     }
 });
 setInterval(function () {
-    if (document.getElementById('painelHistorico').classList.contains('active')) {
-        var localOk = sincronizarAssinaturasNoDb();
-        sincronizarAssinaturasDaNuvem().then(function (nuvOk) {
-            if (localOk || nuvOk) renderHistorico();
-        }).catch(function () {
-            if (localOk) renderHistorico();
-        });
-    }
+    var histAtivo = document.getElementById('painelHistorico') &&
+        document.getElementById('painelHistorico').classList.contains('active');
+    var notaAberta = document.getElementById('modalNota') &&
+        document.getElementById('modalNota').classList.contains('aberto');
+    if (!histAtivo && !notaAberta) return;
+    var faltavaAssinatura = !!(atendimentoNotaAtual && atendimentoNotaAtual.id &&
+        atendimentoNotaAtual.tokenAssinatura && !atendimentoNotaAtual.assinaturaCliente);
+    var localOk = sincronizarAssinaturasNoDb();
+    sincronizarAssinaturasDaNuvem().then(function (nuvOk) {
+        if (!(localOk || nuvOk)) return;
+        if (histAtivo) renderHistorico();
+        if (notaAberta && faltavaAssinatura && atendimentoNotaAtual && atendimentoNotaAtual.id) {
+            var aNovo = (carregar().atendimentos || []).find(function (x) {
+                return x && String(x.id) === String(atendimentoNotaAtual.id);
+            });
+            if (aNovo && aNovo.assinaturaCliente) abrirNota(aNovo.id);
+        }
+    }).catch(function () {
+        if (localOk && histAtivo) renderHistorico();
+    });
 }, 4000);
 
 /* ---------- Produtos (+ leitor de código de barras) ---------- */
@@ -3378,320 +3565,6 @@ function renderOrcamentos() {
         });
     }
 }
-
-/* ---------- Despesas por OS (Modo Interno) ---------- */
-var despesaOsSelecionadaId = null;
-
-function obterOsOcultasDespesas() {
-    var intDb = carregarInternoRaw();
-    if (!intDb.despesasOsOcultas || typeof intDb.despesasOsOcultas !== 'object') {
-        return {};
-    }
-    return intDb.despesasOsOcultas;
-}
-
-function ocultarOsDespesas(atendimentoId) {
-    if (!atendimentoId) return;
-    var intDb = carregarInternoRaw();
-    if (!intDb.despesasOsOcultas || typeof intDb.despesasOsOcultas !== 'object') {
-        intDb.despesasOsOcultas = {};
-    }
-    intDb.despesasOsOcultas[String(atendimentoId)] = new Date().toISOString();
-    salvarInternoRaw(intDb);
-}
-
-function limparDespesasInternasDaOs(atendimentoId) {
-    if (!atendimentoId) return 0;
-    var canalAntes = canalVendas;
-    canalVendas = 'interno';
-    var db = carregar();
-    var antes = (db.caixa || []).length;
-    db.caixa = (db.caixa || []).filter(function (x) {
-        return !(x && x.tipo === 'saida' && String(x.atendimentoId) === String(atendimentoId));
-    });
-    var removidos = antes - (db.caixa || []).length;
-    if (removidos > 0) salvar(db);
-    canalVendas = canalAntes;
-    return removidos;
-}
-
-function excluirOsDaListaDespesas(atendimentoId) {
-    if (!atendimentoId) return;
-    if (!confirm(
-        'Excluir esta OS da lista Despesas por OS?\n\n' +
-        '• Apaga as despesas internas lançadas nela\n' +
-        '• Remove a OS desta tela\n' +
-        '(A OS oficial no Histórico / Oficina NÃO é apagada.)'
-    )) return;
-    var n = limparDespesasInternasDaOs(atendimentoId);
-    ocultarOsDespesas(atendimentoId);
-    if (despesaOsSelecionadaId === atendimentoId) fecharBoxDespesaOs();
-    toast(n > 0
-        ? 'OS removida da lista e ' + n + ' despesa(s) apagada(s).'
-        : 'OS removida da lista Despesas por OS.');
-    renderDespesasOs();
-    if (typeof gerarArvorePastasDespesasOs === 'function') gerarArvorePastasDespesasOs();
-}
-
-function listarDespesasInternasPorOs(atendimentoId) {
-    var intDb = carregarInternoRaw();
-    return (intDb.caixa || []).filter(function (x) {
-        return x && x.tipo === 'saida' && x.atendimentoId === atendimentoId;
-    });
-}
-
-function totalDespesasInternasPorOs(atendimentoId) {
-    return listarDespesasInternasPorOs(atendimentoId).reduce(function (s, x) {
-        return s + (Number(x.valor) || 0);
-    }, 0);
-}
-
-function resumoLucroOs(atendimento) {
-    var bruto = Number(atendimento && atendimento.total) || 0;
-    var despesas = totalDespesasInternasPorOs(atendimento && atendimento.id);
-    return {
-        bruto: bruto,
-        despesas: despesas,
-        lucro: bruto - despesas
-    };
-}
-
-function fecharBoxDespesaOs() {
-    despesaOsSelecionadaId = null;
-    var box = document.getElementById('boxLancarDespesaOs');
-    if (box) box.style.display = 'none';
-    document.getElementById('dosAtendimentoId').value = '';
-    document.getElementById('formDespesaOs').reset();
-    document.getElementById('tabelaDespesasOsDetalhe').innerHTML = '';
-    document.getElementById('listaDespesasOsDetalheVazia').style.display = 'none';
-}
-
-function abrirLancarDespesaOs(atendimentoId) {
-    var main = carregarMain();
-    var a = (main.atendimentos || []).find(function (x) { return x.id === atendimentoId; });
-    if (!a) {
-        toast('OS não encontrada.');
-        return;
-    }
-    canalVendas = 'interno';
-    atualizarBadgeCanal();
-    despesaOsSelecionadaId = atendimentoId;
-    document.getElementById('dosAtendimentoId').value = atendimentoId;
-    var nome = nomeAtendimento(main, a);
-    var resumo = resumoLucroOs(a);
-    document.getElementById('tituloLancarDespesaOs').textContent =
-        'Despesas — ' + nome + ' · ' + ((a.placa || '—').toUpperCase());
-    document.getElementById('hintLancarDespesaOs').innerHTML =
-        'Bruto OS: <strong>' + moeda(resumo.bruto) +
-        '</strong> · Despesas: <strong>' + moeda(resumo.despesas) +
-        '</strong> · Lucro: <strong>' + moeda(resumo.lucro) + '</strong>';
-    document.getElementById('boxLancarDespesaOs').style.display = '';
-    renderDespesasOsDetalhe(atendimentoId);
-    document.getElementById('dosDesc').focus();
-}
-
-function renderDespesasOsDetalhe(atendimentoId) {
-    var lista = listarDespesasInternasPorOs(atendimentoId);
-    var tb = document.getElementById('tabelaDespesasOsDetalhe');
-    var vazio = document.getElementById('listaDespesasOsDetalheVazia');
-    tb.innerHTML = '';
-    if (!lista.length) {
-        vazio.style.display = '';
-        return;
-    }
-    vazio.style.display = 'none';
-    lista.slice().reverse().forEach(function (x) {
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-            '<td>' + esc(fmtData(x.criadoEm)) + '</td>' +
-            '<td>' + esc(x.descricao || '—') + '</td>' +
-            '<td>' + esc(x.forma || '—') + '</td>' +
-            '<td>' + moeda(x.valor) + '</td>' +
-            '<td class="actions"><button type="button" class="btn btn-danger" data-dos-ex="' + esc(x.id) + '">Excluir</button></td>';
-        tb.appendChild(tr);
-    });
-    tb.querySelectorAll('[data-dos-ex]').forEach(function (b) {
-        b.addEventListener('click', function () {
-            if (!confirm('Excluir esta despesa interna?')) return;
-            var idEx = b.getAttribute('data-dos-ex');
-            var canalAntes = canalVendas;
-            canalVendas = 'interno';
-            var db = carregar();
-            db.caixa = (db.caixa || []).filter(function (x) { return x.id !== idEx; });
-            salvar(db);
-            canalVendas = canalAntes;
-            toast('Despesa interna excluída.');
-            renderDespesasOsDetalhe(atendimentoId);
-            renderDespesasOs();
-            renderCaixa();
-            renderRelatorioCaixa();
-        });
-    });
-}
-
-function renderDespesasOs() {
-    var panel = document.getElementById('painelDespesasOs');
-    if (!panel) return;
-    var main = carregarMain();
-    var ocultas = obterOsOcultasDespesas();
-    var q = (document.getElementById('buscaDespesasOs').value || '').toLowerCase().trim();
-    var lista = (main.atendimentos || []).slice().filter(function (a) {
-        if (!a || !a.id) return false;
-        if (ocultas[a.id] || ocultas[String(a.id)]) return false;
-        return true;
-    }).sort(function (a, b) {
-        return String(b.entrada || b.criadoEm || '').localeCompare(String(a.entrada || a.criadoEm || ''));
-    });
-    if (q) {
-        lista = lista.filter(function (a) {
-            var nome = nomeAtendimento(main, a);
-            return [nome, a.placa, a.carro, a.status, a.responsavel].join(' ').toLowerCase().indexOf(q) > -1;
-        });
-    }
-
-    var totBruto = 0, totDesp = 0;
-    lista.forEach(function (a) {
-        var r = resumoLucroOs(a);
-        totBruto += r.bruto;
-        totDesp += r.despesas;
-    });
-    document.getElementById('dosQtdOs').textContent = String(lista.length);
-    document.getElementById('dosBruto').textContent = moeda(totBruto);
-    document.getElementById('dosDespesas').textContent = moeda(totDesp);
-    document.getElementById('dosLucro').textContent = moeda(totBruto - totDesp);
-
-    if (typeof gerarArvorePastasDespesasOs === 'function') gerarArvorePastasDespesasOs();
-
-    var tb = document.getElementById('tabelaDespesasOs');
-    var vazio = document.getElementById('listaDespesasOsVazia');
-    tb.innerHTML = '';
-    if (!lista.length) {
-        vazio.style.display = '';
-        return;
-    }
-    vazio.style.display = 'none';
-    lista.forEach(function (a) {
-        var r = resumoLucroOs(a);
-        var nome = nomeAtendimento(main, a);
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-            '<td>' + esc(fmtData(a.entrada || a.criadoEm)) + '</td>' +
-            '<td>' + esc(nome) + '</td>' +
-            '<td>' + esc(a.carro || '—') + ' · <strong>' + esc((a.placa || '—').toUpperCase()) + '</strong></td>' +
-            '<td>' + esc(a.status || '—') + '</td>' +
-            '<td>' + moeda(r.bruto) + '</td>' +
-            '<td>' + moeda(r.despesas) + '</td>' +
-            '<td><strong>' + moeda(r.lucro) + '</strong></td>' +
-            '<td class="actions" style="white-space:nowrap">' +
-            '<button type="button" class="btn btn-primary" data-dos-abrir="' + esc(a.id) + '">Despesas</button> ' +
-            '<button type="button" class="btn btn-danger" data-dos-excluir-os="' + esc(a.id) + '">Excluir</button>' +
-            '</td>';
-        tb.appendChild(tr);
-    });
-    tb.querySelectorAll('[data-dos-abrir]').forEach(function (b) {
-        b.addEventListener('click', function () {
-            abrirLancarDespesaOs(b.getAttribute('data-dos-abrir'));
-        });
-    });
-    tb.querySelectorAll('[data-dos-excluir-os]').forEach(function (b) {
-        b.addEventListener('click', function () {
-            excluirOsDaListaDespesas(b.getAttribute('data-dos-excluir-os'));
-        });
-    });
-
-    if (despesaOsSelecionadaId) {
-        var aindaExiste = lista.some(function (a) { return a.id === despesaOsSelecionadaId; });
-        if (aindaExiste) {
-            var aSel = (main.atendimentos || []).find(function (x) { return x.id === despesaOsSelecionadaId; });
-            if (aSel) {
-                var resumo = resumoLucroOs(aSel);
-                document.getElementById('hintLancarDespesaOs').innerHTML =
-                    'Bruto OS: <strong>' + moeda(resumo.bruto) +
-                    '</strong> · Despesas: <strong>' + moeda(resumo.despesas) +
-                    '</strong> · Lucro: <strong>' + moeda(resumo.lucro) + '</strong>';
-                renderDespesasOsDetalhe(despesaOsSelecionadaId);
-            }
-        } else {
-            fecharBoxDespesaOs();
-        }
-    }
-}
-
-function lancarDespesaOs(e) {
-    e.preventDefault();
-    var atendimentoId = document.getElementById('dosAtendimentoId').value || despesaOsSelecionadaId;
-    if (!atendimentoId) {
-        toast('Selecione uma OS para lançar a despesa.');
-        return;
-    }
-    var main = carregarMain();
-    var a = (main.atendimentos || []).find(function (x) { return x.id === atendimentoId; });
-    if (!a) {
-        toast('OS não encontrada no balcão oficial.');
-        return;
-    }
-    var desc = document.getElementById('dosDesc').value.trim();
-    var valor = parseMoeda(document.getElementById('dosValor').value);
-    var forma = document.getElementById('dosForma').value;
-    if (!desc) { toast('Informe a descrição da despesa.'); return; }
-    if (!(valor > 0)) { toast('Informe um valor válido.'); return; }
-
-    var canalAntes = canalVendas;
-    canalVendas = 'interno';
-    var db = carregar();
-    if (!db.caixa) db.caixa = [];
-    var nome = nomeAtendimento(main, a);
-    var placa = (a.placa || '—').toUpperCase();
-    db.caixa.push({
-        id: uid(),
-        tipo: 'saida',
-        descricao: desc,
-        valor: valor,
-        forma: forma,
-        conta: 'balcao',
-        atendimentoId: atendimentoId,
-        osResumo: {
-            cliente: nome,
-            placa: placa,
-            carro: a.carro || '',
-            totalOs: Number(a.total) || 0,
-            entrada: a.entrada || a.criadoEm || ''
-        },
-        criadoEm: new Date().toISOString()
-    });
-    salvar(db);
-    canalVendas = canalAntes;
-    atualizarBadgeCanal();
-
-    document.getElementById('formDespesaOs').reset();
-    toast('Despesa interna lançada na OS ' + placa + '.');
-    renderDespesasOsDetalhe(atendimentoId);
-    renderDespesasOs();
-    renderCaixa();
-    renderRelatorioCaixa();
-    document.getElementById('dosDesc').focus();
-}
-
-document.getElementById('formDespesaOs').addEventListener('submit', lancarDespesaOs);
-document.getElementById('btnCancelarDespesaOs').addEventListener('click', fecharBoxDespesaOs);
-document.getElementById('btnLimparDespesasOs').addEventListener('click', function () {
-    var id = despesaOsSelecionadaId || document.getElementById('dosAtendimentoId').value;
-    if (!id) {
-        toast('Nenhuma OS selecionada.');
-        return;
-    }
-    if (!confirm('Apagar TODAS as despesas internas desta OS?')) return;
-    var n = limparDespesasInternasDaOs(id);
-    toast(n > 0 ? n + ' despesa(s) apagada(s).' : 'Esta OS não tinha despesas internas.');
-    renderDespesasOsDetalhe(id);
-    renderDespesasOs();
-});
-document.getElementById('btnAtualizarDespesasOs').addEventListener('click', function () {
-    renderDespesasOs();
-    toast('Lista de OS atualizada.');
-});
-document.getElementById('buscaDespesasOs').addEventListener('input', renderDespesasOs);
-/* Pastas Ano→Mês de despesas por OS removidas da UI (1.3.1) */
 
 /* comissoes/funcionarios: ver js/comissoes.js */
 

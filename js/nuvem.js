@@ -221,6 +221,68 @@ async function obterSessaoFirebase() {
     return sessao;
 }
 
+/**
+ * Firestore público (igual assinar-joninha.html) — sem Auth.
+ * Usado só para ler/gravar joninha_assinaturas, espelhando o celular.
+ */
+var _fbAssinPublico = null;
+async function obterFirestoreAssinaturasPublico() {
+    var cfg = carregarConfigNuvem();
+    if (!cfg || !cfg.apiKey || !cfg.projectId) return null;
+    if (_fbAssinPublico && _fbAssinPublico.projectId === cfg.projectId) return _fbAssinPublico;
+    var appMod = await import('https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js');
+    var fsMod = await import('https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js');
+    var appName = 'joninha-assin-pub-' + cfg.projectId;
+    var app;
+    try { app = appMod.getApp(appName); }
+    catch (e) {
+        app = appMod.initializeApp({
+            apiKey: cfg.apiKey,
+            authDomain: cfg.authDomain || (cfg.projectId + '.firebaseapp.com'),
+            projectId: cfg.projectId,
+            storageBucket: cfg.storageBucket || undefined,
+            messagingSenderId: cfg.messagingSenderId || '',
+            appId: cfg.appId || ''
+        }, appName);
+    }
+    _fbAssinPublico = {
+        projectId: cfg.projectId,
+        app: app,
+        dbFs: fsMod.getFirestore(app),
+        fsMod: fsMod
+    };
+    return _fbAssinPublico;
+}
+
+/** Remove base64 pesado (fotos/logo) do pack — evita estourar limite 1MB do Firestore */
+function packAssinaturaLeveParaNuvem(pack) {
+    if (!pack || typeof pack !== 'object') return pack;
+    var out = {
+        token: pack.token || null,
+        atendimentoId: pack.atendimentoId || null,
+        criadoEm: pack.criadoEm || null,
+        atualizadoEm: pack.atualizadoEm || new Date().toISOString(),
+        assinadoEm: pack.assinadoEm || null,
+        assinaturaCliente: pack.assinaturaCliente || null
+    };
+    if (pack.documento && typeof pack.documento === 'object') {
+        var doc = Object.assign({}, pack.documento);
+        if (doc.empresaLogo && String(doc.empresaLogo).indexOf('data:') === 0) {
+            doc.empresaLogo = 'logo-joninha.jpg';
+        }
+        if (Array.isArray(doc.fotos)) {
+            doc.fotos = doc.fotos.map(function (f) {
+                return { id: f && f.id, url: f && f.url ? f.url : null };
+            }).filter(function (f) { return f && f.url; });
+            if (!doc.fotos.length) delete doc.fotos;
+        }
+        out.documento = doc;
+    }
+    if (!out.assinaturaCliente) delete out.assinaturaCliente;
+    if (!out.assinadoEm) delete out.assinadoEm;
+    return out;
+}
+
 async function obterSessaonuvem() { return obterSessaoFirebase(); }
 
 async function loginComFirebase(email, senha) {
@@ -332,6 +394,14 @@ function mesclarAtendimentosLocalNuvem(localLista, nuvemLista) {
             var fotosLoc = L.fotos || [];
             var fotosNuv = n.fotos || [];
             map[n.id] = Object.assign({}, L, n);
+            /* Assinatura do celular (coleção própria) não pode sumir se a OS na nuvem for mais nova sem o campo */
+            if (!map[n.id].assinaturaCliente && L.assinaturaCliente) {
+                map[n.id].assinaturaCliente = L.assinaturaCliente;
+                map[n.id].assinadoEm = L.assinadoEm || map[n.id].assinadoEm || null;
+            }
+            if (!map[n.id].tokenAssinatura && L.tokenAssinatura) {
+                map[n.id].tokenAssinatura = L.tokenAssinatura;
+            }
             if (fotosNuv.length) {
                 map[n.id].fotos = fotosNuv.map(function (fn, idx) {
                     if (fn.data || fn.url) return fn;
@@ -637,6 +707,12 @@ async function sincronizarOficinaNuvem(opts) {
         _syncUltimaOkEm = Date.now();
         try { localStorage.setItem(SYNC_ULTIMA_KEY, String(_syncUltimaOkEm)); } catch (eUlt) { /* ok */ }
 
+        try {
+            if (typeof sincronizarAssinaturasDaNuvem === 'function') {
+                await sincronizarAssinaturasDaNuvem();
+            }
+        } catch (eAss) { /* ok */ }
+
         if (mostrarToast) {
             toast('Oficina nuvem: ' + ok + ' OS' + (falha ? ' · ' + falha + ' falha(s)' : '') + '.');
         }
@@ -764,6 +840,12 @@ async function sincronizarTodosNuvem(opts) {
         canalVendas = canalAntes;
         _syncUltimaOkEm = Date.now();
         try { localStorage.setItem(SYNC_ULTIMA_KEY, String(_syncUltimaOkEm)); } catch (eUlt) { /* ok */ }
+
+        try {
+            if (typeof sincronizarAssinaturasDaNuvem === 'function') {
+                await sincronizarAssinaturasDaNuvem();
+            }
+        } catch (eAss2) { /* ok */ }
 
         if (mostrarToast) {
             if (silencioso) {
