@@ -389,26 +389,7 @@ function renderCaixa() {
         var acoesCell = tr.querySelector('.cx-acoes-cell');
         var wrap = document.createElement('div');
         wrap.className = 'cx-acoes-fh';
-        if (x.atendimentoId) {
-            var bVer = document.createElement('button');
-            bVer.type = 'button';
-            bVer.className = 'btn btn-secondary';
-            bVer.textContent = 'Ver';
-            bVer.setAttribute('data-cx-ver', String(x.atendimentoId));
-            wrap.appendChild(bVer);
-            var bPdf = document.createElement('button');
-            bPdf.type = 'button';
-            bPdf.className = 'btn btn-pdf';
-            bPdf.textContent = 'PDF';
-            bPdf.setAttribute('data-cx-pdf', String(x.atendimentoId));
-            wrap.appendChild(bPdf);
-            var bLink = document.createElement('button');
-            bLink.type = 'button';
-            bLink.className = 'btn btn-assinar';
-            bLink.textContent = 'Link';
-            bLink.setAttribute('data-cx-link', String(x.atendimentoId));
-            wrap.appendChild(bLink);
-        }
+        montarAcoesDocumentoCaixa(wrap, x);
         var bEx = document.createElement('button');
         bEx.type = 'button';
         bEx.className = 'btn btn-danger';
@@ -423,6 +404,7 @@ function renderCaixa() {
     if (!tb._cxClickLigado) {
         tb._cxClickLigado = true;
         tb.addEventListener('click', function (e) {
+            if (tratarCliqueAcoesDocumentoCaixa(e)) return;
             var bEx = e.target.closest('[data-ex]');
             if (bEx) {
                 e.preventDefault();
@@ -436,24 +418,67 @@ function renderCaixa() {
                     renderCaixa();
                     atualizarKPIs(carregarMain());
                 }
-                return;
-            }
-            var bVer = e.target.closest('[data-cx-ver]');
-            if (bVer) {
-                abrirNota(bVer.getAttribute('data-cx-ver'));
-                return;
-            }
-            var bPdf = e.target.closest('[data-cx-pdf]');
-            if (bPdf) {
-                imprimirNotaPdf(bPdf.getAttribute('data-cx-pdf'));
-                return;
-            }
-            var bLink = e.target.closest('[data-cx-link]');
-            if (bLink) {
-                abrirLinkAssinatura(bLink.getAttribute('data-cx-link'));
             }
         });
     }
+}
+
+/** Botões Ver / Imprimir / PDF / Editar (e Link na OS) — espelho do FH Control */
+function montarAcoesDocumentoCaixa(wrap, x) {
+    if (!wrap || !x) return;
+    if (x.atendimentoId) {
+        var idOs = String(x.atendimentoId);
+        appendBtnAcaoCaixa(wrap, 'btn-secondary', 'Ver', 'data-cx-ver', idOs);
+        appendBtnAcaoCaixa(wrap, 'btn-secondary', 'Imprimir', 'data-cx-imp', idOs);
+        appendBtnAcaoCaixa(wrap, 'btn-pdf', 'PDF', 'data-cx-pdf', idOs);
+        appendBtnAcaoCaixa(wrap, 'btn-assinar', 'Link', 'data-cx-link', idOs);
+        appendBtnAcaoCaixa(wrap, 'btn-secondary', 'Editar', 'data-cx-edit-os', idOs);
+        return;
+    }
+    if (x.vendaId) {
+        var idVd = String(x.vendaId);
+        appendBtnAcaoCaixa(wrap, 'btn-secondary', 'Ver', 'data-cx-ver-vd', idVd);
+        appendBtnAcaoCaixa(wrap, 'btn-secondary', 'Imprimir', 'data-cx-imp-vd', idVd);
+        appendBtnAcaoCaixa(wrap, 'btn-pdf', 'PDF', 'data-cx-pdf-vd', idVd);
+        appendBtnAcaoCaixa(wrap, 'btn-secondary', 'Editar', 'data-cx-edit-vd', idVd);
+    }
+}
+
+function appendBtnAcaoCaixa(wrap, cls, texto, attr, valor) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn ' + cls;
+    b.textContent = texto;
+    b.setAttribute(attr, valor);
+    wrap.appendChild(b);
+}
+
+function tratarCliqueAcoesDocumentoCaixa(e) {
+    var b;
+    b = e.target.closest('[data-cx-ver]');
+    if (b) { abrirNota(b.getAttribute('data-cx-ver')); return true; }
+    b = e.target.closest('[data-cx-imp]');
+    if (b) { imprimirNotaPdf(b.getAttribute('data-cx-imp')); return true; }
+    b = e.target.closest('[data-cx-pdf]');
+    if (b) {
+        var idOsPdf = b.getAttribute('data-cx-pdf');
+        abrirNota(idOsPdf);
+        setTimeout(function () { salvarNotaPdfArquivo(); }, 80);
+        return true;
+    }
+    b = e.target.closest('[data-cx-link]');
+    if (b) { abrirLinkAssinatura(b.getAttribute('data-cx-link')); return true; }
+    b = e.target.closest('[data-cx-edit-os]');
+    if (b) { editarAtendimento(b.getAttribute('data-cx-edit-os')); return true; }
+    b = e.target.closest('[data-cx-ver-vd]');
+    if (b) { abrirDocumentoVenda(b.getAttribute('data-cx-ver-vd')); return true; }
+    b = e.target.closest('[data-cx-imp-vd]');
+    if (b) { imprimirDocumentoVenda(b.getAttribute('data-cx-imp-vd')); return true; }
+    b = e.target.closest('[data-cx-pdf-vd]');
+    if (b) { salvarPdfDocumentoVenda(b.getAttribute('data-cx-pdf-vd')); return true; }
+    b = e.target.closest('[data-cx-edit-vd]');
+    if (b) { editarDocumentoVenda(b.getAttribute('data-cx-edit-vd')); return true; }
+    return false;
 }
 
 (function ligarBuscaCaixaBalcao() {
@@ -544,13 +569,17 @@ function renderCaixaBanco() {
         var tr = document.createElement('tr');
         var tdAcoes = document.createElement('td');
         tdAcoes.className = 'actions';
+        var wrap = document.createElement('div');
+        wrap.className = 'cx-acoes-fh';
+        montarAcoesDocumentoCaixa(wrap, x);
         var bEx = document.createElement('button');
         bEx.type = 'button';
         bEx.className = 'btn btn-danger';
         bEx.textContent = 'Excluir';
         bEx.setAttribute('data-ex', String(x.id || ''));
         if (x.atendimentoId) bEx.setAttribute('data-ex-at', String(x.atendimentoId));
-        tdAcoes.appendChild(bEx);
+        wrap.appendChild(bEx);
+        tdAcoes.appendChild(wrap);
         tr.innerHTML =
             '<td>' + esc(fmtData(x.criadoEm)) + '</td>' +
             '<td>' + esc(x.tipo) + '</td>' +
@@ -563,6 +592,7 @@ function renderCaixaBanco() {
     if (!tb._bkClickLigado) {
         tb._bkClickLigado = true;
         tb.addEventListener('click', function (e) {
+            if (tratarCliqueAcoesDocumentoCaixa(e)) return;
             var b = e.target.closest('[data-ex]');
             if (!b) return;
             e.preventDefault();
@@ -649,18 +679,30 @@ function renderPendentes() {
     }
     lista.slice().reverse().forEach(function (p) {
         var tr = document.createElement('tr');
+        var acoesDoc = p.vendaId
+            ? '<button type="button" class="btn btn-secondary" data-cx-ver-vd="' + esc(p.vendaId) + '">Ver</button>' +
+              '<button type="button" class="btn btn-secondary" data-cx-imp-vd="' + esc(p.vendaId) + '">Imprimir</button>' +
+              '<button type="button" class="btn btn-pdf" data-cx-pdf-vd="' + esc(p.vendaId) + '">PDF</button>' +
+              '<button type="button" class="btn btn-secondary" data-cx-edit-vd="' + esc(p.vendaId) + '">Editar</button>'
+            : '';
         tr.innerHTML =
             '<td>' + esc(p.cliente) + '</td>' +
             '<td>' + esc(p.descricao) + '</td>' +
             '<td>' + esc(fmtData(p.vencimento)) + '</td>' +
             '<td>' + moeda(p.valor) + '</td>' +
-            '<td class="actions">' +
+            '<td class="actions"><div class="cx-acoes-fh">' + acoesDoc +
             '<button type="button" class="btn btn-ok" data-rec-b="' + p.id + '">Receber balcão</button>' +
             '<button type="button" class="btn btn-primary" data-rec-k="' + p.id + '">Receber banco</button>' +
             '<button type="button" class="btn btn-danger" data-ex="' + p.id + '">Excluir</button>' +
-            '</td>';
+            '</div></td>';
         tb.appendChild(tr);
     });
+    if (!tb._pdDocClickLigado) {
+        tb._pdDocClickLigado = true;
+        tb.addEventListener('click', function (e) {
+            tratarCliqueAcoesDocumentoCaixa(e);
+        });
+    }
     tb.querySelectorAll('[data-rec-b]').forEach(function (b) {
         b.addEventListener('click', function () { receberPendente(b.getAttribute('data-rec-b'), 'balcao'); });
     });

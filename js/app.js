@@ -2537,10 +2537,179 @@ document.querySelectorAll('th[data-ordena-prod]').forEach(function (th) {
 });
 
 /* ---------- Venda / Orçamento (modelo FH Control) ---------- */
+var vendaEmEdicaoId = null;
+var documentoVendaAtual = null;
+
 function formaPagamentoEhDigital(formaPag) {
     var f = String(formaPag || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     return f.indexOf('pix') > -1 || f.indexOf('cartao') > -1 || f.indexOf('debito') > -1 ||
         f.indexOf('credito') > -1 || f.indexOf('boleto') > -1 || f.indexOf('transfer') > -1;
+}
+
+function obterDocumentoVendaPorId(id) {
+    if (!id) return null;
+    var db = carregar();
+    return (db.orcamentos || []).find(function (o) { return o && String(o.id) === String(id); }) || null;
+}
+
+function htmlDocumentoVenda(db, o) {
+    var emp = getEmpresa(db);
+    var nome = o.funcionarioNome || o.clienteNome || nomeCliente(db, o.clienteId) || '—';
+    var tipo = o.tipo || 'VENDA';
+    var rows = (o.itens || []).map(function (it) {
+        return '<tr><td>' + esc(it.desc || '') + '</td>' +
+            '<td style="text-align:center">' + esc(String(it.qtd != null ? it.qtd : 1)) + '</td>' +
+            '<td style="text-align:right">' + moeda(it.venda != null ? it.venda : it.total) + '</td>' +
+            '<td style="text-align:right">' + moeda(it.total != null ? it.total : ((Number(it.qtd) || 1) * (Number(it.venda) || 0))) + '</td></tr>';
+    }).join('');
+    if (!rows) rows = '<tr><td colspan="4" style="text-align:center">Sem itens</td></tr>';
+    var extras = '';
+    if (o.placa) extras += '<div><b>Placa:</b> ' + esc(String(o.placa).toUpperCase()) + '</div>';
+    if (o.observacao) extras += '<div style="margin-top:8px"><b>Obs:</b> ' + esc(o.observacao) + '</div>';
+    return '<div class="nota-espelho">' +
+        htmlCabecalhoNotaEmpresa(emp) +
+        '<h2 class="nota-titulo-espelho">' + esc(tipo) + ' Nº ' + esc(String(o.numero || '—')) + '</h2>' +
+        '<div class="nota-registro">' + esc(fmtData(o.dataEmissao || o.criadoEm)) +
+        ' · ' + esc(o.statusPagamento || '') + (o.formaPagamento ? ' / ' + esc(o.formaPagamento) : '') + '</div>' +
+        '<div class="nota-bloco compacto"><div class="tit vermelho">Cliente</div>' +
+        '<div class="nota-grid nota-grid-compacta"><div class="nota-campo full"><span class="nota-label">Nome</span>' +
+        '<span class="nota-valor">' + esc(nome) + '</span></div></div>' + extras + '</div>' +
+        '<div class="nota-bloco compacto"><div class="tit verde">Itens</div>' +
+        '<table class="nota-itens compacta"><thead><tr><th>Descrição</th><th style="text-align:center">Qtd</th>' +
+        '<th style="text-align:right">Unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>' +
+        rows + '</tbody></table>' +
+        '<div class="nota-subtotais compacto">Subtotal: <strong>' + moeda(o.subtotal != null ? o.subtotal : o.valor) + '</strong>' +
+        (Number(o.descontoReais) > 0 || Number(o.descontoPerc) > 0
+            ? ' · Desconto: <strong>' + moeda(o.descontoReais || 0) +
+              (Number(o.descontoPerc) > 0 ? ' (' + esc(String(o.descontoPerc)) + '%)' : '') + '</strong>'
+            : '') +
+        '</div>' +
+        '<div class="nota-total compacto">Total: ' + moeda(o.valor) + '</div></div></div>';
+}
+
+function abrirDocumentoVenda(id) {
+    var db = carregar();
+    var o = obterDocumentoVendaPorId(id);
+    if (!o) { toast('Documento de venda não encontrado.'); return; }
+    documentoVendaAtual = o;
+    atendimentoNotaAtual = null;
+    var titulo = (o.tipo || 'VENDA') + ' Nº ' + (o.numero || '—') + ' · ' + (o.clienteNome || o.funcionarioNome || '');
+    var html = htmlDocumentoVenda(db, o);
+    _htmlNotaImpressaoAtual = html;
+    _tituloNotaImpressao = titulo;
+    if (ehCelular()) {
+        abrirViewerPdf(html, titulo);
+        return;
+    }
+    var tit = document.getElementById('modalNotaTitulo');
+    var corpo = document.getElementById('modalNotaCorpo');
+    var exp = document.getElementById('btnNotaExportFotos');
+    if (tit) tit.textContent = titulo;
+    if (corpo) corpo.innerHTML = html;
+    if (exp) exp.style.display = 'none';
+    var modal = document.getElementById('modalNota');
+    if (modal) modal.classList.add('aberto');
+}
+
+function imprimirDocumentoVenda(id) {
+    var db = carregar();
+    var o = id ? obterDocumentoVendaPorId(id) : documentoVendaAtual;
+    if (!o) { toast('Documento não encontrado.'); return; }
+    documentoVendaAtual = o;
+    var html = htmlDocumentoVenda(db, o);
+    var titulo = (o.tipo || 'VENDA') + ' Nº ' + (o.numero || '—');
+    _htmlNotaImpressaoAtual = html;
+    _tituloNotaImpressao = titulo;
+    if (ehCelular()) {
+        abrirViewerPdf(html, titulo);
+        return;
+    }
+    executarImpressaoHtml(html);
+}
+
+async function salvarPdfDocumentoVenda(id) {
+    var db = carregar();
+    var o = id ? obterDocumentoVendaPorId(id) : documentoVendaAtual;
+    if (!o) { toast('Documento não encontrado.'); return; }
+    documentoVendaAtual = o;
+    var html = htmlDocumentoVenda(db, o);
+    _htmlNotaImpressaoAtual = html;
+    _tituloNotaImpressao = (o.tipo || 'VENDA') + ' Nº ' + (o.numero || '—');
+    var sugestao = limparNomeArquivoPdf(
+        (o.tipo || 'Venda') + '_' + (o.numero || '') + '_' + (o.clienteNome || o.funcionarioNome || 'doc')
+    );
+    var pNome = perguntarNomeArquivoPdfAsync();
+    setTimeout(function () {
+        var input = document.getElementById('inputNomePdf');
+        if (input) input.value = sugestao.replace(/\.(pdf)$/i, '');
+    }, 0);
+    var nomeArq = await pNome;
+    if (!nomeArq) return;
+    toast('Gerando PDF…');
+    try {
+        var blob = await gerarPdfBlobDaNota(html, nomeArq);
+        if (!blob || blob.size < 800) throw new Error('PDF vazio');
+        var arquivo = new File([blob], nomeArq, { type: 'application/pdf' });
+        if (ehCelular() && navigator.share) {
+            try {
+                await navigator.share({ title: nomeArq, files: [arquivo] });
+                toast('PDF pronto: ' + nomeArq);
+                return;
+            } catch (errShare) {
+                if (errShare && errShare.name === 'AbortError') return;
+            }
+        }
+        baixarBlobComoArquivo(blob, nomeArq);
+        toast('PDF salvo: ' + nomeArq);
+    } catch (err) {
+        console.error(err);
+        toast('Falha ao gerar PDF da venda.');
+    }
+}
+
+function editarDocumentoVenda(id) {
+    var db = carregar();
+    var o = obterDocumentoVendaPorId(id);
+    if (!o) { toast('Documento não encontrado.'); return; }
+    if (o.vendaFuncionario || o.funcionarioId) {
+        canalVendas = 'interno';
+    } else {
+        canalVendas = 'normal';
+    }
+    atualizarBadgeCanal();
+    limparVendaForm();
+    vendaEmEdicaoId = o.id;
+    documentoVendaAtual = o;
+    document.getElementById('vdTipo').value = o.tipo || 'VENDA';
+    document.getElementById('vdNumero').value = o.numero || '';
+    document.getElementById('vdStatus').value = o.statusPagamento || 'PAGO';
+    document.getElementById('vdForma').value = o.formaPagamento || 'Dinheiro';
+    document.getElementById('vdEmissao').value = (o.dataEmissao || String(o.criadoEm || '').slice(0, 10) || hojeISO());
+    document.getElementById('vdVenc').value = o.dataVencimento || hojeISO();
+    document.getElementById('vdObs').value = o.observacao || '';
+    document.getElementById('vdDescReais').value = o.descontoReais != null ? o.descontoReais : 0;
+    document.getElementById('vdDescPerc').value = o.descontoPerc != null ? o.descontoPerc : 0;
+    document.getElementById('vdRecebido').value = o.valorRecebido != null ? o.valorRecebido : '';
+    if (canalVendas === 'interno') {
+        preencherSelectFuncionariosVenda();
+        var selF = document.getElementById('vdFuncionarioId');
+        if (selF) selF.value = o.funcionarioId || '';
+        var placaInt = document.getElementById('vdPlacaInterno');
+        if (placaInt) placaInt.value = o.placa || '';
+    } else {
+        document.getElementById('vdCliente').value = o.clienteNome || '';
+        document.getElementById('vdPlaca').value = o.placa || '';
+    }
+    carrinhoVenda = (o.itens || []).map(function (it) {
+        return Object.assign({}, it);
+    });
+    atualizarUIVendaPorCanal();
+    renderCarrinhoVenda();
+    calcTotaisVenda();
+    var btnPainel = document.querySelector('.nav-btn[data-panel="painelOrcamento"][data-canal="' + canalVendas + '"]') ||
+        document.querySelector('.nav-btn[data-panel="painelOrcamento"]');
+    abrirPainel('painelOrcamento', btnPainel || undefined);
+    toast('Editando ' + (o.tipo || 'venda') + ' Nº ' + (o.numero || '') + ' — salve de novo para gravar. Estoque não é recalculado na edição.');
 }
 
 function proximoNumeroVenda(db) {
@@ -2928,6 +3097,7 @@ document.getElementById('btnVdAddMao').addEventListener('click', function () {
 });
 
 function limparVendaForm() {
+    vendaEmEdicaoId = null;
     carrinhoVenda = [];
     produtoVendaSelecionado = null;
     document.getElementById('vdCliente').value = '';
@@ -2994,9 +3164,17 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
     var status = document.getElementById('vdStatus').value;
     var forma = document.getElementById('vdForma').value;
     var numero = Number(document.getElementById('vdNumero').value) || proximoNumeroVenda(db);
+    var editando = !!vendaEmEdicaoId;
+    var docExistente = editando
+        ? (db.orcamentos || []).find(function (x) { return x && String(x.id) === String(vendaEmEdicaoId); })
+        : null;
+    if (editando && !docExistente) {
+        toast('Documento em edição não encontrado. Abra de novo pelo botão Editar.');
+        return;
+    }
 
-    /* Baixa de estoque — só em VENDA (orçamento não mexe). Igual FH Control. */
-    if (tipo === 'VENDA') {
+    /* Baixa de estoque — só em VENDA nova (edição não recalcula estoque). */
+    if (tipo === 'VENDA' && !editando) {
         var necessidade = {};
         for (var i = 0; i < carrinhoVenda.length; i++) {
             var it = carrinhoVenda[i];
@@ -3031,7 +3209,7 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
     }
 
     var doc = {
-        id: uid(),
+        id: editando ? docExistente.id : uid(),
         numero: numero,
         tipo: tipo,
         clienteId: !interno && resolvido.ok && !resolvido.clienteAvulso ? resolvido.clienteId : null,
@@ -3054,13 +3232,27 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
         troco: totais.troco,
         observacao: document.getElementById('vdObs').value.trim(),
         descricao: carrinhoVenda.map(function (x) { return x.desc; }).join(', '),
-        criadoEm: new Date().toISOString()
+        criadoEm: editando ? (docExistente.criadoEm || new Date().toISOString()) : new Date().toISOString(),
+        atualizadoEm: new Date().toISOString()
     };
     if (!db.orcamentos) db.orcamentos = [];
-    db.orcamentos.push(doc);
+    if (editando) {
+        var idxDoc = db.orcamentos.findIndex(function (x) { return x && String(x.id) === String(doc.id); });
+        if (idxDoc >= 0) db.orcamentos[idxDoc] = doc;
+        else db.orcamentos.push(doc);
+    } else {
+        db.orcamentos.push(doc);
+    }
 
-    /* Destino financeiro — igual FH */
+    function removerLancamentosVenda(vid) {
+        db.caixa = (db.caixa || []).filter(function (l) { return String(l.vendaId || '') !== String(vid); });
+        db.caixaBanco = (db.caixaBanco || []).filter(function (l) { return String(l.vendaId || '') !== String(vid); });
+        db.pendentes = (db.pendentes || []).filter(function (l) { return String(l.vendaId || '') !== String(vid); });
+    }
+
+    /* Destino financeiro — igual FH (na edição, regrava o lançamento ligado à venda) */
     if (tipo === 'VENDA' || tipo === 'ORCAMENTO') {
+        if (editando) removerLancamentosVenda(doc.id);
         if (status === 'PAGO' && tipo === 'VENDA') {
             var lanc = {
                 id: uid(),
@@ -3097,12 +3289,17 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
     }
 
     salvar(db);
-    var msg = tipo === 'ORCAMENTO'
-        ? 'Orçamento Nº ' + numero + ' salvo (sem baixa de estoque).'
-        : (status === 'PAGO'
-            ? ('Venda Nº ' + numero + ' salva. Estoque baixado. ' +
-                (formaPagamentoEhDigital(forma) ? 'Valor no Caixa do Banco (PIX/cartão).' : 'Valor no Caixa Balcão (dinheiro).'))
-            : ('Venda Nº ' + numero + ' salva. Estoque baixado. Valor em Contas a Receber.'));
+    var msg;
+    if (editando) {
+        msg = (tipo === 'ORCAMENTO' ? 'Orçamento' : 'Venda') + ' Nº ' + numero + ' atualizado(a). Estoque não foi alterado na edição.';
+    } else if (tipo === 'ORCAMENTO') {
+        msg = 'Orçamento Nº ' + numero + ' salvo (sem baixa de estoque).';
+    } else if (status === 'PAGO') {
+        msg = 'Venda Nº ' + numero + ' salva. Estoque baixado. ' +
+            (formaPagamentoEhDigital(forma) ? 'Valor no Caixa do Banco (PIX/cartão).' : 'Valor no Caixa Balcão (dinheiro).');
+    } else {
+        msg = 'Venda Nº ' + numero + ' salva. Estoque baixado. Valor em Contas a Receber.';
+    }
     toast(interno
         ? (msg + ' Funcionário: ' + funcionarioNome + '.')
         : msg);
@@ -3138,20 +3335,48 @@ function renderOrcamentos() {
             '<td>' + esc(nome) + tagFunc + tagAvulso + '</td>' +
             '<td>' + esc(pgto) + '</td>' +
             '<td>' + moeda(o.valor) + '</td>' +
-            '<td class="actions"><button type="button" class="btn btn-danger" data-ex="' + o.id + '">Excluir</button></td>';
+            '<td class="actions cx-acoes-cell"></td>';
+        var wrap = document.createElement('div');
+        wrap.className = 'cx-acoes-fh';
+        wrap.innerHTML =
+            '<button type="button" class="btn btn-secondary" data-orc-ver="' + esc(o.id) + '">Ver</button>' +
+            '<button type="button" class="btn btn-secondary" data-orc-imp="' + esc(o.id) + '">Imprimir</button>' +
+            '<button type="button" class="btn btn-pdf" data-orc-pdf="' + esc(o.id) + '">PDF</button>' +
+            '<button type="button" class="btn btn-secondary" data-orc-edit="' + esc(o.id) + '">Editar</button>' +
+            '<button type="button" class="btn btn-danger" data-ex="' + esc(o.id) + '">Excluir</button>';
+        tr.querySelector('.cx-acoes-cell').appendChild(wrap);
         tb.appendChild(tr);
     });
-    tb.querySelectorAll('[data-ex]').forEach(function (b) {
-        b.addEventListener('click', function () {
+    if (!tb._orcClickLigado) {
+        tb._orcClickLigado = true;
+        tb.addEventListener('click', function (e) {
+            var b;
+            b = e.target.closest('[data-orc-ver]');
+            if (b) { abrirDocumentoVenda(b.getAttribute('data-orc-ver')); return; }
+            b = e.target.closest('[data-orc-imp]');
+            if (b) { imprimirDocumentoVenda(b.getAttribute('data-orc-imp')); return; }
+            b = e.target.closest('[data-orc-pdf]');
+            if (b) { salvarPdfDocumentoVenda(b.getAttribute('data-orc-pdf')); return; }
+            b = e.target.closest('[data-orc-edit]');
+            if (b) { editarDocumentoVenda(b.getAttribute('data-orc-edit')); return; }
+            b = e.target.closest('[data-ex]');
+            if (!b) return;
             if (!confirm('Excluir documento? (não estorna estoque automaticamente)')) return;
             var db2 = carregar();
             var idEx = b.getAttribute('data-ex');
             if (canalVendas !== 'interno') marcarExcluido(db2, 'orcamentos', idEx);
-            db2.orcamentos = db2.orcamentos.filter(function (x) { return x.id !== idEx; });
+            db2.orcamentos = (db2.orcamentos || []).filter(function (x) { return x.id !== idEx; });
+            db2.caixa = (db2.caixa || []).filter(function (l) { return String(l.vendaId || '') !== String(idEx); });
+            db2.caixaBanco = (db2.caixaBanco || []).filter(function (l) { return String(l.vendaId || '') !== String(idEx); });
+            db2.pendentes = (db2.pendentes || []).filter(function (l) { return String(l.vendaId || '') !== String(idEx); });
             salvar(db2);
             renderOrcamentos();
+            renderCaixa();
+            renderCaixaBanco();
+            renderPendentes();
+            atualizarKPIs(db2);
         });
-    });
+    }
 }
 
 /* ---------- Despesas por OS (Modo Interno) ---------- */
