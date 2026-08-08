@@ -202,47 +202,147 @@ function somaPorTipo(tipo) {
     }, 0);
 }
 
+function normalizarPecaItem(it) {
+    if (!it || (it.tipo || 'peca') === 'mao') return it;
+    var qtd = Math.max(1, Math.round(Number(it.qtd) || 1));
+    var valorUnit = it.valorUnit != null ? Number(it.valorUnit) : NaN;
+    var custoUnit = it.custoUnit != null ? Number(it.custoUnit) : NaN;
+    if (isNaN(valorUnit) || valorUnit < 0) {
+        valorUnit = qtd > 0 ? (Number(it.valor) || 0) / qtd : (Number(it.valor) || 0);
+    }
+    if (isNaN(custoUnit) || custoUnit < 0) {
+        custoUnit = qtd > 0 ? (Number(it.custo) || 0) / qtd : (Number(it.custo) || 0);
+    }
+    it.qtd = qtd;
+    it.valorUnit = +valorUnit.toFixed(2);
+    it.custoUnit = +custoUnit.toFixed(2);
+    it.valor = +(it.valorUnit * qtd).toFixed(2);
+    it.custo = +(it.custoUnit * qtd).toFixed(2);
+    return it;
+}
+
+function aplicarQtdPeca(idx, novaQtd) {
+    var it = itensTemp[idx];
+    if (!it || (it.tipo || 'peca') === 'mao') return;
+    normalizarPecaItem(it);
+    it.qtd = Math.max(1, Math.round(Number(novaQtd) || 1));
+    it.valor = +(it.valorUnit * it.qtd).toFixed(2);
+    it.custo = +(it.custoUnit * it.qtd).toFixed(2);
+    renderItens();
+}
+
+function htmlLinhaItemOs(it, idx) {
+    var tipo = it.tipo || 'peca';
+    if (tipo === 'peca') {
+        normalizarPecaItem(it);
+        var extraP = '<div class="muted" style="font-size:0.78rem">Unit. custo ' + moeda(it.custoUnit) +
+            ' · venda ' + moeda(it.valorUnit) +
+            ' · Total custo ' + moeda(it.custo) +
+            ' · Ganho <span class="ganho-linha">' + moeda(ganhoItem(it)) + '</span></div>';
+        return '<div class="row" style="margin-bottom:8px;align-items:center;gap:6px">' +
+            '<div class="col" style="flex:2"><span style="display:inline-block;margin-right:8px;padding:2px 8px;border-radius:999px;font-size:0.7rem;font-weight:700;background:rgba(61,160,232,0.15);color:#9fd3ff;border:1px solid rgba(61,160,232,0.4)">PEÇA</span>' +
+            esc(it.desc) + extraP + '</div>' +
+            '<div class="col" style="flex:1.1;display:flex;align-items:center;gap:4px">' +
+            '<button type="button" class="btn btn-secondary" data-qtd-menos="' + idx + '" style="padding:4px 10px;min-width:36px">−</button>' +
+            '<input type="number" min="1" step="1" value="' + esc(String(it.qtd)) + '" data-qtd-input="' + idx + '" ' +
+            'style="width:64px;text-align:center;padding:6px;font-weight:700" title="Quantidade">' +
+            '<button type="button" class="btn btn-secondary" data-qtd-mais="' + idx + '" style="padding:4px 10px;min-width:36px">+</button>' +
+            '</div>' +
+            '<div class="col" style="flex:0.9;font-weight:800">' + moeda(it.valor) + '</div>' +
+            '<div class="col" style="flex:0.4"><button type="button" class="btn btn-danger" data-rm="' + idx + '">×</button></div>' +
+            '</div>';
+    }
+
+    var pctLinha = Number(it.comissaoPct);
+    if (isNaN(pctLinha)) pctLinha = 0;
+    if (it.funcionarioId && pctLinha <= 0) {
+        var dRecalc = obterDadosComissaoFuncionario(it.funcionarioId, it.tipoMao || 'servico');
+        if (dRecalc.pct > 0) {
+            pctLinha = dRecalc.pct;
+            it.comissaoPct = pctLinha;
+            if (!it.funcionarioNome) it.funcionarioNome = dRecalc.nome;
+        }
+    }
+    var comVal = calcularValorComissaoMao(it.valor, pctLinha);
+    it.comissaoValor = comVal;
+    var tipoLbl = it.tipoMao ? rotuloTipoMaoComissao(it.tipoMao) : 'Serviço';
+    var nomeF = it.funcionarioNome || (it.funcionarioId ? 'Funcionário' : 'sem funcionário');
+    var extraM = '<div class="muted" style="font-size:0.8rem;margin-top:2px">' +
+        esc(tipoLbl) + ' · ' + esc(nomeF);
+    if (it.funcionarioId) {
+        if (pctLinha > 0) {
+            extraM += ' · Comissão <strong style="color:#8fe0b8">' + esc(String(pctLinha)) + '%</strong>' +
+                ' = <span class="ganho-linha" style="font-weight:800">' + moeda(comVal) + '</span>';
+        } else {
+            extraM += ' · <span style="color:#ffb4b4">sem % cadastrada neste tipo</span>';
+        }
+    }
+    extraM += '</div>';
+    return '<div class="row" style="margin-bottom:8px;align-items:center">' +
+        '<div class="col" style="flex:2"><span style="display:inline-block;margin-right:8px;padding:2px 8px;border-radius:999px;font-size:0.7rem;font-weight:700;background:rgba(47,158,107,0.2);color:#8fe0b8;border:1px solid rgba(47,158,107,0.45)">MÃO DE OBRA</span>' +
+        esc(it.desc) + extraM + '</div>' +
+        '<div class="col" style="font-weight:800">' + moeda(it.valor) + '</div>' +
+        '<div class="col" style="flex:0.5"><button type="button" class="btn btn-danger" data-rm="' + idx + '">×</button></div>' +
+        '</div>';
+}
+
 function renderItens() {
     var box = document.getElementById('listaItens');
     if (!itensTemp.length) {
         box.innerHTML = '<p class="muted">Nenhuma peça ou mão de obra adicionada.</p>';
-    } else {
-        box.innerHTML = itensTemp.map(function (it, idx) {
-            var tipo = it.tipo || 'peca';
-            var tag = tipo === 'mao'
-                ? '<span style="display:inline-block;margin-right:8px;padding:2px 8px;border-radius:999px;font-size:0.7rem;font-weight:700;background:rgba(47,158,107,0.2);color:#8fe0b8;border:1px solid rgba(47,158,107,0.45)">MÃO DE OBRA</span>'
-                : '<span style="display:inline-block;margin-right:8px;padding:2px 8px;border-radius:999px;font-size:0.7rem;font-weight:700;background:rgba(61,160,232,0.15);color:#9fd3ff;border:1px solid rgba(61,160,232,0.4)">PEÇA</span>';
-            var extra = '';
-            if (tipo === 'peca') {
-                extra = '<div class="muted" style="font-size:0.78rem">Custo ' + moeda(it.custo || 0) + ' · Ganho <span class="ganho-linha">' + moeda(ganhoItem(it)) + '</span></div>';
-            } else if (it.funcionarioId || it.funcionarioNome) {
-                var pctLinha = Number(it.comissaoPct);
-                if (isNaN(pctLinha)) pctLinha = 0;
-                var comVal = it.comissaoValor != null
-                    ? Number(it.comissaoValor)
-                    : +((Number(it.valor) || 0) * pctLinha / 100).toFixed(2);
-                var tipoLbl = it.tipoMao ? rotuloTipoMaoComissao(it.tipoMao) : '';
-                extra = '<div class="muted" style="font-size:0.78rem">' +
-                    (tipoLbl ? esc(tipoLbl) + ' · ' : '') +
-                    esc(it.funcionarioNome || 'Funcionário') +
-                    (comVal > 0
-                        ? ' · Comissão: <span class="ganho-linha">' + moeda(comVal) + '</span>'
-                        : '') +
-                    '</div>';
-            }
-            return '<div class="row" style="margin-bottom:6px;align-items:center">' +
-                '<div class="col" style="flex:2">' + tag + esc(it.desc) + extra + '</div>' +
-                '<div class="col">' + moeda(it.valor) + '</div>' +
-                '<div class="col" style="flex:0.5"><button type="button" class="btn btn-danger" data-rm="' + idx + '">×</button></div>' +
-                '</div>';
-        }).join('');
-        box.querySelectorAll('[data-rm]').forEach(function (b) {
-            b.addEventListener('click', function () {
-                itensTemp.splice(Number(b.getAttribute('data-rm')), 1);
-                renderItens();
-            });
-        });
+        calcTotal();
+        return;
     }
+
+    var idxsPeca = [];
+    var idxsMao = [];
+    itensTemp.forEach(function (it, idx) {
+        if ((it.tipo || 'peca') === 'mao') idxsMao.push(idx);
+        else idxsPeca.push(idx);
+    });
+
+    var html = '';
+    html += '<div style="margin:10px 0 6px;padding:6px 0;border-bottom:1px solid rgba(61,160,232,0.45);color:#9fd3ff;font-weight:800;letter-spacing:.04em;font-size:0.82rem">PEÇAS</div>';
+    if (!idxsPeca.length) {
+        html += '<p class="muted" style="margin:0 0 10px;font-size:0.85rem">Nenhuma peça nesta OS.</p>';
+    } else {
+        html += idxsPeca.map(function (idx) { return htmlLinhaItemOs(itensTemp[idx], idx); }).join('');
+    }
+    html += '<div style="margin:16px 0 6px;padding:6px 0;border-bottom:1px solid rgba(47,158,107,0.45);color:#8fe0b8;font-weight:800;letter-spacing:.04em;font-size:0.82rem">MÃO DE OBRA</div>';
+    if (!idxsMao.length) {
+        html += '<p class="muted" style="margin:0;font-size:0.85rem">Nenhuma mão de obra nesta OS.</p>';
+    } else {
+        html += idxsMao.map(function (idx) { return htmlLinhaItemOs(itensTemp[idx], idx); }).join('');
+    }
+    box.innerHTML = html;
+
+    box.querySelectorAll('[data-rm]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            itensTemp.splice(Number(b.getAttribute('data-rm')), 1);
+            renderItens();
+        });
+    });
+    box.querySelectorAll('[data-qtd-mais]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var i = Number(b.getAttribute('data-qtd-mais'));
+            var it = itensTemp[i];
+            if (!it) return;
+            aplicarQtdPeca(i, (Number(it.qtd) || 1) + 1);
+        });
+    });
+    box.querySelectorAll('[data-qtd-menos]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var i = Number(b.getAttribute('data-qtd-menos'));
+            var it = itensTemp[i];
+            if (!it) return;
+            aplicarQtdPeca(i, Math.max(1, (Number(it.qtd) || 1) - 1));
+        });
+    });
+    box.querySelectorAll('[data-qtd-input]').forEach(function (inp) {
+        inp.addEventListener('change', function () {
+            aplicarQtdPeca(Number(inp.getAttribute('data-qtd-input')), inp.value);
+        });
+    });
     calcTotal();
 }
 
@@ -267,14 +367,46 @@ function addLinhaValor(tipo, descId, valorId, msgVazio) {
 
 document.getElementById('btnAddItem').addEventListener('click', function () {
     var desc = document.getElementById('itemDesc').value.trim();
-    var custo = parseMoeda(document.getElementById('itemCusto').value);
-    var valor = parseMoeda(document.getElementById('itemValor').value);
+    var custoUnit = parseMoeda(document.getElementById('itemCusto').value);
+    var valorUnit = parseMoeda(document.getElementById('itemValor').value);
+    var qtdRaw = document.getElementById('itemQtd') ? document.getElementById('itemQtd').value : '1';
+    var qtd = Math.max(1, Math.round(Number(String(qtdRaw).replace(',', '.')) || 1));
     if (!desc) { toast('Informe a descrição da peça/item.'); return; }
-    if (!(valor > 0) && !(custo > 0)) { toast('Informe o valor de venda da peça.'); return; }
-    itensTemp.push({ tipo: 'peca', desc: desc, custo: custo, valor: valor || custo });
+    if (!(valorUnit > 0) && !(custoUnit > 0)) { toast('Informe o valor de venda da peça.'); return; }
+    if (!(valorUnit > 0)) valorUnit = custoUnit;
+
+    /* Se já existe a mesma peça (mesmo nome + unitários), só soma a quantidade */
+    var iExist = itensTemp.findIndex(function (x) {
+        if (!x || (x.tipo || 'peca') === 'mao') return false;
+        if (String(x.desc || '').toLowerCase() !== desc.toLowerCase()) return false;
+        normalizarPecaItem(x);
+        return Number(x.valorUnit) === valorUnit && Number(x.custoUnit) === custoUnit;
+    });
+    if (iExist >= 0) {
+        normalizarPecaItem(itensTemp[iExist]);
+        aplicarQtdPeca(iExist, (Number(itensTemp[iExist].qtd) || 1) + qtd);
+        document.getElementById('itemDesc').value = '';
+        document.getElementById('itemCusto').value = '';
+        document.getElementById('itemValor').value = '';
+        if (document.getElementById('itemQtd')) document.getElementById('itemQtd').value = '1';
+        toast('Quantidade da peça atualizada.');
+        return;
+    }
+
+    var item = {
+        tipo: 'peca',
+        desc: desc,
+        qtd: qtd,
+        custoUnit: custoUnit,
+        valorUnit: valorUnit,
+        custo: +(custoUnit * qtd).toFixed(2),
+        valor: +(valorUnit * qtd).toFixed(2)
+    };
+    itensTemp.push(item);
     document.getElementById('itemDesc').value = '';
     document.getElementById('itemCusto').value = '';
     document.getElementById('itemValor').value = '';
+    if (document.getElementById('itemQtd')) document.getElementById('itemQtd').value = '1';
     renderItens();
 });
 
@@ -441,9 +573,13 @@ document.getElementById('formAtendimento').addEventListener('submit', async func
         return;
     }
     var id = document.getElementById('atId').value;
-    /* Garante comissão calculada e gravada em cada mão de obra */
+    /* Garante qtd/totais nas peças e comissão gravada em cada mão de obra */
     itensTemp.forEach(function (it) {
-        if (!it || (it.tipo || '') !== 'mao') return;
+        if (!it) return;
+        if ((it.tipo || 'peca') !== 'mao') {
+            normalizarPecaItem(it);
+            return;
+        }
         if (!it.tipoMao) it.tipoMao = 'servico';
         if (it.funcionarioId) {
             var dCom = obterDadosComissaoFuncionario(it.funcionarioId, it.tipoMao);
@@ -640,17 +776,22 @@ function editarAtendimento(id) {
         var comVal = it.comissaoValor != null
             ? Number(it.comissaoValor)
             : calcularValorComissaoMao(valorMo, pct);
-        return {
+        var row = {
             tipo: it.tipo || 'peca',
             tipoMao: tipoMao,
             desc: it.desc || '',
             valor: valorMo,
             custo: Number(it.custo) || 0,
+            qtd: it.qtd != null ? Number(it.qtd) : 1,
+            valorUnit: it.valorUnit != null ? Number(it.valorUnit) : null,
+            custoUnit: it.custoUnit != null ? Number(it.custoUnit) : null,
             funcionarioId: fid,
             funcionarioNome: nome,
             comissaoPct: pct,
             comissaoValor: comVal
         };
+        if ((row.tipo || 'peca') !== 'mao') normalizarPecaItem(row);
+        return row;
     });
     /* Compatibilidade: valor único antigo de mão de obra vira um item */
     var temMaoNaLista = itensTemp.some(function (it) { return it.tipo === 'mao'; });

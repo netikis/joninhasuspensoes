@@ -538,36 +538,57 @@ function preencherSelectMaoFunc() {
 
 
 function listarComissoes(filtroFuncId, mesYYYYMM) {
-    var db = carregar();
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
     var funcsMap = {};
+    function registrarFunc(f) {
+        if (!f || !f.id) return;
+        funcsMap[String(f.id)] = f;
+    }
+    try {
+        if (typeof listarFuncionariosInterno === 'function') {
+            listarFuncionariosInterno().forEach(registrarFunc);
+        }
+    } catch (e0) { /* ok */ }
     try {
         comCanalInterno(function () {
-            (carregar().funcionarios || []).forEach(function (f) { funcsMap[f.id] = f; });
+            (carregar().funcionarios || []).forEach(registrarFunc);
         });
     } catch (e) {
         try {
             var raw = localStorage.getItem(STORAGE_INTERNO);
             var int = raw ? JSON.parse(raw) : {};
-            (int.funcionarios || []).forEach(function (f) { funcsMap[f.id] = f; });
+            (int.funcionarios || []).forEach(registrarFunc);
         } catch (e2) {}
     }
     var out = [];
     (db.atendimentos || []).forEach(function (a) {
         var d = dataAtendimentoISO(a);
+        if (!d) return;
         if (mesYYYYMM && d.slice(0, 7) !== mesYYYYMM) return;
         (a.itens || []).forEach(function (it) {
             if ((it.tipo || '') !== 'mao') return;
-            var fid = it.funcionarioId || '';
+            var fid = it.funcionarioId ? String(it.funcionarioId) : '';
             if (!fid) return;
-            if (filtroFuncId && fid !== filtroFuncId) return;
+            if (filtroFuncId && fid !== String(filtroFuncId)) return;
             var f = funcsMap[fid] || {};
             var tipoMao = it.tipoMao || 'servico';
-            var pct = it.comissaoPct != null ? Number(it.comissaoPct) : pctComissaoPorTipo(f, tipoMao);
-            if (isNaN(pct)) pct = 0;
+            var pct = it.comissaoPct != null ? Number(it.comissaoPct) : NaN;
+            if (isNaN(pct) || pct <= 0) {
+                /* OS antiga / salva com 0% → usa % atual do cadastro */
+                pct = typeof pctComissaoPorTipo === 'function'
+                    ? pctComissaoPorTipo(f, tipoMao)
+                    : (Number(f.comissaoServicoPct != null ? f.comissaoServicoPct : f.comissaoPct) || 0);
+            }
+            if (isNaN(pct) || pct < 0) pct = 0;
             var base = Number(it.valor) || 0;
-            var valor = it.comissaoValor != null && !isNaN(Number(it.comissaoValor))
-                ? +(Number(it.comissaoValor)).toFixed(2)
+            var valorSalvo = it.comissaoValor != null ? Number(it.comissaoValor) : NaN;
+            var valor = (!isNaN(valorSalvo) && valorSalvo > 0)
+                ? +valorSalvo.toFixed(2)
                 : +(base * pct / 100).toFixed(2);
+            /* Se tinha valor 0 com % agora > 0, recalcula */
+            if (!(valor > 0) && pct > 0 && base > 0) {
+                valor = +(base * pct / 100).toFixed(2);
+            }
             var descMo = it.desc || 'Mão de obra';
             if (it.tipoMao) descMo = '[' + rotuloTipoMaoComissao(tipoMao) + '] ' + descMo;
             out.push({
