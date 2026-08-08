@@ -66,7 +66,8 @@ function excluidosVazio() {
         orcamentos: {},
         caixa: {},
         caixaBanco: {},
-        pendentes: {}
+        pendentes: {},
+        funcionarios: {}
     };
 }
 

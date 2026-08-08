@@ -298,13 +298,14 @@ funcs.push({
     return payloadLoginsFuncNuvemSyncFromLista(funcs);
 }
 
-async function enviarLoginsFuncNuvem() {
+async function enviarLoginsFuncNuvem(opts) {
+    opts = opts || {};
     var cfg = carregarConfigNuvem();
     if (!cfg || !cfg.apiKey || !cfg.projectId) {
 return { ok: false, erro: 'Nuvem sem configuração Firebase.' };
     }
     var pack = await payloadLoginsFuncNuvem();
-    if (!(pack.funcionarios || []).length) {
+    if (!(pack.funcionarios || []).length && !opts.permitirVazio) {
 return { ok: false, erro: 'Nenhum login de funcionário para enviar.' };
     }
     try {
@@ -331,18 +332,24 @@ try {
     if (usuarioNuvemLogado()) {
 try {
     var s2 = await obterSessaonuvem();
+    var mainPush = (typeof carregarMain === 'function') ? carregarMain() : null;
+    var excluidosPush = mainPush ? garantirExcluidos(mainPush) : null;
     await s2.fsMod.setDoc(
         s2.fsMod.doc(s2.dbFs, 'joninha_suspensoes_base', 'principal'),
-        { funcionarios: listarFuncionariosInterno().map(function (f) {
-            return {
-                id: f.id,
-                nome: f.nome,
-                ativo: f.ativo !== false,
-                loginUsuario: f.loginUsuario || '',
-                loginSenhaHash: f.loginSenhaHash || '',
-                atualizadoEm: f.atualizadoEm || null
-            };
-        }), atualizadoEm: pack.atualizadoEm },
+        {
+            funcionarios: listarFuncionariosInterno().map(function (f) {
+                return {
+                    id: f.id,
+                    nome: f.nome,
+                    ativo: f.ativo !== false,
+                    loginUsuario: f.loginUsuario || '',
+                    loginSenhaHash: f.loginSenhaHash || '',
+                    atualizadoEm: f.atualizadoEm || null
+                };
+            }),
+            excluidos: excluidosPush || undefined,
+            atualizadoEm: pack.atualizadoEm
+        },
         { merge: true }
     );
 } catch (e2) { /* ok */ }
@@ -354,29 +361,56 @@ logins: pack.funcionarios.map(function (f) { return f.loginUsuario; })
     };
 }
 
+function mapaExcluidosFuncionarios() {
+    try {
+        var main = (typeof carregarMain === 'function') ? carregarMain() : null;
+        if (!main) return {};
+        var ex = garantirExcluidos(main);
+        return ex.funcionarios || {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function funcionarioEstaExcluido(id, mapaEx, atualizadoEmRemoto) {
+    if (!id) return false;
+    var mapa = mapaEx || {};
+    var chave = mapa[id] != null ? id : (mapa[String(id)] != null ? String(id) : null);
+    if (chave == null) return false;
+    var tEx = new Date(mapa[chave] || 0).getTime();
+    var tR = new Date(atualizadoEmRemoto || 0).getTime();
+    /* Só “volta” se o remoto for mais novo que a exclusão (recadastro) */
+    return !(tR > tEx);
+}
+
 function forcarAplicarFuncionariosNuvem(remotos) {
     if (!Array.isArray(remotos) || !remotos.length) return [];
+    var mapaEx = mapaExcluidosFuncionarios();
     var lista = listarFuncionariosInterno();
     var byId = {};
     lista.forEach(function (f) {
-if (f && f.id) byId[f.id] = Object.assign({}, f);
+        if (!f || !f.id) return;
+        if (funcionarioEstaExcluido(f.id, mapaEx, f.atualizadoEm || f.criadoEm)) return;
+        byId[String(f.id)] = Object.assign({}, f, { id: f.id });
     });
     remotos.forEach(function (r) {
-if (!r || !r.id) return;
-var cur = byId[r.id] || { id: r.id, criadoEm: r.atualizadoEm || new Date().toISOString() };
-var u = normalizarLoginFunc(r.loginUsuario);
-byId[r.id] = Object.assign({}, cur, {
-    id: r.id,
-    nome: r.nome || cur.nome || u || 'Funcionário',
-    ativo: r.ativo !== false,
-    loginUsuario: u || cur.loginUsuario || '',
-    loginSenhaHash: r.loginSenhaHash || cur.loginSenhaHash || '',
-    atualizadoEm: r.atualizadoEm || new Date().toISOString()
-});
-/* Nuvem não manda senha em texto — preserva local se existir */
-if (r.loginSenha && !byId[r.id].loginSenha) {
-    byId[r.id].loginSenha = normalizarSenhaFunc(r.loginSenha);
-}
+        if (!r || !r.id) return;
+        var rid = String(r.id);
+        if (funcionarioEstaExcluido(rid, mapaEx, r.atualizadoEm)) return;
+        var cur = byId[rid] || { id: r.id, criadoEm: r.atualizadoEm || new Date().toISOString() };
+        var u = normalizarLoginFunc(r.loginUsuario);
+        byId[rid] = Object.assign({}, cur, {
+            id: r.id,
+            nome: r.nome || cur.nome || u || 'Funcionário',
+            ativo: r.ativo !== false,
+            loginUsuario: u || cur.loginUsuario || '',
+            loginSenhaHash: r.loginSenhaHash || cur.loginSenhaHash || '',
+            atualizadoEm: r.atualizadoEm || new Date().toISOString()
+        });
+        /* Nuvem não manda senha em texto — preserva local se existir */
+        if (r.loginSenha && !byId[rid].loginSenha) {
+            byId[rid].loginSenha = normalizarSenhaFunc(r.loginSenha);
+        }
     });
     salvarFuncionariosInterno(Object.keys(byId).map(function (k) { return byId[k]; }));
     return Object.keys(sincronizarMapaLoginsFuncLimpo());

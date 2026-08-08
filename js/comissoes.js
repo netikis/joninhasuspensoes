@@ -116,17 +116,44 @@ function abrirEdicaoFuncionario(id) {
 function excluirFuncionarioPorId(id) {
     if (!id) return;
     if (!confirm('Excluir este funcionário? Histórico de pagamentos e vendas permanece.')) return;
+    var idStr = String(id);
     comCanalInterno(function () {
         var db = carregar();
-        db.funcionarios = (db.funcionarios || []).filter(function (f) { return f.id !== id; });
+        marcarExcluido(db, 'funcionarios', idStr);
+        db.funcionarios = (db.funcionarios || []).filter(function (f) {
+            return f && String(f.id) !== idStr;
+        });
         salvar(db);
         toast('Funcionário removido.');
-        if (document.getElementById('pfFuncEditId').value === id) limparFormFuncionario();
+        var editEl = document.getElementById('pfFuncEditId');
+        if (editEl && String(editEl.value) === idStr) limparFormFuncionario();
     });
+    /* Garante também no STORAGE_INTERNO direto (fonte dos logins/sync) */
+    try {
+        var lista = listarFuncionariosInterno().filter(function (f) {
+            return f && String(f.id) !== idStr;
+        });
+        salvarFuncionariosInterno(lista);
+        if (typeof sincronizarMapaLoginsFuncLimpo === 'function') sincronizarMapaLoginsFuncLimpo();
+    } catch (eLimpa) { /* ok */ }
+    /* Marca exclusão no banco oficial para o sync não ressuscitar */
+    try {
+        var main = carregarMain();
+        marcarExcluido(main, 'funcionarios', idStr);
+        salvarMain(main);
+    } catch (eMain) { /* ok */ }
+
     fecharModalVerFuncionario();
     renderListaFuncionarios();
     renderPagFuncionarios();
-    preencherSelectFuncionariosVenda();
+    if (typeof preencherSelectFuncionariosVenda === 'function') preencherSelectFuncionariosVenda();
+    if (typeof preencherSelectMaoFunc === 'function') preencherSelectMaoFunc();
+
+    /* Empurra lista sem o excluído + mapa de exclusões para a nuvem */
+    if (typeof agendarSyncAutomatico === 'function') agendarSyncAutomatico('excluir-funcionario');
+    if (typeof enviarLoginsFuncNuvem === 'function') {
+        enviarLoginsFuncNuvem({ permitirVazio: true }).catch(function () { /* offline */ });
+    }
 }
 
 var _verFuncIdAtual = null;
