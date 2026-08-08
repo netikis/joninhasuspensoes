@@ -355,11 +355,12 @@
 
                 <div class="box">
                     <h2>Valores — Peças e Mão de Obra</h2>
-                    <p class="hint">Peça: informe <strong>custo</strong> e <strong>venda</strong>. Mão de obra: vincule o funcionário — a comissão é calculada na hora (em R$) e fica salva em <strong>Comissões</strong> para o balanço do mês. A % não aparece aqui.</p>
+                    <p class="hint">Peça: <strong>custo</strong> e <strong>venda unitários</strong> + <strong>qtd</strong> (total = venda × qtd). Na lista dá para alterar a quantidade. Mão de obra: a <strong>% e o R$ da comissão</strong> do funcionário aparecem na linha (só no painel interno — não vai na nota do cliente).</p>
                     <div class="row">
                         <div class="col" style="flex:2"><label>Descrição peça</label><input id="itemDesc" placeholder="Ex: Amortecedor dianteiro"></div>
-                        <div class="col"><label>Custo (R$)</label><input id="itemCusto" inputmode="decimal" placeholder="55,00"></div>
-                        <div class="col"><label>Venda (R$)</label><input id="itemValor" inputmode="decimal" placeholder="60,00"></div>
+                        <div class="col"><label>Custo unit. (R$)</label><input id="itemCusto" inputmode="decimal" placeholder="55,00"></div>
+                        <div class="col"><label>Venda unit. (R$)</label><input id="itemValor" inputmode="decimal" placeholder="60,00"></div>
+                        <div class="col" style="flex:0.55"><label>Qtd</label><input id="itemQtd" inputmode="numeric" value="1" min="1" step="1" placeholder="1"></div>
                         <div class="col" style="flex:0.7;align-self:end"><button type="button" class="btn btn-secondary" id="btnAddItem" style="width:100%">+ Peça</button></div>
                     </div>
                     <div class="row" style="margin-top:10px">
