@@ -4685,10 +4685,11 @@ function imprimirRelatorioOficina() {
         }
     });
     var btnSairF = document.getElementById('btnSairFuncPainel');
-    if (btnSairF) btnSairF.addEventListener('click', function () {
-        bloquearApp();
-        toast('Saiu do painel do funcionário.');
-    });
+    if (btnSairF) btnSairF.addEventListener('click', function () { sairDoSistema(); });
+    var btnSairSis = document.getElementById('btnSairSistema');
+    if (btnSairSis) btnSairSis.addEventListener('click', function () { sairDoSistema(); });
+    var btnSairTop = document.getElementById('btnSairTopbar');
+    if (btnSairTop) btnSairTop.addEventListener('click', function () { sairDoSistema(); });
     var formLoginCfg = document.getElementById('formLoginFuncCfg');
     if (formLoginCfg) formLoginCfg.addEventListener('submit', async function (e) {
         e.preventDefault();

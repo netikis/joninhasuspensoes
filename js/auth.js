@@ -64,6 +64,34 @@ function bloquearApp() {
     preencherSelectLoginFunc();
     pararSyncAutomatico();
     atualizarStatusNuvemUI();
+    try {
+        var em = document.getElementById('loginEmail');
+        var se = document.getElementById('loginSenha');
+        var fu = document.getElementById('loginFuncUser');
+        var fs = document.getElementById('loginFuncSenha');
+        if (em) em.value = '';
+        if (se) se.value = '';
+        if (fu) fu.value = '';
+        if (fs) fs.value = '';
+    } catch (eLimpa) { /* ok */ }
+}
+
+/** Sai da sessão (Admin ou Funcionário) para trocar usuário — especialmente no celular */
+async function sairDoSistema(opts) {
+    opts = opts || {};
+    if (!opts.semConfirm && !confirm('Sair do sistema para trocar de usuário?')) return;
+    try {
+        if (typeof fecharMenuMobile === 'function') fecharMenuMobile();
+    } catch (eM) { /* ok */ }
+    try {
+        if (typeof logoutFirebase === 'function') await logoutFirebase();
+    } catch (eL) { /* ok */ }
+    bloquearApp();
+    toast('Saiu. Escolha Oficina/Admin ou Funcionário para entrar de novo.');
+    try {
+        var tabA = document.getElementById('tabLoginAdmin');
+        if (tabA) tabA.click();
+    } catch (eT) { /* ok */ }
 }
 
 function restaurarSessaoFuncionarioSalva() {
