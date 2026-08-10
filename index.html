@@ -108,7 +108,7 @@
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelVeiculo" data-canal="normal">📝 Ordem de Serviço / Veículo</button>
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelHistorico" data-canal="normal">🗂️ Histórico de Atendimentos</button>
             </div>
-            <button type="button" class="btn btn-danger" id="btnSairFuncPainel">Sair do painel</button>
+            <button type="button" class="btn btn-danger" id="btnSairFuncPainel">Sair / Trocar usuário</button>
         </div>
 
         <div class="menu-grupo" data-grupo="comissoes">
@@ -152,6 +152,10 @@
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelConfigBackup" data-canal="normal">💾 Backup e limpeza</button>
             </div>
         </div>
+
+        <div class="sidebar-sair">
+            <button type="button" class="btn btn-danger" id="btnSairSistema">🚪 Sair / Trocar usuário</button>
+        </div>
     </aside>
 
     <main class="main">
@@ -165,6 +169,7 @@
             </div>
             <span class="badge-db" id="badgeDb">DB isolado · joninha_suspensoes_v1</span>
             <span class="badge-db" id="badgeAppVersion" style="margin-left:6px">v?</span>
+            <button type="button" class="btn btn-danger btn-sair-top" id="btnSairTopbar" title="Sair / Trocar usuário">Sair</button>
         </div>
         <div class="banner-canal" id="bannerCanal" style="display:none" aria-hidden="true"></div>
 
