@@ -1,6 +1,23 @@
 'use strict';
 /* Joninha — UI: toast, menus, painéis, renderTudo (etapa 2.2) */
 
+/* Altura real da tela no Android/iPhone (barra de endereço muda o 100vh) */
+function atualizarVhFallback() {
+    try {
+        var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        if (!(h > 0)) h = window.innerHeight;
+        document.documentElement.style.setProperty('--vh-fallback', (h * 0.01) + 'px');
+    } catch (e) { /* ok */ }
+}
+atualizarVhFallback();
+window.addEventListener('resize', atualizarVhFallback);
+window.addEventListener('orientationchange', function () {
+    setTimeout(atualizarVhFallback, 180);
+});
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', atualizarVhFallback);
+}
+
 function atualizarBadgeCanal() {
     var badge = document.getElementById('badgeDb');
     var interno = canalVendas === 'interno';
@@ -114,12 +131,6 @@ function abrirPainel(id, btn) {
     if (id === 'painelRelatorioOficina') renderRelatorioOficina();
     if (id === 'painelComissoes') renderComissoes();
     if (id === 'painelVeiculo') preencherSelectMaoFunc();
-    if (id === 'painelDespesasOs') {
-        canalVendas = 'interno';
-        atualizarBadgeCanal();
-        fecharBoxDespesaOs();
-        renderDespesasOs();
-    }
     if (id === 'painelFuncionarios') {
         canalVendas = 'interno';
         atualizarBadgeCanal();
@@ -153,7 +164,6 @@ function abrirPainel(id, btn) {
 }
 
 var PAINEIS_CANAL = {
-    painelDespesasOs: true,
     painelFuncionarios: true,
     painelListaFuncionarios: true,
     painelPagFuncionarios: true,
@@ -236,10 +246,6 @@ function renderTudo() {
     renderCaixaBanco();
     renderPendentes();
     renderRelatorioCaixa();
-    if (document.getElementById('painelDespesasOs') &&
-        document.getElementById('painelDespesasOs').classList.contains('active')) {
-        renderDespesasOs();
-    }
     if (document.getElementById('painelListaFuncionarios') &&
         document.getElementById('painelListaFuncionarios').classList.contains('active')) {
         renderListaFuncionarios();
