@@ -13,6 +13,91 @@ function getCaixaConfig(db) {
     }, (db && db.caixaConfig) || {});
 }
 
+var paginaAtualCaixa = 1;
+var itensPorPaginaCaixa = 20;
+var paginaAtualBanco = 1;
+var itensPorPaginaBanco = 20;
+
+function formaEhDigitalCx(forma) {
+    if (typeof formaPagamentoEhDigital === 'function') return formaPagamentoEhDigital(forma);
+    var f = String(forma || '').toLowerCase();
+    return /pix|cart[aã]o|boleto|transfer/.test(f);
+}
+
+function dataLancISO(x) {
+    return String(x && (x.criadoEm || x.data) || '').slice(0, 10);
+}
+
+function renderResumoCaixaHoje() {
+    var tbody = document.getElementById('tabelaResumoPgto');
+    if (!tbody) return;
+    var db = carregarMain();
+    var hoje = hojeISO();
+    var resumo = {};
+    var resumoDigital = {};
+    var qtdDespesas = 0;
+    var totalDespesas = 0;
+
+    function addEntrada(mapa, forma, valor, icone) {
+        var chave = forma || 'Outros';
+        if (!mapa[chave]) mapa[chave] = { qtd: 0, total: 0, icone: icone || '💰' };
+        mapa[chave].qtd++;
+        mapa[chave].total += Number(valor) || 0;
+    }
+
+    (db.caixa || []).forEach(function (x) {
+        if (dataLancISO(x) !== hoje) return;
+        var valor = Number(x.valor) || 0;
+        if (x.tipo === 'saida') {
+            qtdDespesas++;
+            totalDespesas += valor;
+            return;
+        }
+        if (x.tipo !== 'entrada') return;
+        var forma = x.forma || 'Dinheiro';
+        if (formaEhDigitalCx(forma)) addEntrada(resumoDigital, forma.replace(/Cartão de /i, ''), valor, /pix/i.test(forma) ? '🌀' : '💳');
+        else addEntrada(resumo, forma, valor, '💰');
+    });
+    (db.caixaBanco || []).forEach(function (x) {
+        if (dataLancISO(x) !== hoje) return;
+        var valor = Number(x.valor) || 0;
+        if (x.tipo === 'saida') {
+            qtdDespesas++;
+            totalDespesas += valor;
+            return;
+        }
+        if (x.tipo !== 'entrada') return;
+        var forma = x.forma || 'PIX';
+        addEntrada(resumoDigital, forma.replace(/Cartão de /i, ''), valor, /pix/i.test(forma) ? '🌀' : '💳');
+    });
+
+    var html = '';
+    Object.keys(resumo).forEach(function (forma) {
+        var r = resumo[forma];
+        html += '<tr><td style="font-weight:700">' + esc(r.icone + ' ' + forma) +
+            ' <small class="muted">(gaveta)</small></td>' +
+            '<td style="text-align:center">' + r.qtd + '</td>' +
+            '<td style="text-align:right;color:#2ecc71;font-weight:800">' + moeda(r.total) + '</td>' +
+            '<td style="text-align:center"><span class="badge-cx entrada">ENTRADA</span></td></tr>';
+    });
+    Object.keys(resumoDigital).forEach(function (forma) {
+        var r = resumoDigital[forma];
+        html += '<tr><td style="font-weight:700">' + esc(r.icone + ' ' + forma) +
+            ' <small class="muted">(banco — recebido hoje)</small></td>' +
+            '<td style="text-align:center">' + r.qtd + '</td>' +
+            '<td style="text-align:right;color:#5dade2;font-weight:800">' + moeda(r.total) + '</td>' +
+            '<td style="text-align:center"><span class="badge-cx os">BANCO</span></td></tr>';
+    });
+    html += '<tr><td style="font-weight:700;color:#e74c3c">🔻 Despesas / Saídas</td>' +
+        '<td style="text-align:center;color:#e74c3c">' + qtdDespesas + '</td>' +
+        '<td style="text-align:right;color:#e74c3c;font-weight:800">- ' + moeda(totalDespesas) + '</td>' +
+        '<td style="text-align:center"><span class="badge-cx despesas">SAÍDA</span></td></tr>';
+    if (!Object.keys(resumo).length && !Object.keys(resumoDigital).length && !qtdDespesas) {
+        html = '<tr><td colspan="4" class="muted" style="text-align:center">Sem movimentação hoje.</td></tr>';
+    }
+    tbody.innerHTML = html;
+}
+
 function mesclarCaixaConfig(localCfg, nuvemCfg) {
     var L = getCaixaConfig({ caixaConfig: localCfg });
     var N = getCaixaConfig({ caixaConfig: nuvemCfg });
@@ -128,8 +213,6 @@ function editarCaixaInicial() {
 }
 
 document.getElementById('btnCxInicial').addEventListener('click', editarCaixaInicial);
-var cardCxIni = document.getElementById('cardCxInicial');
-if (cardCxIni) cardCxIni.addEventListener('click', editarCaixaInicial);
 
 function lancarBalcaoRapido(tipo) {
     var titulo = tipo === 'saida' ? 'Lançar DESPESA no balcão' : 'Lançar ENTRADA no balcão';
@@ -326,7 +409,10 @@ function renderCaixa() {
 
     var tb = document.getElementById('tabelaCaixa');
     tb.innerHTML = '';
-    /* pastas do balcão foram movidas para Relatório de Despesas */
+    if (typeof gerarArvorePastasCaixa === 'function') {
+        gerarArvorePastasCaixa({ elId: 'arvorePastasBalcao', filtro: 'balcao', idPrefix: 'pasta_bal' });
+    }
+    renderResumoCaixaHoje();
 
     var q = ((document.getElementById('buscaCaixaBalcao') && document.getElementById('buscaCaixaBalcao').value) || '').toLowerCase().trim();
     var listaFiltrada = lista.slice().reverse().filter(function (x) {
@@ -350,11 +436,21 @@ function renderCaixa() {
         tb.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#fff;font-weight:700">' +
             (lista.length ? 'Nenhum registro encontrado na busca.' : 'Nenhum documento registrado no balcão.') +
             '</td></tr>';
+        var infoVazia = document.getElementById('infoPaginaCaixa');
+        if (infoVazia) infoVazia.textContent = 'Pág 1';
         return;
     }
 
+    var maxPag = Math.max(1, Math.ceil(listaFiltrada.length / itensPorPaginaCaixa));
+    if (paginaAtualCaixa > maxPag) paginaAtualCaixa = maxPag;
+    if (paginaAtualCaixa < 1) paginaAtualCaixa = 1;
+    var inicio = (paginaAtualCaixa - 1) * itensPorPaginaCaixa;
+    var pagina = listaFiltrada.slice(inicio, inicio + itensPorPaginaCaixa);
+    var infoPag = document.getElementById('infoPaginaCaixa');
+    if (infoPag) infoPag.textContent = 'Pág ' + paginaAtualCaixa + ' de ' + maxPag;
+
     var main = carregarMain();
-    listaFiltrada.forEach(function (x) {
+    pagina.forEach(function (x) {
         var tip = classificarTipoCaixaFh(x);
         var doc = numDocCaixaFh(x);
         var cli = clienteCaixaFh(x);
@@ -397,13 +493,24 @@ function renderCaixa() {
         bEx.setAttribute('data-ex', String(x.id || ''));
         if (x.atendimentoId) bEx.setAttribute('data-ex-at', String(x.atendimentoId));
         wrap.appendChild(bEx);
-        acoesCell.appendChild(wrap);
+        acoesCell.appendChild(compactarAcoesOpcoesNota(wrap));
         tb.appendChild(tr);
     });
 
     if (!tb._cxClickLigado) {
         tb._cxClickLigado = true;
         tb.addEventListener('click', function (e) {
+            var opt = e.target.closest('.btn-opcoes-nota');
+            if (opt) {
+                e.preventDefault();
+                e.stopPropagation();
+                var wrapOp = opt.closest('.cx-opcoes-wrap');
+                document.querySelectorAll('.cx-opcoes-wrap.aberto').forEach(function (w) {
+                    if (w !== wrapOp) w.classList.remove('aberto');
+                });
+                if (wrapOp) wrapOp.classList.toggle('aberto');
+                return;
+            }
             if (tratarCliqueAcoesDocumentoCaixa(e)) return;
             var bEx = e.target.closest('[data-ex]');
             if (bEx) {
@@ -424,6 +531,22 @@ function renderCaixa() {
 }
 
 /** Botões Ver / Imprimir / PDF / Editar (e Link na OS) — espelho do FH Control */
+/** Botões Ver / Imprimir / PDF / Editar (e Link na OS) — no painel OPÇÕES NOTA, como o ERP PDV */
+function compactarAcoesOpcoesNota(wrap) {
+    var box = document.createElement('div');
+    box.className = 'cx-opcoes-wrap';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-secondary btn-opcoes-nota';
+    btn.textContent = '⚙️ OPÇÕES NOTA';
+    var menu = document.createElement('div');
+    menu.className = 'cx-opcoes-menu';
+    while (wrap.firstChild) menu.appendChild(wrap.firstChild);
+    box.appendChild(btn);
+    box.appendChild(menu);
+    return box;
+}
+
 function montarAcoesDocumentoCaixa(wrap, x) {
     if (!wrap || !x) return;
     if (x.atendimentoId) {
@@ -485,7 +608,37 @@ function tratarCliqueAcoesDocumentoCaixa(e) {
     var el = document.getElementById('buscaCaixaBalcao');
     if (!el || el._ligadoCx) return;
     el._ligadoCx = true;
-    el.addEventListener('input', function () { renderCaixa(); });
+    el.addEventListener('input', function () {
+        paginaAtualCaixa = 1;
+        renderCaixa();
+    });
+})();
+
+document.addEventListener('click', function (e) {
+    if (!e.target.closest('.cx-opcoes-wrap')) {
+        document.querySelectorAll('.cx-opcoes-wrap.aberto').forEach(function (w) {
+            w.classList.remove('aberto');
+        });
+    }
+});
+
+(function ligarPaginacaoCaixa() {
+    var ant = document.getElementById('btnCxPagAnt');
+    var prox = document.getElementById('btnCxPagProx');
+    if (ant && !ant._ligado) {
+        ant._ligado = true;
+        ant.addEventListener('click', function () {
+            paginaAtualCaixa = Math.max(1, paginaAtualCaixa - 1);
+            renderCaixa();
+        });
+    }
+    if (prox && !prox._ligado) {
+        prox._ligado = true;
+        prox.addEventListener('click', function () {
+            paginaAtualCaixa += 1;
+            renderCaixa();
+        });
+    }
 })();
 
 document.getElementById('btnBkInicial').addEventListener('click', function () {
@@ -561,14 +714,56 @@ function renderCaixaBanco() {
     if (typeof gerarArvorePastasCaixa === 'function') {
         gerarArvorePastasCaixa({ elId: 'arvorePastasBanco', filtro: 'banco', idPrefix: 'pasta_ban' });
     }
-    if (!lista.length) {
-        tb.innerHTML = '<tr><td colspan="6" class="muted">Sem lançamentos no banco.</td></tr>';
+    var qBk = ((document.getElementById('buscaCaixaBanco') && document.getElementById('buscaCaixaBanco').value) || '').toLowerCase().trim();
+    var listaFiltradaBk = lista.slice().reverse().filter(function (x) {
+        if (!qBk) return true;
+        var blob = [numDocCaixaFh(x), clienteCaixaFh(x), x.descricao, x.forma, x.tipo, fmtData(x.criadoEm)].join(' ').toLowerCase();
+        return blob.indexOf(qBk) > -1;
+    });
+    if (!listaFiltradaBk.length) {
+        tb.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center">' +
+            (lista.length ? 'Nenhum registro encontrado na busca.' : 'Sem lançamentos no banco.') + '</td></tr>';
+        var infoVaziaBk = document.getElementById('infoPaginaBanco');
+        if (infoVaziaBk) infoVaziaBk.textContent = 'Pág 1';
         return;
     }
-    lista.slice().reverse().forEach(function (x) {
+    var maxPagBk = Math.max(1, Math.ceil(listaFiltradaBk.length / itensPorPaginaBanco));
+    if (paginaAtualBanco > maxPagBk) paginaAtualBanco = maxPagBk;
+    if (paginaAtualBanco < 1) paginaAtualBanco = 1;
+    var paginaBk = listaFiltradaBk.slice((paginaAtualBanco - 1) * itensPorPaginaBanco, paginaAtualBanco * itensPorPaginaBanco);
+    var infoBk = document.getElementById('infoPaginaBanco');
+    if (infoBk) infoBk.textContent = 'Pág ' + paginaAtualBanco + ' de ' + maxPagBk;
+
+    var mainBk = carregarMain();
+    paginaBk.forEach(function (x) {
+        var tip = classificarTipoCaixaFh(x);
+        var doc = numDocCaixaFh(x);
+        var cli = clienteCaixaFh(x);
+        var dataLanc = fmtData(x.criadoEm);
+        var venc = x.vencimento ? fmtData(x.vencimento) : dataLanc;
+        var valorCor = tip.cls === 'despesas' ? '#e74c3c' : '#2ecc71';
+        var forma = (x.forma || '').toUpperCase();
+        var statusHtml = (tip.cls === 'despesas' || tip.cls === 'fech')
+            ? '—'
+            : '<span class="badge-cx pago">✅ PAGO' + (forma ? ' - ' + esc(forma) : '') + '</span>';
+        var assHtml = '—';
+        if (x.atendimentoId) {
+            var at = (mainBk.atendimentos || []).find(function (a) { return a.id === x.atendimentoId; });
+            if (at && at.assinaturaCliente) assHtml = '<span style="color:#2ecc71">✍️ OK</span>';
+            else assHtml = '<span style="color:#e74c3c">❌ Pend</span>';
+        }
         var tr = document.createElement('tr');
-        var tdAcoes = document.createElement('td');
-        tdAcoes.className = 'actions';
+        tr.innerHTML =
+            '<td style="font-weight:800">' + esc(doc) + '</td>' +
+            '<td><span class="badge-cx ' + tip.cls + '">' + tip.sigla + '</span></td>' +
+            '<td>' + esc(dataLanc) + '</td>' +
+            '<td>' + esc(cli) + '</td>' +
+            '<td>' + esc(venc) + '</td>' +
+            '<td style="color:' + valorCor + ';font-weight:800">' + moeda(x.valor) + '</td>' +
+            '<td style="text-align:center">' + statusHtml + '</td>' +
+            '<td style="text-align:center;font-size:0.8rem">' + assHtml + '</td>' +
+            '<td class="cx-acoes-cell"></td>';
+        var acoesCell = tr.querySelector('.cx-acoes-cell');
         var wrap = document.createElement('div');
         wrap.className = 'cx-acoes-fh';
         montarAcoesDocumentoCaixa(wrap, x);
@@ -579,19 +774,23 @@ function renderCaixaBanco() {
         bEx.setAttribute('data-ex', String(x.id || ''));
         if (x.atendimentoId) bEx.setAttribute('data-ex-at', String(x.atendimentoId));
         wrap.appendChild(bEx);
-        tdAcoes.appendChild(wrap);
-        tr.innerHTML =
-            '<td>' + esc(fmtData(x.criadoEm)) + '</td>' +
-            '<td>' + esc(x.tipo) + '</td>' +
-            '<td>' + esc(x.descricao) + '</td>' +
-            '<td>' + esc(x.forma) + '</td>' +
-            '<td>' + moeda(x.valor) + '</td>';
-        tr.appendChild(tdAcoes);
+        acoesCell.appendChild(compactarAcoesOpcoesNota(wrap));
         tb.appendChild(tr);
     });
     if (!tb._bkClickLigado) {
         tb._bkClickLigado = true;
         tb.addEventListener('click', function (e) {
+            var opt = e.target.closest('.btn-opcoes-nota');
+            if (opt) {
+                e.preventDefault();
+                e.stopPropagation();
+                var wrapOp = opt.closest('.cx-opcoes-wrap');
+                document.querySelectorAll('.cx-opcoes-wrap.aberto').forEach(function (w) {
+                    if (w !== wrapOp) w.classList.remove('aberto');
+                });
+                if (wrapOp) wrapOp.classList.toggle('aberto');
+                return;
+            }
             if (tratarCliqueAcoesDocumentoCaixa(e)) return;
             var b = e.target.closest('[data-ex]');
             if (!b) return;
@@ -610,6 +809,33 @@ function renderCaixaBanco() {
         });
     }
 }
+
+(function ligarBuscaPaginacaoBanco() {
+    var el = document.getElementById('buscaCaixaBanco');
+    if (el && !el._ligadoBk) {
+        el._ligadoBk = true;
+        el.addEventListener('input', function () {
+            paginaAtualBanco = 1;
+            renderCaixaBanco();
+        });
+    }
+    var ant = document.getElementById('btnBkPagAnt');
+    var prox = document.getElementById('btnBkPagProx');
+    if (ant && !ant._ligado) {
+        ant._ligado = true;
+        ant.addEventListener('click', function () {
+            paginaAtualBanco = Math.max(1, paginaAtualBanco - 1);
+            renderCaixaBanco();
+        });
+    }
+    if (prox && !prox._ligado) {
+        prox._ligado = true;
+        prox.addEventListener('click', function () {
+            paginaAtualBanco += 1;
+            renderCaixaBanco();
+        });
+    }
+})();
 
 document.getElementById('formPendente').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -1018,6 +1244,131 @@ function togglePastaCaixa(id) {
 }
 window.togglePastaCaixa = togglePastaCaixa;
 
+function expandirPastaCaixa(elId, tipo) {
+    var raiz = document.getElementById(elId);
+    if (!raiz) return false;
+    raiz.querySelectorAll('.pasta-cx-tipo').forEach(function (n) {
+        n.classList.remove('pasta-cx-destaque');
+    });
+    var anoBox = raiz.querySelector('[data-pasta-nivel="ano"]');
+    if (!anoBox) {
+        raiz.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return false;
+    }
+    anoBox.style.display = 'block';
+    var mesBox = anoBox.querySelector('[data-pasta-nivel="mes"]');
+    if (mesBox) mesBox.style.display = 'block';
+    var alvoTipo = tipo === 'saidas' ? 'saidas' : tipo;
+    var host = mesBox || anoBox;
+    var conteudo = host.querySelector('[data-pasta-tipo="' + alvoTipo + '"]');
+    if (!conteudo && alvoTipo === 'saidas') {
+        conteudo = host.querySelector('[data-pasta-tipo="despesas"]');
+    }
+    if (conteudo) {
+        conteudo.style.display = 'block';
+        var btn = conteudo.previousElementSibling;
+        if (btn && btn.classList.contains('pasta-cx-tipo')) btn.classList.add('pasta-cx-destaque');
+        setTimeout(function () {
+            (btn || conteudo).scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 60);
+        return true;
+    }
+    raiz.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return false;
+}
+window.expandirPastaCaixa = expandirPastaCaixa;
+
+function irParaPastaInicio(tipo) {
+    var mapa = {
+        entradas: { panel: 'painelCaixa', elId: 'arvorePastasBalcao', tipo: 'entradas' },
+        saidas: { panel: 'painelCaixa', elId: 'arvorePastasBalcao', tipo: 'saidas' },
+        pendentes: { panel: 'painelPendentes', elId: 'arvorePastasPendentes', tipo: 'pendentes' }
+    };
+    var dest = mapa[tipo];
+    if (!dest) return;
+    abrirPainel(dest.panel);
+    setTimeout(function () {
+        expandirPastaCaixa(dest.elId, dest.tipo);
+    }, 180);
+}
+window.irParaPastaInicio = irParaPastaInicio;
+
+function destacarAtalhoCaixa(el) {
+    if (!el) return;
+    el.classList.add('cx-atalho-foco');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(function () { el.classList.remove('cx-atalho-foco'); }, 1800);
+}
+
+function abrirRelatorioOficinaDia(focoId) {
+    var rof = document.getElementById('rofPeriodo');
+    if (rof) rof.value = 'dia';
+    abrirPainel('painelRelatorioOficina');
+    if (typeof renderRelatorioOficina === 'function') renderRelatorioOficina();
+    setTimeout(function () {
+        var alvo = focoId ? document.getElementById(focoId) : null;
+        destacarAtalhoCaixa(alvo ? (alvo.closest('.card') || alvo) : document.getElementById('rofConteudo'));
+    }, 220);
+}
+
+function irParaAtalhoCaixa(acao, origem) {
+    origem = origem || 'balcao';
+    var pastaId = origem === 'banco' ? 'arvorePastasBanco' : 'arvorePastasBalcao';
+
+    if (acao === 'inicial') {
+        if (origem === 'banco') {
+            var btnBk = document.getElementById('btnBkInicial');
+            if (btnBk) btnBk.click();
+        } else {
+            editarCaixaInicial();
+        }
+        return;
+    }
+    if (acao === 'entradas' || acao === 'saidas') {
+        expandirPastaCaixa(pastaId, acao);
+        return;
+    }
+    if (acao === 'balanco') {
+        destacarAtalhoCaixa(document.querySelector('#painelCaixa .resumo-caixa-hoje'));
+        return;
+    }
+    if (acao === 'saldo') {
+        var movBk = document.getElementById('tabelaBanco');
+        destacarAtalhoCaixa(movBk ? (movBk.closest('.box') || movBk) : document.getElementById('arvorePastasBanco'));
+        return;
+    }
+    if (acao === 'oficina-pecas') {
+        abrirRelatorioOficinaDia('rofPecasBruto');
+        return;
+    }
+    if (acao === 'oficina-ganho') {
+        abrirRelatorioOficinaDia('rofPecasLucro');
+        return;
+    }
+    if (acao === 'oficina-mao') {
+        abrirRelatorioOficinaDia('rofMaoBruta');
+        return;
+    }
+    if (acao === 'oficina-os') {
+        expandirPastaCaixa('arvorePastasBalcao', 'entradas');
+        setTimeout(function () {
+            var tb = document.getElementById('tabelaCaixa');
+            destacarAtalhoCaixa(tb ? tb.closest('.table-wrap') : null);
+        }, 280);
+        return;
+    }
+    if (acao === 'rel-geral') {
+        expandirPastaCaixa('arvorePastasCaixa', 'entradas');
+    }
+}
+window.irParaAtalhoCaixa = irParaAtalhoCaixa;
+
+document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-cx-atalho]');
+    if (!btn) return;
+    irParaAtalhoCaixa(btn.getAttribute('data-cx-atalho'), btn.getAttribute('data-cx-origem') || 'balcao');
+});
+
 function filtrarItensArvoreCaixa(lista, filtro) {
     if (!lista) return [];
     if (filtro === 'balcao') return lista.filter(function (x) { return x.origem === 'Balcão'; });
@@ -1078,7 +1429,7 @@ function gerarArvorePastasCaixa(opts) {
         idc++;
         var idAno = idPrefix + '_ano_' + idc;
         html += '<div class="pasta-cx-ano" onclick="togglePastaCaixa(\'' + idAno + '\')">📁 Ano: ' + esc(ano) + '</div>';
-        html += '<div id="' + idAno + '" style="display:none">';
+        html += '<div id="' + idAno + '" data-pasta-nivel="ano" style="display:none">';
         Object.keys(arvore[ano]).forEach(function (mesNome) {
             var bucket = arvore[ano][mesNome];
             idc++;
@@ -1099,37 +1450,37 @@ function gerarArvorePastasCaixa(opts) {
                 esc(bucket.mesAno) + '" data-rel-mes="' + esc(filtro) + '">📄 Relatório geral</button>' +
                 '<button type="button" class="btn btn-secondary" style="padding:6px 10px;font-size:12px" data-arquivar-mes="' +
                 esc(bucket.mesAno) + '" data-arquivar-filtro="' + esc(filtro) + '">📂 Arquivar no PC</button></div>';
-            html += '<div id="' + idMes + '" style="display:none">';
+            html += '<div id="' + idMes + '" data-pasta-nivel="mes" style="display:none">';
 
             if (filtro === 'despesas') {
                 idc++;
                 var idS = idPrefix + '_s_' + idc;
-                html += '<div class="pasta-cx-tipo" onclick="togglePastaCaixa(\'' + idS + '\')">🔻 Despesas (' +
+                html += '<div class="pasta-cx-tipo" data-pasta-tipo-btn="despesas" onclick="togglePastaCaixa(\'' + idS + '\')">🔻 Despesas (' +
                     bucket.saidas.length + ' · ' + moeda(totS) + ')</div>';
-                html += '<div id="' + idS + '" class="pasta-cx-conteudo" style="display:none">' +
+                html += '<div id="' + idS + '" class="pasta-cx-conteudo" data-pasta-tipo="despesas" style="display:none">' +
                     htmlItensPastaCx(bucket.saidas, 'val-sai') + '</div>';
             } else if (filtro !== 'pendentes') {
                 idc++;
                 var idE = idPrefix + '_e_' + idc;
-                html += '<div class="pasta-cx-tipo" onclick="togglePastaCaixa(\'' + idE + '\')">✅ Entradas (' +
+                html += '<div class="pasta-cx-tipo" data-pasta-tipo-btn="entradas" onclick="togglePastaCaixa(\'' + idE + '\')">✅ Entradas (' +
                     bucket.entradas.length + ' · ' + moeda(totE) + ')</div>';
-                html += '<div id="' + idE + '" class="pasta-cx-conteudo" style="display:none">' +
+                html += '<div id="' + idE + '" class="pasta-cx-conteudo" data-pasta-tipo="entradas" style="display:none">' +
                     htmlItensPastaCx(bucket.entradas, 'val-ent') + '</div>';
 
                 idc++;
                 var idS2 = idPrefix + '_s_' + idc;
-                html += '<div class="pasta-cx-tipo" onclick="togglePastaCaixa(\'' + idS2 + '\')">🔻 Saídas (' +
+                html += '<div class="pasta-cx-tipo" data-pasta-tipo-btn="saidas" onclick="togglePastaCaixa(\'' + idS2 + '\')">🔻 Saídas (' +
                     bucket.saidas.length + ' · ' + moeda(totS) + ')</div>';
-                html += '<div id="' + idS2 + '" class="pasta-cx-conteudo" style="display:none">' +
+                html += '<div id="' + idS2 + '" class="pasta-cx-conteudo" data-pasta-tipo="saidas" style="display:none">' +
                     htmlItensPastaCx(bucket.saidas, 'val-sai') + '</div>';
             }
 
             if (filtro === 'geral' || filtro === 'pendentes') {
                 idc++;
                 var idP = idPrefix + '_p_' + idc;
-                html += '<div class="pasta-cx-tipo" onclick="togglePastaCaixa(\'' + idP + '\')">⏳ Pendentes (' +
+                html += '<div class="pasta-cx-tipo" data-pasta-tipo-btn="pendentes" onclick="togglePastaCaixa(\'' + idP + '\')">⏳ Pendentes (' +
                     bucket.pendentes.length + ' · ' + moeda(totP) + ')</div>';
-                html += '<div id="' + idP + '" class="pasta-cx-conteudo" style="display:none">' +
+                html += '<div id="' + idP + '" class="pasta-cx-conteudo" data-pasta-tipo="pendentes" style="display:none">' +
                     htmlItensPastaCx(bucket.pendentes, 'val-pen') + '</div>';
             }
 
@@ -1155,6 +1506,7 @@ function gerarArvorePastasCaixa(opts) {
 
 function atualizarTodasPastasCaixa() {
     gerarArvorePastasCaixa({ elId: 'arvorePastasCaixa', filtro: 'geral', idPrefix: 'pasta_cx' });
+    gerarArvorePastasCaixa({ elId: 'arvorePastasBalcao', filtro: 'balcao', idPrefix: 'pasta_bal' });
     gerarArvorePastasCaixa({ elId: 'arvorePastasDespesas', filtro: 'despesas', idPrefix: 'pasta_des' });
     gerarArvorePastasCaixa({ elId: 'arvorePastasBanco', filtro: 'banco', idPrefix: 'pasta_ban' });
     gerarArvorePastasCaixa({ elId: 'arvorePastasPendentes', filtro: 'pendentes', idPrefix: 'pasta_pen' });

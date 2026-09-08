@@ -63,7 +63,11 @@ function atualizarMarcacaoGrupos() {
     });
 }
 
-function abrirPainel(id, btn) {
+function abrirPainel(id, btn, opcoes) {
+    opcoes = opcoes || {};
+    var estadoAntes = (!opcoes.skipNav && typeof window._navGetEstado === 'function')
+        ? window._navGetEstado()
+        : null;
     if (sessaoFuncionarioId) {
         if (id !== 'painelVeiculo' && id !== 'painelHistorico') {
             id = 'painelVeiculo';
@@ -83,7 +87,7 @@ function abrirPainel(id, btn) {
         else if (gNome === 'vendas' || gNome === 'caixa' || gNome === 'caixaRelatorio') canalVendas = 'normal';
         else canalVendas = 'normal';
     }
-    if (canalAntes !== canalVendas) {
+    if (!opcoes.skipNav && canalAntes !== canalVendas) {
         carrinhoVenda = [];
         produtoVendaSelecionado = null;
     }
@@ -161,7 +165,11 @@ function abrirPainel(id, btn) {
         renderLoginsFuncCfg();
     }
     fecharMenuMobile();
+    if (estadoAntes && typeof window._navRegistrarDepoisNavegacao === 'function') {
+        window._navRegistrarDepoisNavegacao(estadoAntes);
+    }
 }
+window.abrirPainel = abrirPainel;
 
 var PAINEIS_CANAL = {
     painelFuncionarios: true,
@@ -187,7 +195,15 @@ document.getElementById('btnAbrirMenu').addEventListener('click', abrirMenuMobil
 document.getElementById('btnFecharMenu').addEventListener('click', fecharMenuMobile);
 document.getElementById('sidebarOverlay').addEventListener('click', fecharMenuMobile);
 window.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') fecharMenuMobile();
+    if (e.key !== 'Escape') return;
+    if (document.body.classList.contains('menu-aberto')) {
+        fecharMenuMobile();
+        e.preventDefault();
+        return;
+    }
+    if (typeof window._navTratarEscape === 'function' && window._navTratarEscape()) {
+        e.preventDefault();
+    }
 });
 
 document.querySelectorAll('[data-toggle-grupo]').forEach(function (btn) {
@@ -216,6 +232,14 @@ document.querySelectorAll('.nav-btn').forEach(function (btn) {
 document.querySelectorAll('[data-goto]').forEach(function (btn) {
     btn.addEventListener('click', function () {
         abrirPainel(btn.getAttribute('data-goto'));
+    });
+});
+
+document.querySelectorAll('[data-atalho-pasta]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        if (typeof irParaPastaInicio === 'function') {
+            irParaPastaInicio(btn.getAttribute('data-atalho-pasta'));
+        }
     });
 });
 

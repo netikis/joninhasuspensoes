@@ -182,17 +182,58 @@
                 <div class="hero-tag">Timbre oficial · Joninha Suspensões</div>
             </div>
             <div class="cards">
-                <div class="card"><div class="k">Clientes</div><div class="v" id="kpiClientes">0</div></div>
-                <div class="card"><div class="k">Atendimentos</div><div class="v" id="kpiAtend">0</div></div>
-                <div class="card"><div class="k">Produtos</div><div class="v" id="kpiProd">0</div></div>
-                <div class="card"><div class="k">Caixa (entradas)</div><div class="v" id="kpiCaixa">R$ 0</div></div>
+                <button type="button" class="card card-atalho card-ent" data-atalho-pasta="entradas" title="Abrir pasta de entradas">
+                    <div class="k">Entradas</div>
+                    <div class="v" id="kpiInicioEntradas">R$ 0</div>
+                    <div class="card-sub">Clique para entrar na pasta</div>
+                </button>
+                <button type="button" class="card card-atalho card-sai" data-atalho-pasta="saidas" title="Abrir pasta de saídas">
+                    <div class="k">Saídas</div>
+                    <div class="v" id="kpiInicioSaidas">R$ 0</div>
+                    <div class="card-sub">Clique para entrar na pasta</div>
+                </button>
+                <button type="button" class="card card-atalho card-pen" data-atalho-pasta="pendentes" title="Abrir pasta de contas a receber">
+                    <div class="k">Contas a receber</div>
+                    <div class="v" id="kpiInicioPendentes">R$ 0</div>
+                    <div class="card-sub">Clique para entrar na pasta</div>
+                </button>
+                <button type="button" class="card card-atalho" data-goto="painelCaixa" title="Abrir caixa / balcão">
+                    <div class="k">Saldo em caixa</div>
+                    <div class="v" id="kpiCaixa">R$ 0</div>
+                    <div class="card-sub">Balcão + banco</div>
+                </button>
+            </div>
+            <div class="cards">
+                <button type="button" class="card card-atalho" data-goto="painelListaClientes">
+                    <div class="k">Clientes</div>
+                    <div class="v" id="kpiClientes">0</div>
+                    <div class="card-sub">Lista cadastrada</div>
+                </button>
+                <button type="button" class="card card-atalho" data-goto="painelHistorico">
+                    <div class="k">Atendimentos</div>
+                    <div class="v" id="kpiAtend">0</div>
+                    <div class="card-sub">Histórico da oficina</div>
+                </button>
+                <button type="button" class="card card-atalho" data-goto="painelProdutos">
+                    <div class="k">Produtos</div>
+                    <div class="v" id="kpiProd">0</div>
+                    <div class="card-sub">Estoque / cadastro</div>
+                </button>
+                <button type="button" class="card card-atalho" data-goto="painelPendentes">
+                    <div class="k">Pendências abertas</div>
+                    <div class="v" id="kpiInicioQtdPend">0</div>
+                    <div class="card-sub">Contas em aberto</div>
+                </button>
             </div>
             <div class="box">
-                <h2>Como usar esta base</h2>
+                <h2>Acesso rápido</h2>
                 <div class="row">
                     <button type="button" class="btn btn-primary" data-goto="painelClientes">Cadastrar cliente</button>
                     <button type="button" class="btn btn-secondary" data-goto="painelVeiculo">Abrir atendimento</button>
                     <button type="button" class="btn btn-secondary" data-goto="painelOrcamento">Novo orçamento</button>
+                    <button type="button" class="btn btn-ok" data-atalho-pasta="entradas">📁 Entradas</button>
+                    <button type="button" class="btn btn-danger" data-atalho-pasta="saidas">📁 Saídas</button>
+                    <button type="button" class="btn btn-secondary" data-atalho-pasta="pendentes">📁 Contas a receber</button>
                 </div>
             </div>
         </section>
@@ -662,19 +703,48 @@
 
         <section id="painelCaixa" class="panel">
             <div class="cards" style="margin-bottom:14px">
-                <div class="card card-editavel" id="cardCxInicial" style="background:#34495e;cursor:pointer" title="Clique para editar o caixa inicial">
-                    <div class="k">Caixa inicial do dia <span style="opacity:.75;font-size:0.7em">✏️ editar</span></div>
+                <button type="button" class="card card-atalho" id="cardCxInicial" style="background:#34495e" data-cx-atalho="inicial" title="Editar caixa inicial">
+                    <div class="k">Caixa inicial do dia</div>
                     <div class="v" id="cxInicial">R$ 0</div>
-                </div>
-                <div class="card" style="background:#27ae60"><div class="k">Entradas (pagas)</div><div class="v" id="cxEntradas">R$ 0</div></div>
-                <div class="card" style="background:#e74c3c"><div class="k">Saídas (despesas)</div><div class="v" id="cxSaidas">R$ 0</div></div>
-                <div class="card" style="background:#2980b9"><div class="k">Balanço do dia</div><div class="v" id="cxSaldo">R$ 0</div></div>
+                    <div class="card-sub">Clique para editar</div>
+                </button>
+                <button type="button" class="card card-atalho" style="background:#27ae60" data-cx-atalho="entradas" title="Abrir pasta de entradas">
+                    <div class="k">Entradas (pagas)</div>
+                    <div class="v" id="cxEntradas">R$ 0</div>
+                    <div class="card-sub">Clique para entrar na pasta</div>
+                </button>
+                <button type="button" class="card card-atalho" style="background:#e74c3c" data-cx-atalho="saidas" title="Abrir pasta de saídas">
+                    <div class="k">Saídas (despesas)</div>
+                    <div class="v" id="cxSaidas">R$ 0</div>
+                    <div class="card-sub">Clique para entrar na pasta</div>
+                </button>
+                <button type="button" class="card card-atalho" style="background:#2980b9" data-cx-atalho="balanco" title="Ver resumo do dia">
+                    <div class="k">Balanço do dia</div>
+                    <div class="v" id="cxSaldo">R$ 0</div>
+                    <div class="card-sub">Clique para ver o resumo</div>
+                </button>
             </div>
             <div class="cards cards-oficina" style="margin-bottom:14px" id="cxCardsOficina">
-                <div class="card" style="background:#34495e"><div class="k">Oficina — Peças (venda)</div><div class="v" id="cxOfPecas">R$ 0</div></div>
-                <div class="card" style="background:#16a085"><div class="k">Oficina — Ganho em peças</div><div class="v" id="cxOfGanho">R$ 0</div></div>
-                <div class="card" style="background:#8e44ad"><div class="k">Oficina — Mão de obra</div><div class="v" id="cxOfMao">R$ 0</div></div>
-                <div class="card" style="background:#27ae60"><div class="k">Oficina no caixa (OS pagas)</div><div class="v" id="cxOfNoCaixa">R$ 0</div></div>
+                <button type="button" class="card card-atalho" style="background:#34495e" data-cx-atalho="oficina-pecas" title="Abrir relatório de peças">
+                    <div class="k">Oficina — Peças (venda)</div>
+                    <div class="v" id="cxOfPecas">R$ 0</div>
+                    <div class="card-sub">Clique para entrar</div>
+                </button>
+                <button type="button" class="card card-atalho" style="background:#16a085" data-cx-atalho="oficina-ganho" title="Abrir lucro em peças">
+                    <div class="k">Oficina — Ganho em peças</div>
+                    <div class="v" id="cxOfGanho">R$ 0</div>
+                    <div class="card-sub">Clique para entrar</div>
+                </button>
+                <button type="button" class="card card-atalho" style="background:#8e44ad" data-cx-atalho="oficina-mao" title="Abrir mão de obra">
+                    <div class="k">Oficina — Mão de obra</div>
+                    <div class="v" id="cxOfMao">R$ 0</div>
+                    <div class="card-sub">Clique para entrar</div>
+                </button>
+                <button type="button" class="card card-atalho" style="background:#27ae60" data-cx-atalho="oficina-os" title="Ver OS pagas no caixa">
+                    <div class="k">Oficina no caixa (OS pagas)</div>
+                    <div class="v" id="cxOfNoCaixa">R$ 0</div>
+                    <div class="card-sub">Clique para entrar</div>
+                </button>
             </div>
             <div class="box">
                 <h2>Caixa / Balcão</h2>
@@ -688,8 +758,39 @@
                     <button type="button" class="btn btn-ok" id="btnSincronizarPainelCaixa">🔄 Sincronizar painel</button>
                     <button type="button" class="btn btn-pdf" id="btnRelatorioDiaOficina">📄 Relatório do dia (peça/MO)</button>
                 </div>
+                <div class="box resumo-caixa-hoje" style="margin:14px 0">
+                    <h2>Resumo do caixa de hoje (entradas e saídas)</h2>
+                    <p class="hint">Igual ao ERP PDV Balcão: dinheiro na gaveta, digitais no banco e despesas do dia.</p>
+                    <div class="table-wrap">
+                        <table class="tabela-caixa-fh">
+                            <thead>
+                                <tr>
+                                    <th>Forma de pagto / discriminação</th>
+                                    <th style="text-align:center;width:80px">Qtd</th>
+                                    <th style="text-align:right;width:150px">Total (R$)</th>
+                                    <th style="text-align:center;width:100px">Tipo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaResumoPgto">
+                                <tr><td colspan="4" class="muted" style="text-align:center">Calculando movimentações...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="box" style="margin:14px 0;background:rgba(0,0,0,.12)">
+                    <h2>📁 Pastas do balcão (Ano → Mês)</h2>
+                    <p class="hint">Clique no ano, no mês e depois em <strong>Entradas</strong> ou <strong>Saídas</strong> para abrir a pasta.</p>
+                    <div id="arvorePastasBalcao" class="arvore-pastas-caixa">
+                        <div class="muted" style="padding:8px;text-align:center">Carregando pastas…</div>
+                    </div>
+                </div>
                 <div class="toolbar" style="margin-bottom:10px">
                     <input type="search" id="buscaCaixaBalcao" class="search" placeholder="Buscar por Nº Doc / nota, cliente ou data (ex: 05/08/2026)...">
+                    <div class="pagination pagination-caixa">
+                        <button type="button" id="btnCxPagAnt">◀ Ant</button>
+                        <span id="infoPaginaCaixa">Pág 1</span>
+                        <button type="button" id="btnCxPagProx">Próx ▶</button>
+                    </div>
                 </div>
                 <div class="table-wrap">
                     <table class="tabela-caixa-fh">
@@ -714,10 +815,26 @@
 
         <section id="painelCaixaBanco" class="panel">
             <div class="cards" style="margin-bottom:14px">
-                <div class="card" style="background:#34495e;border:1px solid #3498db"><div class="k">Saldo inicial banco</div><div class="v" id="bkInicial" style="color:#7ec8ff">R$ 0</div></div>
-                <div class="card" style="background:#27ae60"><div class="k">Entradas (recebimentos)</div><div class="v" id="bkEntradas">R$ 0</div></div>
-                <div class="card" style="background:#e74c3c"><div class="k">Saídas (pagamentos)</div><div class="v" id="bkSaidas">R$ 0</div></div>
-                <div class="card" style="background:#2980b9"><div class="k">Saldo atual banco</div><div class="v" id="bkSaldo">R$ 0</div></div>
+                <button type="button" class="card card-atalho" id="cardBkInicial" style="background:#34495e;border:1px solid #3498db" data-cx-atalho="inicial" data-cx-origem="banco" title="Editar saldo inicial do banco">
+                    <div class="k">Saldo inicial banco</div>
+                    <div class="v" id="bkInicial" style="color:#7ec8ff">R$ 0</div>
+                    <div class="card-sub">Clique para editar</div>
+                </button>
+                <button type="button" class="card card-atalho" style="background:#27ae60" data-cx-atalho="entradas" data-cx-origem="banco" title="Abrir pasta de entradas do banco">
+                    <div class="k">Entradas (recebimentos)</div>
+                    <div class="v" id="bkEntradas">R$ 0</div>
+                    <div class="card-sub">Clique para entrar na pasta</div>
+                </button>
+                <button type="button" class="card card-atalho" style="background:#e74c3c" data-cx-atalho="saidas" data-cx-origem="banco" title="Abrir pasta de saídas do banco">
+                    <div class="k">Saídas (pagamentos)</div>
+                    <div class="v" id="bkSaidas">R$ 0</div>
+                    <div class="card-sub">Clique para entrar na pasta</div>
+                </button>
+                <button type="button" class="card card-atalho" style="background:#2980b9" data-cx-atalho="saldo" data-cx-origem="banco" title="Ver movimentações do banco">
+                    <div class="k">Saldo atual banco</div>
+                    <div class="v" id="bkSaldo">R$ 0</div>
+                    <div class="card-sub">Clique para ver o detalhe</div>
+                </button>
             </div>
             <div class="box" style="border-color:rgba(52,152,219,0.45)">
                 <h2 style="color:#7ec8ff">Caixa do Banco (Digital / PIX / Cartões)</h2>
@@ -750,11 +867,40 @@
                 </form>
             </div>
             <div class="box">
+                <h2>📁 Pastas do banco (Ano → Mês)</h2>
+                <p class="hint">Entradas e saídas digitais (PIX / cartão) agrupadas por mês.</p>
+                <div id="arvorePastasBanco" class="arvore-pastas-caixa">
+                    <div class="muted" style="padding:8px;text-align:center">Carregando pastas…</div>
+                </div>
+            </div>
+            <div class="box">
                 <h2>Movimentações digitais</h2>
-                <table>
-                    <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th>Valor</th><th>Ações</th></tr></thead>
-                    <tbody id="tabelaBanco"></tbody>
-                </table>
+                <div class="toolbar" style="margin-bottom:10px">
+                    <input type="search" id="buscaCaixaBanco" class="search" placeholder="Buscar por nº da nota, cliente...">
+                    <div class="pagination pagination-caixa">
+                        <button type="button" id="btnBkPagAnt">◀ Ant</button>
+                        <span id="infoPaginaBanco">Pág 1</span>
+                        <button type="button" id="btnBkPagProx">Próx ▶</button>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table class="tabela-caixa-fh">
+                        <thead>
+                            <tr>
+                                <th>Nº Doc</th>
+                                <th>Tipo</th>
+                                <th>Data Lanc.</th>
+                                <th>Cliente / Descrição</th>
+                                <th>Vencimento</th>
+                                <th>Total</th>
+                                <th>Status Pgto</th>
+                                <th>Assinatura</th>
+                                <th style="width:1%;white-space:nowrap">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaBanco"></tbody>
+                    </table>
+                </div>
             </div>
         </section>
 
@@ -779,6 +925,13 @@
                 <div class="card"><div class="k">Qtd. abertas</div><div class="v" id="pdQtd">0</div></div>
             </div>
             <div class="box">
+                <h2>📁 Pastas a receber (Ano → Mês)</h2>
+                <p class="hint">Clique no ano e no mês para abrir a pasta de <strong>Contas a receber</strong>.</p>
+                <div id="arvorePastasPendentes" class="arvore-pastas-caixa">
+                    <div class="muted" style="padding:8px;text-align:center">Carregando pastas…</div>
+                </div>
+            </div>
+            <div class="box">
                 <h2>Pendências abertas</h2>
                 <table>
                     <thead><tr><th>Cliente</th><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Ações</th></tr></thead>
@@ -797,10 +950,26 @@
                 </div>
             </div>
             <div class="cards" style="margin-bottom:14px">
-                <div class="card"><div class="k">Total balcão</div><div class="v" id="relCxBalcao">R$ 0</div></div>
-                <div class="card"><div class="k">Total banco</div><div class="v" id="relCxBanco">R$ 0</div></div>
-                <div class="card"><div class="k">Pendentes</div><div class="v" id="relCxPend">R$ 0</div></div>
-                <div class="card"><div class="k">Saldo geral</div><div class="v" id="relCxGeral">R$ 0</div></div>
+                <button type="button" class="card card-atalho" data-goto="painelCaixa" title="Abrir caixa / balcão">
+                    <div class="k">Total balcão</div>
+                    <div class="v" id="relCxBalcao">R$ 0</div>
+                    <div class="card-sub">Clique para entrar</div>
+                </button>
+                <button type="button" class="card card-atalho" data-goto="painelCaixaBanco" title="Abrir caixa do banco">
+                    <div class="k">Total banco</div>
+                    <div class="v" id="relCxBanco">R$ 0</div>
+                    <div class="card-sub">Clique para entrar</div>
+                </button>
+                <button type="button" class="card card-atalho" data-atalho-pasta="pendentes" title="Abrir contas a receber">
+                    <div class="k">Pendentes</div>
+                    <div class="v" id="relCxPend">R$ 0</div>
+                    <div class="card-sub">Clique para entrar na pasta</div>
+                </button>
+                <button type="button" class="card card-atalho" data-cx-atalho="rel-geral" title="Ver pastas do caixa">
+                    <div class="k">Saldo geral</div>
+                    <div class="v" id="relCxGeral">R$ 0</div>
+                    <div class="card-sub">Clique para ver as pastas</div>
+                </button>
             </div>
 
             <div class="box">
@@ -843,6 +1012,14 @@
                             <button type="button" class="btn btn-pdf" data-rel-mes="geral">📄 PDF</button>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="box">
+                <h2>📁 Pastas do caixa (Ano → Mês)</h2>
+                <p class="hint">Visão geral: <strong>Entradas</strong>, <strong>Saídas</strong> e <strong>Pendentes</strong> no mesmo lugar.</p>
+                <div id="arvorePastasCaixa" class="arvore-pastas-caixa">
+                    <div class="muted" style="padding:8px;text-align:center">Carregando pastas…</div>
                 </div>
             </div>
 
@@ -1408,6 +1585,7 @@
     <script src="js/caixa.js"></script>
     <script src="js/comissoes.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/navegacao.js"></script>
 </body>
 </html>
 

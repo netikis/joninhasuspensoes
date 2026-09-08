@@ -914,15 +914,29 @@ function atualizarSugestoesClienteAt() {
 function atualizarKPIs(db) {
     /* KPIs do painel sempre do balcão oficial (não misturar com interno) */
     db = carregarMain();
-    document.getElementById('kpiClientes').textContent = db.clientes.length;
-    document.getElementById('kpiAtend').textContent = db.atendimentos.length;
-    document.getElementById('kpiProd').textContent = db.produtos.length;
+    var setTxt = function (id, val) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+    setTxt('kpiClientes', db.clientes.length);
+    setTxt('kpiAtend', db.atendimentos.length);
+    setTxt('kpiProd', db.produtos.length);
     var cfg = db.caixaConfig || { inicialBalcao: 0, inicialBanco: 0 };
     var entradas = (db.caixa || []).filter(function (x) { return x.tipo === 'entrada'; })
         .reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
+    var saidas = (db.caixa || []).filter(function (x) { return x.tipo === 'saida'; })
+        .reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
     var entBanco = (db.caixaBanco || []).filter(function (x) { return x.tipo === 'entrada'; })
         .reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
-    document.getElementById('kpiCaixa').textContent = moeda((Number(cfg.inicialBalcao) || 0) + entradas + (Number(cfg.inicialBanco) || 0) + entBanco);
+    var saiBanco = (db.caixaBanco || []).filter(function (x) { return x.tipo === 'saida'; })
+        .reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
+    var pendentes = (db.pendentes || []).filter(function (p) { return p.status !== 'pago'; });
+    var totPend = pendentes.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
+    setTxt('kpiInicioEntradas', moeda(entradas + entBanco));
+    setTxt('kpiInicioSaidas', moeda(saidas + saiBanco));
+    setTxt('kpiInicioPendentes', moeda(totPend));
+    setTxt('kpiInicioQtdPend', pendentes.length);
+    setTxt('kpiCaixa', moeda((Number(cfg.inicialBalcao) || 0) + entradas + (Number(cfg.inicialBanco) || 0) + entBanco - saidas - saiBanco));
 }
 
 function preencherSelectsCliente(db) {

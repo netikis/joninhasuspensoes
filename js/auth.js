@@ -26,6 +26,7 @@ if (sessaoFuncionarioId) {
     atualizarStatusNuvemUI();
     garantirSessaoNuvemQualquer().then(function (ok) {
         iniciarSyncAutomatico();
+        if (typeof window._navIniciarSessao === 'function') window._navIniciarSessao();
         if (!ok) {
             toast('Fotos/OS ficam só neste celular até ativar Auth Anônimo no Firebase.');
             atualizarStatusNuvemUI();
@@ -41,6 +42,7 @@ localStorage.setItem(SESS_LOCAL_KEY, '1');
 aplicarModoFuncionario(null);
 atualizarStatusNuvemUI();
 iniciarSyncAutomatico();
+if (typeof window._navIniciarSessao === 'function') window._navIniciarSessao();
 sincronizarTodosNuvem({ silencioso: true, mostrarToast: true }).catch(function () {
     if (typeof puxarConfigEmpresaNuvemSilencioso === 'function') {
         puxarConfigEmpresaNuvemSilencioso().then(function (ok) {
@@ -64,6 +66,7 @@ function bloquearApp() {
     preencherSelectLoginFunc();
     pararSyncAutomatico();
     atualizarStatusNuvemUI();
+    if (typeof window._navLimparHistorico === 'function') window._navLimparHistorico();
     try {
         var em = document.getElementById('loginEmail');
         var se = document.getElementById('loginSenha');
