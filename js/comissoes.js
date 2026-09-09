@@ -58,11 +58,13 @@ function lerPctsComissaoFormFunc() {
     var serv = n('pfComissaoServico', 0);
     var amort = n('pfComissaoAmortecedor', 0);
     var amortOrig = nMoeda('pfComissaoAmortecedorOriginal');
+    var amortOrig2 = nMoeda('pfComissaoAmortecedorOriginal2');
     return {
         comissaoAlinhamentoPct: alin,
         comissaoServicoPct: serv,
         comissaoAmortecedorPct: amort,
         comissaoAmortecedorOriginalValor: amortOrig,
+        comissaoAmortecedorOriginalValor2: amortOrig2,
         comissaoPct: serv
     };
 }
@@ -75,10 +77,12 @@ function limparFormFuncionario() {
     var s = document.getElementById('pfComissaoServico');
     var m = document.getElementById('pfComissaoAmortecedor');
     var o = document.getElementById('pfComissaoAmortecedorOriginal');
+    var o2 = document.getElementById('pfComissaoAmortecedorOriginal2');
     if (a) a.value = 30;
     if (s) s.value = 40;
     if (m) m.value = 50;
     if (o) o.value = '';
+    if (o2) o2.value = '';
     var pctEl = document.getElementById('pfComissaoPct');
     if (pctEl) pctEl.value = 40;
     var pinEl = document.getElementById('pfPinFunc');
@@ -101,13 +105,17 @@ function preencherFormFuncionario(f) {
     var s = document.getElementById('pfComissaoServico');
     var m = document.getElementById('pfComissaoAmortecedor');
     var o = document.getElementById('pfComissaoAmortecedorOriginal');
+    var o2 = document.getElementById('pfComissaoAmortecedorOriginal2');
     if (a) a.value = f.comissaoAlinhamentoPct != null ? f.comissaoAlinhamentoPct : leg;
     if (s) s.value = f.comissaoServicoPct != null ? f.comissaoServicoPct : leg;
     if (m) m.value = f.comissaoAmortecedorPct != null ? f.comissaoAmortecedorPct : leg;
-    if (o) {
-        var vOrig = f.comissaoAmortecedorOriginalValor != null ? Number(f.comissaoAmortecedorOriginalValor) : 0;
-        o.value = vOrig > 0 ? String(vOrig).replace('.', ',') : '';
+    function txtRs(v) {
+        var n = Number(v);
+        if (isNaN(n) || n <= 0) return '';
+        return String(n).replace('.', ',');
     }
+    if (o) o.value = txtRs(f.comissaoAmortecedorOriginalValor);
+    if (o2) o2.value = txtRs(f.comissaoAmortecedorOriginalValor2);
     var pctEl = document.getElementById('pfComissaoPct');
     if (pctEl) pctEl.value = f.comissaoServicoPct != null ? f.comissaoServicoPct : leg;
     var pinEl = document.getElementById('pfPinFunc');
@@ -193,7 +201,9 @@ function abrirModalVerFuncionario(id) {
         var serv = f.comissaoServicoPct != null ? Number(f.comissaoServicoPct) : leg;
         var amort = f.comissaoAmortecedorPct != null ? Number(f.comissaoAmortecedorPct) : leg;
         var amortOrig = f.comissaoAmortecedorOriginalValor != null ? Number(f.comissaoAmortecedorOriginalValor) : 0;
+        var amortOrig2 = f.comissaoAmortecedorOriginalValor2 != null ? Number(f.comissaoAmortecedorOriginalValor2) : 0;
         if (isNaN(amortOrig) || amortOrig < 0) amortOrig = 0;
+        if (isNaN(amortOrig2) || amortOrig2 < 0) amortOrig2 = 0;
         var ativo = f.ativo !== false;
         document.getElementById('modalVerFuncTitulo').textContent = f.nome || 'Funcionário';
         document.getElementById('modalVerFuncCorpo').innerHTML =
@@ -204,7 +214,8 @@ function abrirModalVerFuncionario(id) {
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO ALINHAMENTO</span><div>' + esc(String(alin)) + '%</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO SERVIÇO</span><div>' + esc(String(serv)) + '%</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO AMORTECEDOR</span><div>' + esc(String(amort)) + '%</div></div>' +
-            '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO AMORTECEDOR ORIGINAL</span><div>' + moeda(amortOrig) + '</div></div>' +
+            '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO AMORTECEDOR ORIGINAL 1</span><div>' + moeda(amortOrig) + '</div></div>' +
+            '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO AMORTECEDOR ORIGINAL 2</span><div>' + moeda(amortOrig2) + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">STATUS</span><div style="color:' + (ativo ? '#2ecc71' : '#e74c3c') + '">' + (ativo ? 'Ativo' : 'Inativo') + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">PIN</span><div>' + (f.pin ? 'Definido' : 'Não definido') + '</div></div>' +
             '<div style="grid-column:1/-1"><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">OBSERVAÇÃO</span><div>' + esc(f.obs || '—') + '</div></div>' +
@@ -244,7 +255,9 @@ function renderListaFuncionarios() {
                 var serv = f.comissaoServicoPct != null ? Number(f.comissaoServicoPct) : leg;
                 var amort = f.comissaoAmortecedorPct != null ? Number(f.comissaoAmortecedorPct) : leg;
                 var amortOrig = f.comissaoAmortecedorOriginalValor != null ? Number(f.comissaoAmortecedorOriginalValor) : 0;
+                var amortOrig2 = f.comissaoAmortecedorOriginalValor2 != null ? Number(f.comissaoAmortecedorOriginalValor2) : 0;
                 if (isNaN(amortOrig) || amortOrig < 0) amortOrig = 0;
+                if (isNaN(amortOrig2) || amortOrig2 < 0) amortOrig2 = 0;
                 return '<tr>' +
                     '<td style="color:#fff;font-weight:800">' + esc(f.nome || '—') + '</td>' +
                     '<td style="color:#fff;font-weight:700">' + esc(f.telefone || '—') + '</td>' +
@@ -253,6 +266,7 @@ function renderListaFuncionarios() {
                     '<td style="color:#fff;font-weight:800">' + esc(String(serv)) + '%</td>' +
                     '<td style="color:#fff;font-weight:800">' + esc(String(amort)) + '%</td>' +
                     '<td style="color:#fff;font-weight:800">' + moeda(amortOrig) + '</td>' +
+                    '<td style="color:#fff;font-weight:800">' + moeda(amortOrig2) + '</td>' +
                     '<td>' + (ativo
                         ? '<span style="color:#2ecc71;font-weight:700">Ativo</span>'
                         : '<span style="color:#e74c3c;font-weight:700">Inativo</span>') + '</td>' +
@@ -385,11 +399,12 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
                 comissaoServicoPct: pcts.comissaoServicoPct,
                 comissaoAmortecedorPct: pcts.comissaoAmortecedorPct,
                 comissaoAmortecedorOriginalValor: pcts.comissaoAmortecedorOriginalValor,
+                comissaoAmortecedorOriginalValor2: pcts.comissaoAmortecedorOriginalValor2,
                 comissaoPct: pcts.comissaoPct,
                 pin: pin || prevPin,
                 atualizadoEm: agora
             });
-            toast('Funcionário atualizado — Alinh. ' + pcts.comissaoAlinhamentoPct + '% · Serv. ' + pcts.comissaoServicoPct + '% · Amort. ' + pcts.comissaoAmortecedorPct + '% · Orig. ' + moeda(pcts.comissaoAmortecedorOriginalValor) + '.');
+            toast('Funcionário atualizado — Alinh. ' + pcts.comissaoAlinhamentoPct + '% · Serv. ' + pcts.comissaoServicoPct + '% · Amort. ' + pcts.comissaoAmortecedorPct + '% · Orig.1 ' + moeda(pcts.comissaoAmortecedorOriginalValor) + ' · Orig.2 ' + moeda(pcts.comissaoAmortecedorOriginalValor2) + '.');
         } else {
             db.funcionarios.push({
                 id: uid(),
@@ -402,12 +417,13 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
                 comissaoServicoPct: pcts.comissaoServicoPct,
                 comissaoAmortecedorPct: pcts.comissaoAmortecedorPct,
                 comissaoAmortecedorOriginalValor: pcts.comissaoAmortecedorOriginalValor,
+                comissaoAmortecedorOriginalValor2: pcts.comissaoAmortecedorOriginalValor2,
                 comissaoPct: pcts.comissaoPct,
                 pin: pin,
                 criadoEm: agora,
                 atualizadoEm: agora
             });
-            toast('Funcionário cadastrado — % por tipo e R$ do amortecedor original salvos.');
+            toast('Funcionário cadastrado — % por tipo e os dois R$ de amortecedor original salvos.');
         }
         salvar(db);
         limparFormFuncionario();
@@ -587,6 +603,7 @@ function preencherSelectMaoFunc() {
         return '<option value="' + esc(f.id) + '">' + esc(f.nome || '') + '</option>';
     }).join('');
     if (cur) sel.value = cur;
+    if (typeof atualizarRotulosTipoMaoOriginal === 'function') atualizarRotulosTipoMaoOriginal();
 }
 
 function preencherSelectMecanicoVenda() {
@@ -618,8 +635,10 @@ function resolverComissaoLinha(it, f, tipoMao, base) {
         var fixo = (!isNaN(valorSalvo) && valorSalvo > 0)
             ? +valorSalvo.toFixed(2)
             : (typeof valorFixoAmortecedorOriginal === 'function'
-                ? valorFixoAmortecedorOriginal(f)
-                : (Number(f && f.comissaoAmortecedorOriginalValor) || 0));
+                ? valorFixoAmortecedorOriginal(f, tipoMao)
+                : (Number(f && (faixaAmortecedorOriginal && faixaAmortecedorOriginal(tipoMao) === 2
+                    ? f.comissaoAmortecedorOriginalValor2
+                    : f.comissaoAmortecedorOriginalValor)) || 0));
         return { pct: 0, pctTxt: 'fixo', valor: +Number(fixo || 0).toFixed(2) };
     }
     var pct = it && it.comissaoPct != null ? Number(it.comissaoPct) : NaN;

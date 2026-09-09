@@ -5529,7 +5529,7 @@ if ('serviceWorker' in navigator) {
         window.location.reload();
     });
 
-    navigator.serviceWorker.register('./sw.js?v=25').then(function (reg) {
+    navigator.serviceWorker.register('./sw.js?v=26').then(function (reg) {
         function checarAtualizacao() {
             try { reg.update(); } catch (e) { /* ok */ }
         }

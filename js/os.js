@@ -415,20 +415,31 @@ document.getElementById('btnAddItem').addEventListener('click', function () {
     renderItens();
 });
 
+function faixaAmortecedorOriginal(tipo) {
+    if (tipo === 'amortecedor-original-2' || tipo === 'amortecedorOriginal2') return 2;
+    if (tipo === 'amortecedor-original' || tipo === 'amortecedorOriginal') return 1;
+    return 0;
+}
+
 function rotuloTipoMaoComissao(tipo) {
     if (tipo === 'alinhamento') return 'Alinhamento';
-    if (tipo === 'amortecedor-original' || tipo === 'amortecedorOriginal') return 'Amortecedor original';
+    var faixaOrig = faixaAmortecedorOriginal(tipo);
+    if (faixaOrig === 2) return 'Amortecedor original 2';
+    if (faixaOrig === 1) return 'Amortecedor original 1';
     if (tipo === 'amortecedor') return 'Amortecedor';
     return 'Serviço';
 }
 
 function ehTipoMaoAmortOriginal(tipo) {
-    return tipo === 'amortecedor-original' || tipo === 'amortecedorOriginal';
+    return faixaAmortecedorOriginal(tipo) > 0;
 }
 
-function valorFixoAmortecedorOriginal(f) {
+function valorFixoAmortecedorOriginal(f, tipo) {
     if (!f) return 0;
-    var v = Number(f.comissaoAmortecedorOriginalValor);
+    var faixa = faixaAmortecedorOriginal(tipo || 'amortecedor-original');
+    var v = faixa === 2
+        ? Number(f.comissaoAmortecedorOriginalValor2)
+        : Number(f.comissaoAmortecedorOriginalValor);
     if (isNaN(v) || v < 0) v = 0;
     return +v.toFixed(2);
 }
@@ -467,7 +478,7 @@ function obterDadosComissaoFuncionario(fid, tipoMao) {
     if (f) {
         out.nome = f.nome || '';
         if (ehTipoMaoAmortOriginal(out.tipo)) {
-            out.valorFixo = valorFixoAmortecedorOriginal(f);
+            out.valorFixo = valorFixoAmortecedorOriginal(f, out.tipo);
             out.pct = 0;
         } else {
             out.pct = pctComissaoPorTipo(f, out.tipo);
@@ -494,7 +505,23 @@ function calcularValorComissaoMao(valorMo, pct) {
     return +(base * p / 100).toFixed(2);
 }
 
+function atualizarRotulosTipoMaoOriginal() {
+    var sel = document.getElementById('maoTipoComissao');
+    if (!sel) return;
+    var fid = document.getElementById('maoFuncId') && document.getElementById('maoFuncId').value;
+    var d1 = fid ? obterDadosComissaoFuncionario(fid, 'amortecedor-original') : { valorFixo: 0 };
+    var d2 = fid ? obterDadosComissaoFuncionario(fid, 'amortecedor-original-2') : { valorFixo: 0 };
+    function setOpt(val, base, v) {
+        var o = sel.querySelector('option[value="' + val + '"]');
+        if (!o) return;
+        o.textContent = (v > 0) ? (base + ' (' + moeda(v) + ')') : base;
+    }
+    setOpt('amortecedor-original', 'Mão de obra — Amortecedor original 1', d1.valorFixo);
+    setOpt('amortecedor-original-2', 'Mão de obra — Amortecedor original 2', d2.valorFixo);
+}
+
 function atualizarPreviewComissaoMao() {
+    atualizarRotulosTipoMaoOriginal();
     var el = document.getElementById('maoComissaoPreview');
     if (!el) return;
     var fid = document.getElementById('maoFuncId') && document.getElementById('maoFuncId').value;
@@ -506,13 +533,14 @@ function atualizarPreviewComissaoMao() {
     }
     var dados = obterDadosComissaoFuncionario(fid, tipo);
     if (ehTipoMaoAmortOriginal(tipo)) {
+        var faixaLbl = rotuloTipoMaoComissao(tipo);
         if (!(dados.valorFixo > 0)) {
-            el.textContent = (dados.nome || 'Funcionário') + ' — sem R$ de amortecedor original no cadastro.';
+            el.textContent = (dados.nome || 'Funcionário') + ' — sem R$ de ' + faixaLbl.toLowerCase() + ' no cadastro.';
             el.style.color = '#ffb4b4';
             return;
         }
         el.style.color = '#8fe0b8';
-        el.textContent = (dados.nome || 'Funcionário') + ' · Amortecedor original — recebe ' +
+        el.textContent = (dados.nome || 'Funcionário') + ' · ' + faixaLbl + ' — recebe ' +
             moeda(dados.valorFixo) + ' (valor fixo do cadastro)';
         return;
     }

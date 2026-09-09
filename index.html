@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=25">
-    <link rel="stylesheet" href="css/tema-m3.css?v=25">
+    <link rel="stylesheet" href="css/app.css?v=26">
+    <link rel="stylesheet" href="css/tema-m3.css?v=26">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -444,7 +444,8 @@
                                 <option value="servico">Mão de obra — Serviço</option>
                                 <option value="alinhamento">Mão de obra — Alinhamento</option>
                                 <option value="amortecedor">Mão de obra — Amortecedor</option>
-                                <option value="amortecedor-original">Mão de obra — Amortecedor original</option>
+                                <option value="amortecedor-original">Mão de obra — Amortecedor original 1</option>
+                                <option value="amortecedor-original-2">Mão de obra — Amortecedor original 2</option>
                             </select>
                         </div>
                         <div class="col"><label>Valor (R$)</label><input id="maoValor" inputmode="decimal" placeholder="0,00"></div>
@@ -1157,7 +1158,10 @@
                         <div class="col"><label>MO Alinhamento (%)</label><input id="pfComissaoAlinhamento" type="number" min="0" max="100" step="0.5" placeholder="Ex: 30" value="30"></div>
                         <div class="col"><label>MO Serviço (%)</label><input id="pfComissaoServico" type="number" min="0" max="100" step="0.5" placeholder="Ex: 40" value="40"></div>
                         <div class="col"><label>MO Amortecedor (%)</label><input id="pfComissaoAmortecedor" type="number" min="0" max="100" step="0.5" placeholder="Ex: 50" value="50"></div>
-                        <div class="col"><label>MO Amortecedor original (R$)</label><input id="pfComissaoAmortecedorOriginal" inputmode="decimal" placeholder="Ex: 80,00"></div>
+                    </div>
+                    <div class="row" style="margin-top:10px">
+                        <div class="col"><label>MO Amortecedor original 1 (R$)</label><input id="pfComissaoAmortecedorOriginal" inputmode="decimal" placeholder="Ex: 5,00"></div>
+                        <div class="col"><label>MO Amortecedor original 2 (R$)</label><input id="pfComissaoAmortecedorOriginal2" inputmode="decimal" placeholder="Ex: 10,00"></div>
                     </div>
                     <div class="row" style="margin-top:10px">
                         <div class="col"><label>PIN (opcional)</label><input id="pfPinFunc" type="password" inputmode="numeric" maxlength="8" placeholder="Ex: 1234"></div>
@@ -1168,7 +1172,7 @@
                             </label>
                         </div>
                     </div>
-                    <p class="hint" style="margin-top:8px">Na OS, Alinhamento / Serviço / Amortecedor usam a <strong>%</strong>. Amortecedor original usa o <strong>R$ fixo</strong> cadastrado (o que o funcionário recebe naquele serviço).</p>
+                    <p class="hint" style="margin-top:8px">Na OS, Alinhamento / Serviço / Amortecedor usam a <strong>%</strong>. Amortecedor original 1 e 2 usam o <strong>R$ fixo</strong> (ex.: 5,00 e 10,00). Na OS você escolhe qual dos dois o funcionário recebe.</p>
                     <input type="hidden" id="pfComissaoPct" value="40">
                     <div class="row" style="margin-top:14px">
                         <button type="submit" class="btn btn-primary" id="btnSalvarFunc">Salvar funcionário</button>
@@ -1198,7 +1202,8 @@
                                 <th>Alinh.%</th>
                                 <th>Serv.%</th>
                                 <th>Amort.%</th>
-                                <th>Orig. R$</th>
+                                <th>Orig. 1</th>
+                                <th>Orig. 2</th>
                                 <th>Status</th>
                                 <th style="min-width:220px">Ações</th>
                             </tr>
@@ -1632,16 +1637,16 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=25"></script>
-    <script src="js/storage.js?v=25"></script>
-    <script src="js/ui.js?v=25"></script>
-    <script src="js/auth.js?v=25"></script>
-    <script src="js/os.js?v=25"></script>
-    <script src="js/nuvem.js?v=25"></script>
-    <script src="js/caixa.js?v=25"></script>
-    <script src="js/comissoes.js?v=25"></script>
-    <script src="js/app.js?v=25"></script>
-    <script src="js/navegacao.js?v=25"></script>
+    <script src="js/config.js?v=26"></script>
+    <script src="js/storage.js?v=26"></script>
+    <script src="js/ui.js?v=26"></script>
+    <script src="js/auth.js?v=26"></script>
+    <script src="js/os.js?v=26"></script>
+    <script src="js/nuvem.js?v=26"></script>
+    <script src="js/caixa.js?v=26"></script>
+    <script src="js/comissoes.js?v=26"></script>
+    <script src="js/app.js?v=26"></script>
+    <script src="js/navegacao.js?v=26"></script>
 </body>
 </html>
 
