@@ -560,6 +560,26 @@ document.getElementById('atClienteBusca').addEventListener('keydown', function (
     }
 });
 
+/* Enter em peça/MO deve adicionar a linha — não salvar a OS nem recarregar a página. */
+document.getElementById('formAtendimento').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.keyCode !== 13) return;
+    var t = e.target;
+    if (!t || t.tagName === 'TEXTAREA') return;
+    if (t.tagName === 'BUTTON' || t.type === 'submit') return;
+    e.preventDefault();
+    e.stopPropagation();
+    var id = t.id || '';
+    if (id === 'itemDesc' || id === 'itemCusto' || id === 'itemValor' || id === 'itemQtd') {
+        var btnPeca = document.getElementById('btnAddItem');
+        if (btnPeca) btnPeca.click();
+        return;
+    }
+    if (id === 'maoDesc' || id === 'maoValor' || id === 'maoTipoComissao' || id === 'maoFuncId') {
+        var btnMao = document.getElementById('btnAddMao');
+        if (btnMao) btnMao.click();
+    }
+});
+
 document.getElementById('formAtendimento').addEventListener('submit', async function (e) {
     e.preventDefault();
     var db = carregar();

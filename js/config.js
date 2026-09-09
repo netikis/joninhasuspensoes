@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.3.16-carros-aberto';
+var APP_VERSION = '1.3.18-painel-junto';
 var STORAGE_KEY = 'joninha_suspensoes_v1';
 var STORAGE_INTERNO = 'joninha_suspensoes_interno_v1';
 var STORAGE_LOGINS_FUNC = 'joninha_suspensoes_logins_func_v1';
@@ -15,13 +15,13 @@ var atendimentoNotaAtual = null;
 var canalVendas = 'normal'; /* normal | interno */
 
 var TITULOS = {
-    painelInicio: ['Painel', 'Carros em andamento ficam abertos · clique nas entradas para ver os serviços'],
+    painelInicio: ['Painel', 'OS e venda rápida contam juntas · ganho nosso e custo das peças no topo'],
     painelClientes: ['Cadastrar Cliente', 'Base de clientes Joninha Suspensões'],
     painelListaClientes: ['Clientes Cadastrados', 'Lista e edição rápida'],
     painelVeiculo: ['Ordem de Serviço / Veículo', 'Atendimento com veículo, serviços e valores'],
-    painelHistorico: ['Histórico de Atendimentos', 'Veículos e serviços registrados'],
-    painelProdutos: ['Cadastro de Produtos', 'Estoque local simplificado'],
-    painelOrcamento: ['Venda / Orçamento', 'Documentos do balcão local'],
+    painelHistorico: ['Histórico da oficina', 'OS e vendas no mesmo lugar — busque pelo cliente'],
+    painelProdutos: ['Cadastro de Produtos', 'Estoque da oficina'],
+    painelOrcamento: ['Venda da oficina', 'Tudo que sai da oficina entra aqui e no histórico'],
     painelCaixa: ['Caixa / Balcão', 'Clique nos cards para entrar em entradas, saídas, balanço ou oficina'],
     painelCaixaBanco: ['Caixa do Banco', 'PIX · cartões · transferências'],
     painelPendentes: ['Contas a Receber', 'Valores em aberto'],

@@ -397,20 +397,35 @@ function renderCaixa() {
     document.getElementById('cxSaldo').textContent = moeda(inicial + entradas - saidas);
 
     var hoje = hojeISO();
-    var of = calcularRelatorioOficina({ inicio: hoje, fim: hoje, label: hoje });
-    var elP = document.getElementById('cxOfPecas');
+    var iniMes = hoje.slice(0, 7) + '-01';
+    var of = calcularRelatorioOficina({ inicio: iniMes, fim: hoje, label: iniMes });
+    if (!((of.mao + of.ganho + of.pecas) > 0.009)) {
+        var dBack = new Date(hoje + 'T12:00:00');
+        dBack.setMonth(dBack.getMonth() - 2);
+        dBack.setDate(1);
+        var iniBack = dBack.getFullYear() + '-' + String(dBack.getMonth() + 1).padStart(2, '0') + '-01';
+        of = calcularRelatorioOficina({ inicio: iniBack, fim: hoje, label: iniBack });
+    }
+    var elPecas = document.getElementById('cxOfPecas');
     var elG = document.getElementById('cxOfGanho');
     var elM = document.getElementById('cxOfMao');
     var elN = document.getElementById('cxOfNoCaixa');
-    if (elP) elP.textContent = moeda(of.pecas);
+    var elSomaSub = document.getElementById('cxOfSomaSub');
+    if (elPecas) elPecas.textContent = moeda(of.pecas);
     if (elG) elG.textContent = moeda(of.ganho);
     if (elM) elM.textContent = moeda(of.mao);
-    if (elN) elN.textContent = moeda(totaisOficinaNoCaixaHoje(db, hoje));
+    if (elN) elN.textContent = moeda((Number(of.mao) || 0) + (Number(of.ganho) || 0));
+    if (elSomaSub) elSomaSub.textContent = 'Mão de obra + ganho em peças';
 
     var tb = document.getElementById('tabelaCaixa');
     tb.innerHTML = '';
     if (typeof gerarArvorePastasCaixa === 'function') {
-        gerarArvorePastasCaixa({ elId: 'arvorePastasBalcao', filtro: 'balcao', idPrefix: 'pasta_bal' });
+        try {
+            gerarArvorePastasCaixa({ elId: 'arvorePastasBalcao', filtro: 'balcao', idPrefix: 'pasta_bal' });
+        } catch (errPasta) {
+            var elP = document.getElementById('arvorePastasBalcao');
+            if (elP) elP.innerHTML = '<div class="muted" style="padding:10px;text-align:center">Não foi possível montar as pastas. Use a lista abaixo.</div>';
+        }
     }
     renderResumoCaixaHoje();
 
@@ -472,6 +487,15 @@ function renderCaixa() {
         }
 
         var tr = document.createElement('tr');
+        if (x.vendaId) {
+            tr.setAttribute('data-cx-abrir-vd', String(x.vendaId));
+            tr.style.cursor = 'pointer';
+            tr.title = 'Clique para abrir a venda';
+        } else if (x.atendimentoId) {
+            tr.setAttribute('data-cx-abrir-os', String(x.atendimentoId));
+            tr.style.cursor = 'pointer';
+            tr.title = 'Clique para abrir a OS';
+        }
         tr.innerHTML =
             '<td style="font-weight:800">' + esc(doc) + '</td>' +
             '<td><span class="badge-cx ' + tip.cls + '">' + tip.sigla + '</span></td>' +
@@ -512,6 +536,21 @@ function renderCaixa() {
                 return;
             }
             if (tratarCliqueAcoesDocumentoCaixa(e)) return;
+            if (!e.target.closest('button') && !e.target.closest('a')) {
+                var trAbrir = e.target.closest('tr[data-cx-abrir-vd], tr[data-cx-abrir-os]');
+                if (trAbrir) {
+                    var idVd = trAbrir.getAttribute('data-cx-abrir-vd');
+                    var idOs = trAbrir.getAttribute('data-cx-abrir-os');
+                    if (idVd && typeof editarDocumentoVenda === 'function') {
+                        editarDocumentoVenda(idVd);
+                        return;
+                    }
+                    if (idOs && typeof editarAtendimento === 'function') {
+                        editarAtendimento(idOs);
+                        return;
+                    }
+                }
+            }
             var bEx = e.target.closest('[data-ex]');
             if (bEx) {
                 e.preventDefault();

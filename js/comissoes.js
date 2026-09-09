@@ -563,6 +563,28 @@ function preencherSelectMaoFunc() {
     if (cur) sel.value = cur;
 }
 
+function preencherSelectMecanicoVenda() {
+    var sel = document.getElementById('vdMecanicoId');
+    if (!sel) return;
+    var cur = sel.value;
+    var funcs = [];
+    try {
+        comCanalInterno(function () {
+            funcs = listarFuncionariosOrdenados(carregar(), true);
+        });
+    } catch (e) {
+        try {
+            var raw = localStorage.getItem(STORAGE_INTERNO);
+            var int = raw ? JSON.parse(raw) : {};
+            funcs = (int.funcionarios || []).filter(function (f) { return f.ativo !== false; });
+        } catch (e2) { funcs = []; }
+    }
+    sel.innerHTML = '<option value="">— sem funcionário —</option>' + funcs.map(function (f) {
+        return '<option value="' + esc(f.id) + '">' + esc(f.nome || '') + '</option>';
+    }).join('');
+    if (cur) sel.value = cur;
+}
+
 
 function listarComissoes(filtroFuncId, mesYYYYMM) {
     var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
@@ -601,7 +623,6 @@ function listarComissoes(filtroFuncId, mesYYYYMM) {
             var tipoMao = it.tipoMao || 'servico';
             var pct = it.comissaoPct != null ? Number(it.comissaoPct) : NaN;
             if (isNaN(pct) || pct <= 0) {
-                /* OS antiga / salva com 0% → usa % atual do cadastro */
                 pct = typeof pctComissaoPorTipo === 'function'
                     ? pctComissaoPorTipo(f, tipoMao)
                     : (Number(f.comissaoServicoPct != null ? f.comissaoServicoPct : f.comissaoPct) || 0);
@@ -612,7 +633,6 @@ function listarComissoes(filtroFuncId, mesYYYYMM) {
             var valor = (!isNaN(valorSalvo) && valorSalvo > 0)
                 ? +valorSalvo.toFixed(2)
                 : +(base * pct / 100).toFixed(2);
-            /* Se tinha valor 0 com % agora > 0, recalcula */
             if (!(valor > 0) && pct > 0 && base > 0) {
                 valor = +(base * pct / 100).toFixed(2);
             }
@@ -628,6 +648,49 @@ function listarComissoes(filtroFuncId, mesYYYYMM) {
                 valor: valor,
                 funcionarioId: fid,
                 funcionarioNome: f.nome || it.funcionarioNome || '—'
+            });
+        });
+    });
+    (db.orcamentos || []).forEach(function (o) {
+        if (!o) return;
+        var dV = String(o.dataEmissao || o.criadoEm || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dV)) return;
+        if (mesYYYYMM && dV.slice(0, 7) !== mesYYYYMM) return;
+        var fidDoc = o.mecanicoId || o.funcionarioId || '';
+        (o.itens || []).forEach(function (it) {
+            if (!it) return;
+            var ehMao = (it.origem || it.tipo || '') === 'mao';
+            if (!ehMao) return;
+            var fid = it.funcionarioId ? String(it.funcionarioId) : String(fidDoc || '');
+            if (!fid) return;
+            if (filtroFuncId && fid !== String(filtroFuncId)) return;
+            var f = funcsMap[fid] || {};
+            var tipoMao = it.tipoMao || 'servico';
+            var pct = it.comissaoPct != null ? Number(it.comissaoPct) : NaN;
+            if (isNaN(pct) || pct <= 0) {
+                pct = typeof pctComissaoPorTipo === 'function'
+                    ? pctComissaoPorTipo(f, tipoMao)
+                    : (Number(f.comissaoServicoPct != null ? f.comissaoServicoPct : f.comissaoPct) || 0);
+            }
+            if (isNaN(pct) || pct < 0) pct = 0;
+            var base = Number(it.total != null ? it.total : (it.venda != null ? it.venda : it.valor)) || 0;
+            var valorSalvo = it.comissaoValor != null ? Number(it.comissaoValor) : NaN;
+            var valor = (!isNaN(valorSalvo) && valorSalvo > 0)
+                ? +valorSalvo.toFixed(2)
+                : +(base * pct / 100).toFixed(2);
+            if (!(valor > 0) && pct > 0 && base > 0) {
+                valor = +(base * pct / 100).toFixed(2);
+            }
+            out.push({
+                data: dV,
+                cliente: o.clienteNome || ('Venda Nº ' + (o.numero || '')),
+                placa: o.placa || '',
+                desc: '[Venda] ' + (it.desc || 'Mão de obra'),
+                base: base,
+                pct: pct,
+                valor: valor,
+                funcionarioId: fid,
+                funcionarioNome: f.nome || o.mecanicoNome || o.funcionarioNome || '—'
             });
         });
     });
@@ -664,7 +727,7 @@ function renderComissoes() {
         if (fa) fa.style.display = 'none';
         filtro = sessaoFuncionarioId;
     } else {
-        hint.textContent = 'Balanço do mês: escolha o mês abaixo. Soma a comissão de cada OS (mão de obra vinculada ao funcionário). A % fica só no cadastro do funcionário.';
+        hint.textContent = 'Balanço do mês: OS + venda da oficina. A % é a do cadastro do funcionário (ex.: 20%). Escolha o mecânico na mão de obra para aparecer aqui.';
         var fa2 = document.getElementById('comFiltrosAdmin');
         if (fa2) fa2.style.display = '';
         var sel = document.getElementById('comFuncFiltro');

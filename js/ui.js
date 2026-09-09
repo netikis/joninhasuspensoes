@@ -84,7 +84,7 @@ function abrirPainel(id, btn, opcoes) {
         var gBtn = btn.closest('.menu-grupo');
         var gNome = gBtn ? gBtn.getAttribute('data-grupo') : '';
         if (gNome === 'funcionario') canalVendas = 'interno';
-        else if (gNome === 'vendas' || gNome === 'caixa' || gNome === 'caixaRelatorio') canalVendas = 'normal';
+        else if (gNome === 'vendas' || gNome === 'oficina' || gNome === 'caixa' || gNome === 'caixaRelatorio') canalVendas = 'normal';
         else canalVendas = 'normal';
     }
     if (!opcoes.skipNav && canalAntes !== canalVendas) {
@@ -261,6 +261,27 @@ function esc(s) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
 }
+
+/* SPA: Enter em <form> dispara submit nativo e recarrega o index → volta ao Início.
+   Trava o reload; cada form continua salvando no listener próprio. */
+document.addEventListener('submit', function (e) {
+    e.preventDefault();
+}, true);
+
+/* Enter no campo clica o botão de adicionar (peça, produto, MO), sem enviar o form. */
+window.enterClicaBotao = function (campoIds, botaoId) {
+    (campoIds || []).forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' && e.keyCode !== 13) return;
+            e.preventDefault();
+            e.stopPropagation();
+            var btn = document.getElementById(botaoId);
+            if (btn) btn.click();
+        });
+    });
+};
 
 function renderTudo() {
     var db = carregar();

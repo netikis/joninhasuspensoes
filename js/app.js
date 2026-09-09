@@ -919,7 +919,12 @@ function atualizarKPIs(db) {
         if (el) el.textContent = val;
     };
     setTxt('kpiClientes', db.clientes.length);
-    setTxt('kpiAtend', db.atendimentos.length);
+    var nVend = (db.orcamentos || []).filter(function (o) {
+        if (!o) return false;
+        var t = String(o.tipo || 'VENDA').toUpperCase();
+        return t === 'VENDA' || t === 'ORCAMENTO';
+    }).length;
+    setTxt('kpiAtend', (db.atendimentos || []).length + nVend);
     setTxt('kpiProd', db.produtos.length);
     var cfg = db.caixaConfig || { inicialBalcao: 0, inicialBanco: 0 };
     var entradas = (db.caixa || []).filter(function (x) { return x.tipo === 'entrada'; })
@@ -937,6 +942,17 @@ function atualizarKPIs(db) {
     setTxt('kpiInicioPendentes', moeda(totPend));
     setTxt('kpiInicioQtdPend', pendentes.length);
     setTxt('kpiCaixa', moeda((Number(cfg.inicialBalcao) || 0) + entradas + (Number(cfg.inicialBanco) || 0) + entBanco - saidas - saiBanco));
+    if (typeof calcularRelatorioOficina === 'function') {
+        var hojePainel = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
+        var ofPainel = calcularRelatorioOficina({ inicio: '2000-01-01', fim: hojePainel, label: 'tudo' });
+        var ganhoNosso = (Number(ofPainel.ganho) || 0) + (Number(ofPainel.mao) || 0);
+        var custoPecas = Number(ofPainel.custoPecas);
+        if (!(custoPecas > 0)) {
+            custoPecas = Math.max(0, (Number(ofPainel.pecas) || 0) - (Number(ofPainel.ganho) || 0));
+        }
+        setTxt('kpiInicioGanho', moeda(ganhoNosso));
+        setTxt('kpiInicioCusto', moeda(custoPecas));
+    }
     var abertos = listarCarrosEmAberto(db);
     setTxt('kpiCarrosAberto', abertos.length);
     if (typeof renderCarrosEmAberto === 'function') renderCarrosEmAberto(db);
@@ -2155,7 +2171,7 @@ function renderHistorico() {
     sincronizarAssinaturasNoDb();
     var db = carregar();
     var q = (document.getElementById('buscaAtend').value || '').toLowerCase().trim();
-    var lista = db.atendimentos.slice().filter(function (a) {
+    var listaOs = db.atendimentos.slice().filter(function (a) {
         if (!q) return true;
         var nome = nomeAtendimento(db, a);
         return [nome, a.carro, a.placa, a.status, a.servicos, a.agendadoPara, fmtData(a.agendadoPara)]
@@ -2169,11 +2185,19 @@ function renderHistorico() {
         }
         return String(b.entrada || b.criadoEm || '').localeCompare(String(a.entrada || a.criadoEm || ''));
     });
+    var listaVendas = (db.orcamentos || []).filter(function (o) {
+        if (!o) return false;
+        if (!q) return true;
+        return [o.clienteNome, o.placa, o.numero, o.tipo, o.descricao, o.statusPagamento, 'venda']
+            .join(' ').toLowerCase().indexOf(q) > -1;
+    }).sort(function (a, b) {
+        return String(b.dataEmissao || b.criadoEm || '').localeCompare(String(a.dataEmissao || a.criadoEm || ''));
+    });
 
     /* Destaque no topo: chips dos agendados */
     var boxAg = document.getElementById('boxAgendadosDestaque');
     var chips = document.getElementById('listaAgendadosChips');
-    var agendados = lista.filter(function (a) { return (a.status || '') === 'Agendado'; });
+    var agendados = listaOs.filter(function (a) { return (a.status || '') === 'Agendado'; });
     if (boxAg && chips) {
         if (!agendados.length) {
             boxAg.style.display = 'none';
@@ -2199,9 +2223,9 @@ function renderHistorico() {
     var tb = document.getElementById('tabelaAtend');
     var vazio = document.getElementById('listaAtendVazia');
     tb.innerHTML = '';
-    if (!lista.length) { vazio.style.display = ''; return; }
+    if (!listaOs.length && !listaVendas.length) { vazio.style.display = ''; renderCarrosEmAberto(db); return; }
     vazio.style.display = 'none';
-    lista.forEach(function (a) {
+    listaOs.forEach(function (a) {
         var nome = nomeAtendimento(db, a);
         var tagAvulso = a.clienteAvulso
             ? ' <span style="font-size:0.68rem;font-weight:700;color:#8fe0b8">AVULSO</span>'
@@ -2252,6 +2276,28 @@ function renderHistorico() {
             '</td>';
         tb.appendChild(tr);
     });
+    listaVendas.forEach(function (o) {
+        var nomeV = o.clienteNome || '—';
+        var nro = o.numero ? ('Venda Nº ' + o.numero) : 'Venda';
+        var tipoLbl = (o.tipo || 'VENDA') === 'ORCAMENTO' ? 'ORÇAMENTO' : 'VENDA';
+        var jaPagoV = String(o.statusPagamento || '').toUpperCase() === 'PAGO';
+        var trv = document.createElement('tr');
+        trv.innerHTML =
+            '<td style="color:#fff;font-weight:600">' + esc(fmtData(o.dataEmissao || o.criadoEm)) + '</td>' +
+            '<td style="color:#fff;font-weight:800">' + esc(nomeV) +
+            ' <span style="font-size:0.68rem;font-weight:700;color:#f1c40f">' + esc(tipoLbl) + '</span>' +
+            (jaPagoV ? '<div class="badge-pago-os">PAGO · ' + esc(o.formaPagamento || '—') + '</div>' : '') +
+            '</td>' +
+            '<td style="color:#fff;font-weight:600">' + esc(nro) + '</td>' +
+            '<td style="color:#fff;font-weight:700">' + esc(o.placa || '—') + '</td>' +
+            '<td style="color:#fff;font-weight:700">' + moeda(o.valor || o.total || 0) + '</td>' +
+            '<td class="actions">' +
+            '<button type="button" class="btn btn-ver" data-vd-ver="' + esc(o.id) + '">Ver</button>' +
+            '<button type="button" class="btn btn-secondary" data-vd-ed="' + esc(o.id) + '">Editar</button>' +
+            '<button type="button" class="btn btn-pdf" data-vd-pdf="' + esc(o.id) + '">PDF</button>' +
+            '</td>';
+        tb.appendChild(trv);
+    });
     tb.querySelectorAll('[data-st]').forEach(function (sel) {
         sel.addEventListener('change', function () {
             alterarStatusAtendimento(sel.getAttribute('data-st'), sel.value);
@@ -2284,6 +2330,15 @@ function renderHistorico() {
     });
     tb.querySelectorAll('[data-ex]').forEach(function (b) {
         b.addEventListener('click', function () { excluirAtendimento(b.getAttribute('data-ex')); });
+    });
+    tb.querySelectorAll('[data-vd-ver]').forEach(function (b) {
+        b.addEventListener('click', function () { abrirDocumentoVenda(b.getAttribute('data-vd-ver')); });
+    });
+    tb.querySelectorAll('[data-vd-ed]').forEach(function (b) {
+        b.addEventListener('click', function () { editarDocumentoVenda(b.getAttribute('data-vd-ed')); });
+    });
+    tb.querySelectorAll('[data-vd-pdf]').forEach(function (b) {
+        b.addEventListener('click', function () { imprimirDocumentoVenda(b.getAttribute('data-vd-pdf')); });
     });
     renderCarrosEmAberto(db);
 }
@@ -3124,6 +3179,9 @@ function editarDocumentoVenda(id) {
     } else {
         document.getElementById('vdCliente').value = o.clienteNome || '';
         document.getElementById('vdPlaca').value = o.placa || '';
+        if (typeof preencherSelectMecanicoVenda === 'function') preencherSelectMecanicoVenda();
+        var selM = document.getElementById('vdMecanicoId');
+        if (selM) selM.value = o.mecanicoId || o.funcionarioId || '';
     }
     carrinhoVenda = (o.itens || []).map(function (it) {
         return Object.assign({}, it);
@@ -3152,6 +3210,7 @@ function prepararVendaForm() {
     document.getElementById('vdEmissao').value = hojeISO();
     document.getElementById('vdVenc').value = hojeISO();
     preencherListaProdutosVenda(db);
+    if (typeof preencherSelectMecanicoVenda === 'function') preencherSelectMecanicoVenda();
     atualizarUIVendaPorCanal();
 }
 
@@ -3380,9 +3439,15 @@ document.getElementById('vdProdBusca').addEventListener('change', preencherCampo
 document.getElementById('vdProdBusca').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') {
         e.preventDefault();
+        e.stopPropagation();
         preencherCamposProdutoEstoque();
     }
 });
+if (typeof window.enterClicaBotao === 'function') {
+    window.enterClicaBotao(['vdProdQtd', 'vdProdCusto', 'vdProdMargem', 'vdProdVenda', 'vdProdUn'], 'btnVdAddEstoque');
+    window.enterClicaBotao(['vdAvNome', 'vdAvQtd', 'vdAvCusto', 'vdAvMargem', 'vdAvVenda', 'vdAvUn'], 'btnVdAddAvulso');
+    window.enterClicaBotao(['vdMaoDesc', 'vdMaoValor'], 'btnVdAddMao');
+}
 ['vdProdQtd', 'vdProdVenda'].forEach(function (id) {
     document.getElementById(id).addEventListener('input', function () {
         atualizarTotalLinhaEstoque();
@@ -3501,8 +3566,21 @@ document.getElementById('btnVdAddMao').addEventListener('click', function () {
     var desc = document.getElementById('vdMaoDesc').value.trim();
     var valor = parseMoeda(document.getElementById('vdMaoValor').value);
     if (!desc) { toast('Informe a descrição da mão de obra.'); return; }
+    var mecId = '';
+    var mecNome = '';
+    var mecSel = document.getElementById('vdMecanicoId') || document.getElementById('vdFuncionarioId');
+    if (mecSel && mecSel.value) {
+        mecId = mecSel.value;
+        mecNome = (mecSel.options[mecSel.selectedIndex] && mecSel.options[mecSel.selectedIndex].text) || '';
+    }
+    var dadosMo = { pct: 0 };
+    if (mecId && typeof obterDadosComissaoFuncionario === 'function') {
+        dadosMo = obterDadosComissaoFuncionario(mecId, 'servico');
+    }
     addItemCarrinho({
         origem: 'mao',
+        tipo: 'mao',
+        tipoMao: 'servico',
         produtoId: null,
         desc: desc,
         qtd: 1,
@@ -3510,7 +3588,13 @@ document.getElementById('btnVdAddMao').addEventListener('click', function () {
         custo: 0,
         margem: 0,
         venda: valor,
-        total: valor
+        total: valor,
+        funcionarioId: mecId,
+        funcionarioNome: mecNome || dadosMo.nome || '',
+        comissaoPct: dadosMo.pct || 0,
+        comissaoValor: typeof calcularValorComissaoMao === 'function'
+            ? calcularValorComissaoMao(valor, dadosMo.pct || 0)
+            : +((valor * (dadosMo.pct || 0)) / 100).toFixed(2)
     });
     document.getElementById('vdMaoDesc').value = '';
     document.getElementById('vdMaoValor').value = '';
@@ -3531,6 +3615,8 @@ function limparVendaForm() {
     if (placaInt) placaInt.value = '';
     var selFunc = document.getElementById('vdFuncionarioId');
     if (selFunc) selFunc.value = '';
+    var selMec = document.getElementById('vdMecanicoId');
+    if (selMec) selMec.value = '';
     document.getElementById('vdProdBusca').value = '';
     document.getElementById('vdObs').value = '';
     document.getElementById('vdDescReais').value = '0';
@@ -3573,6 +3659,34 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
         resolvido = resolverClienteAtendimento(db, clienteNome);
         placa = (document.getElementById('vdPlaca').value || '').toUpperCase().trim();
     }
+    var mecanicoId = '';
+    var mecanicoNome = '';
+    var selMecDoc = document.getElementById('vdMecanicoId');
+    if (!interno && selMecDoc && selMecDoc.value) {
+        mecanicoId = selMecDoc.value;
+        mecanicoNome = (selMecDoc.options[selMecDoc.selectedIndex] && selMecDoc.options[selMecDoc.selectedIndex].text) || '';
+    } else if (interno) {
+        mecanicoId = funcionarioId || '';
+        mecanicoNome = funcionarioNome || '';
+    }
+    carrinhoVenda.forEach(function (it) {
+        if (!it) return;
+        var ehMao = (it.origem || it.tipo || '') === 'mao';
+        if (!ehMao) return;
+        if (!it.funcionarioId && mecanicoId) {
+            it.funcionarioId = mecanicoId;
+            it.funcionarioNome = mecanicoNome;
+        }
+        if (it.funcionarioId && typeof obterDadosComissaoFuncionario === 'function') {
+            var dM = obterDadosComissaoFuncionario(it.funcionarioId, it.tipoMao || 'servico');
+            if (!(Number(it.comissaoPct) > 0) && dM.pct > 0) it.comissaoPct = dM.pct;
+            if (!it.funcionarioNome) it.funcionarioNome = dM.nome;
+            var baseMo = Number(it.total != null ? it.total : it.venda) || 0;
+            if (typeof calcularValorComissaoMao === 'function') {
+                it.comissaoValor = calcularValorComissaoMao(baseMo, it.comissaoPct || 0);
+            }
+        }
+    });
     var tipo = document.getElementById('vdTipo').value;
     /* Orçamento (oficina/balcão): placa, itens e até cliente não bloqueiam */
     if (tipo !== 'ORCAMENTO') {
@@ -3643,6 +3757,8 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
         vendaFuncionario: interno,
         funcionarioId: funcionarioId,
         funcionarioNome: funcionarioNome,
+        mecanicoId: mecanicoId || funcionarioId || '',
+        mecanicoNome: mecanicoNome || funcionarioNome || '',
         placa: placa,
         statusPagamento: status,
         formaPagamento: forma,
@@ -4542,7 +4658,7 @@ function calcularRelatorioOficina(periodo) {
     /* Lucro da casa: só PAGO; data = pagamento/caixa (senão OS/venda); inclui vendas balcão */
     var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
     var mapaPag = mapaDatasPagamentoCaixa(db);
-    var pecas = 0, ganho = 0, mao = 0, comissao = 0, despesas = 0;
+    var pecas = 0, ganho = 0, mao = 0, comissao = 0, despesas = 0, custoPecas = 0;
     var linhas = [];
 
     (db.atendimentos || []).forEach(function (a) {
@@ -4563,6 +4679,7 @@ function calcularRelatorioOficina(periodo) {
         ganho += t.ganhoPecas;
         mao += t.mao;
         comissao += com;
+        custoPecas += Number(t.custoPecas) || Math.max(0, (Number(t.pecas) || 0) - (Number(t.ganhoPecas) || 0));
         linhas.push({
             origem: 'OS',
             data: d,
@@ -4585,9 +4702,24 @@ function calcularRelatorioOficina(periodo) {
         var d = dataCorteVendaISO(o, mapaPag);
         if (!d || d < periodo.inicio || d > periodo.fim) return;
         var t = totaisLucroVendaDoc(o);
+        var comV = 0;
+        (o.itens || []).forEach(function (it) {
+            if (!it || (it.origem || it.tipo || '') !== 'mao') return;
+            var fid = it.funcionarioId || o.mecanicoId || o.funcionarioId;
+            if (!fid) return;
+            var pct = Number(it.comissaoPct);
+            if (!(pct > 0) && typeof obterDadosComissaoFuncionario === 'function') {
+                var dCom = obterDadosComissaoFuncionario(fid, it.tipoMao || 'servico');
+                if (dCom && dCom.pct > 0) pct = dCom.pct;
+            }
+            var base = Number(it.total != null ? it.total : it.venda) || 0;
+            if (pct > 0 && base > 0) comV += +(base * pct / 100).toFixed(2);
+        });
         pecas += t.pecas;
         ganho += t.ganhoPecas;
         mao += t.mao;
+        comissao += comV;
+        custoPecas += Number(t.custoPecas) || Math.max(0, (Number(t.pecas) || 0) - (Number(t.ganhoPecas) || 0));
         linhas.push({
             origem: 'VENDA',
             data: d,
@@ -4596,8 +4728,8 @@ function calcularRelatorioOficina(periodo) {
             pecas: t.pecas,
             ganho: t.ganhoPecas,
             mao: t.mao,
-            comissao: 0,
-            maoCasa: t.mao,
+            comissao: comV,
+            maoCasa: Math.max(0, t.mao - comV),
             total: t.total,
             pago: true,
             vendaId: o.id,
@@ -4636,6 +4768,7 @@ function calcularRelatorioOficina(periodo) {
         pecas: pecas,
         ganho: ganho,
         mao: mao,
+        custoPecas: custoPecas,
         comissao: comissao,
         maoCasa: maoCasa,
         maoLiq: maoCasa,
@@ -4712,7 +4845,7 @@ function totaisOficinaNoCaixaHoje(db, hoje) {
     function somar(lista) {
         (lista || []).forEach(function (l) {
             if (l.tipo !== 'entrada') return;
-            if (!l.atendimentoId && !l.origemOficina) return;
+            if (!l.atendimentoId && !l.origemOficina && !l.vendaId) return;
             var d = String(l.criadoEm || '').slice(0, 10);
             if (d !== hoje) return;
             total += Number(l.valor) || 0;

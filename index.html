@@ -102,19 +102,13 @@
             </div>
         </div>
 
-        <div class="menu-grupo" data-grupo="vendas">
-            <button type="button" class="menu-grupo-btn" data-toggle-grupo="vendas">🛒 Vendas</button>
-            <div class="submenu-lateral">
-                <button type="button" class="nav-btn submenu-btn" data-panel="painelProdutos" data-canal="normal">🏷️ Cadastro de Produtos</button>
-                <button type="button" class="nav-btn submenu-btn" data-panel="painelOrcamento" data-canal="normal">🧾 Venda / Orçamento</button>
-            </div>
-        </div>
-
         <div class="menu-grupo" data-grupo="oficina">
             <button type="button" class="menu-grupo-btn" data-toggle-grupo="oficina">🔧 Oficina</button>
             <div class="submenu-lateral">
                 <button type="button" class="nav-btn submenu-btn" data-panel="painelVeiculo" data-canal="normal">📝 Ordem de Serviço / Veículo</button>
-                <button type="button" class="nav-btn submenu-btn" data-panel="painelHistorico" data-canal="normal">🗂️ Histórico de Atendimentos</button>
+                <button type="button" class="nav-btn submenu-btn" data-panel="painelHistorico" data-canal="normal">🗂️ Histórico da oficina</button>
+                <button type="button" class="nav-btn submenu-btn" data-panel="painelOrcamento" data-canal="normal">🧾 Venda da oficina</button>
+                <button type="button" class="nav-btn submenu-btn" data-panel="painelProdutos" data-canal="normal">🏷️ Cadastro de Produtos</button>
             </div>
             <button type="button" class="btn btn-danger" id="btnSairFuncPainel">Sair / Trocar usuário</button>
         </div>
@@ -219,6 +213,18 @@
                     <div class="card-sub">Balcão + banco</div>
                 </button>
             </div>
+            <div class="cards" id="cardsGanhoDespesaInicio">
+                <button type="button" class="card card-atalho card-ent" data-goto="painelRelatorioOficina" title="Ganho da casa: mão de obra + lucro em peças (OS e venda juntas)">
+                    <div class="k">Ganho nosso</div>
+                    <div class="v" id="kpiInicioGanho">R$ 0</div>
+                    <div class="card-sub">MO + lucro em peças · OS e venda</div>
+                </button>
+                <button type="button" class="card card-atalho card-sai" data-goto="painelRelatorioOficina" title="Custo das peças (despesa da oficina)">
+                    <div class="k">Despesa (custo peças)</div>
+                    <div class="v" id="kpiInicioCusto">R$ 0</div>
+                    <div class="card-sub">O que saiu no custo das peças</div>
+                </button>
+            </div>
             <div class="cards">
                 <button type="button" class="card card-atalho" data-goto="painelListaClientes">
                     <div class="k">Clientes</div>
@@ -233,7 +239,7 @@
                 <button type="button" class="card card-atalho" data-goto="painelHistorico">
                     <div class="k">Atendimentos</div>
                     <div class="v" id="kpiAtend">0</div>
-                    <div class="card-sub">Histórico da oficina</div>
+                    <div class="card-sub">OS + venda rápida juntas</div>
                 </button>
                 <button type="button" class="card card-atalho" data-goto="painelProdutos">
                     <div class="k">Produtos</div>
@@ -330,7 +336,7 @@
                 </div>
             </div>
 
-            <form id="formAtendimento">
+            <form id="formAtendimento" onsubmit="return false;">
                 <input type="hidden" id="atId">
                 <div class="box">
                     <h2>Especificações do Veículo</h2>
@@ -498,9 +504,10 @@
                 <div class="lista-agendados-chips" id="listaAgendadosChips"></div>
             </div>
             <div class="box">
-                <h2>Histórico de Atendimentos</h2>
+                <h2>Histórico da oficina (OS + vendas)</h2>
+                <p class="hint" style="margin:0 0 10px">Aqui entram a ordem de serviço <strong>e</strong> a venda do balcão — é a mesma oficina. Busque por cliente (ex.: Murilo), placa ou nº da venda.</p>
                 <div class="toolbar">
-                    <input type="search" id="buscaAtend" class="search" placeholder="Buscar placa, cliente, carro, agendado...">
+                    <input type="search" id="buscaAtend" class="search" placeholder="Buscar cliente, placa, carro, nº da venda...">
                 </div>
                 <table>
                     <thead>
@@ -508,7 +515,7 @@
                     </thead>
                     <tbody id="tabelaAtend"></tbody>
                 </table>
-                <div id="listaAtendVazia" class="empty" style="display:none;margin-top:12px">Nenhum atendimento salvo.</div>
+                <div id="listaAtendVazia" class="empty" style="display:none;margin-top:12px">Nenhuma OS ou venda neste histórico.</div>
             </div>
         </section>
 
@@ -517,7 +524,7 @@
             <div class="box">
                 <h2 id="tituloFormProd">Cadastro de Produto / Serviço</h2>
                 <p class="hint">Estoque <strong>unificado</strong>: o que cadastrar aqui aparece no balcão oficial e no modo interno. Use leitor USB em <strong>Cód. Barras</strong> (bipar + Enter). Se o código já existir, abre para edição.</p>
-                <form id="formProduto">
+                <form id="formProduto" onsubmit="return false;">
                     <input type="hidden" id="prodId">
                     <div class="row">
                         <div class="col" style="flex:1.2">
@@ -576,8 +583,8 @@
             <div class="venda-layout">
                 <div class="venda-form">
                     <div class="box">
-                        <h2>🛒 Lançar venda — balcão / serviço imediato</h2>
-                        <p class="hint">Venda baixa estoque; <strong>Dinheiro</strong> → Caixa Balcão; <strong>PIX/Cartão/Boleto</strong> → Caixa do Banco; <strong>Pendente</strong> → Contas a Receber.</p>
+                        <h2>🛒 Venda da oficina</h2>
+                        <p class="hint">Na Joninha, venda e oficina são a mesma coisa. O que lançar aqui aparece no <strong>Histórico da oficina</strong> e, se tiver mecânico na mão de obra, entra em <strong>Comissões</strong>.</p>
 
                         <div class="row" style="background:#1a252f;padding:12px;border-radius:8px;border:1px solid var(--line)">
                             <div class="col">
@@ -616,6 +623,12 @@
                                 <datalist id="listaClientesVenda"></datalist>
                             </div>
                             <div class="col"><label>Placa (opcional)</label><input id="vdPlaca" maxlength="7" style="text-transform:uppercase"></div>
+                            <div class="col">
+                                <label>Mecânico (comissão %)</label>
+                                <select id="vdMecanicoId">
+                                    <option value="">— sem funcionário —</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="row" style="margin-top:12px;display:none" id="wrapVdClienteInterno">
                             <div class="col" style="flex:2">
@@ -757,19 +770,19 @@
                     <div class="card-sub">Clique para entrar</div>
                 </button>
                 <button type="button" class="card card-atalho" style="background:#16a085" data-cx-atalho="oficina-ganho" title="Abrir lucro em peças">
-                    <div class="k">Oficina — Ganho em peças</div>
+                    <div class="k">Ganho em peças</div>
                     <div class="v" id="cxOfGanho">R$ 0</div>
-                    <div class="card-sub">Clique para entrar</div>
+                    <div class="card-sub">Autopeça · clique para entrar</div>
                 </button>
                 <button type="button" class="card card-atalho" style="background:#8e44ad" data-cx-atalho="oficina-mao" title="Abrir mão de obra">
-                    <div class="k">Oficina — Mão de obra</div>
+                    <div class="k">Mão de obra</div>
                     <div class="v" id="cxOfMao">R$ 0</div>
-                    <div class="card-sub">Clique para entrar</div>
+                    <div class="card-sub">Serviço da oficina · clique</div>
                 </button>
-                <button type="button" class="card card-atalho" style="background:#27ae60" data-cx-atalho="oficina-os" title="Ver OS pagas no caixa">
-                    <div class="k">Oficina no caixa (OS pagas)</div>
+                <button type="button" class="card card-atalho" style="background:#27ae60" data-cx-atalho="oficina-os" title="Soma mão de obra + ganho em peças">
+                    <div class="k">MO + ganho peças</div>
                     <div class="v" id="cxOfNoCaixa">R$ 0</div>
-                    <div class="card-sub">Clique para entrar</div>
+                    <div class="card-sub" id="cxOfSomaSub">Soma para a casa / pagar equipe</div>
                 </button>
             </div>
             <div class="box">
@@ -1100,7 +1113,7 @@
         <section id="painelComissoes" class="panel">
             <div class="box">
                 <h2>💵 Comissões dos funcionários</h2>
-                <p class="hint" id="comHint">Filtre pelo <strong>mês</strong> para o balanço. A % fica no cadastro do funcionário; na OS a comissão é calculada e gravada — aqui soma o que cada um tem a receber no período.</p>
+                <p class="hint" id="comHint">A % (ex.: 20%) fica no cadastro do funcionário. Aparece aqui a mão de obra da <strong>OS</strong> e da <strong>venda da oficina</strong> quando o mecânico está escolhido. Escolha o mês (o atual já vem marcado).</p>
                 <div class="row" style="margin-bottom:12px" id="comFiltrosAdmin">
                     <div class="col"><label>Funcionário</label>
                         <select id="comFuncFiltro"><option value="">Todos</option></select>
