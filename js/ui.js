@@ -243,6 +243,14 @@ document.querySelectorAll('[data-atalho-pasta]').forEach(function (btn) {
     });
 });
 
+document.querySelectorAll('[data-relatorio-servicos]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        if (typeof abrirRelatorioServicos === 'function') {
+            abrirRelatorioServicos(btn.getAttribute('data-relatorio-servicos'));
+        }
+    });
+});
+
 atualizarMarcacaoGrupos();
 
 

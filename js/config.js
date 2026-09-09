@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.3.15-layout-m3';
+var APP_VERSION = '1.3.16-carros-aberto';
 var STORAGE_KEY = 'joninha_suspensoes_v1';
 var STORAGE_INTERNO = 'joninha_suspensoes_interno_v1';
 var STORAGE_LOGINS_FUNC = 'joninha_suspensoes_logins_func_v1';
@@ -15,7 +15,7 @@ var atendimentoNotaAtual = null;
 var canalVendas = 'normal'; /* normal | interno */
 
 var TITULOS = {
-    painelInicio: ['Painel', 'Clique em Entradas, Saídas ou Contas a receber para abrir a pasta'],
+    painelInicio: ['Painel', 'Carros em andamento ficam abertos · clique nas entradas para ver os serviços'],
     painelClientes: ['Cadastrar Cliente', 'Base de clientes Joninha Suspensões'],
     painelListaClientes: ['Clientes Cadastrados', 'Lista e edição rápida'],
     painelVeiculo: ['Ordem de Serviço / Veículo', 'Atendimento com veículo, serviços e valores'],

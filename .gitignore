@@ -27,8 +27,9 @@ _transcricoes/
 _check.js
 _patch_*.py
 
-# Áudios locais (opcional — remova esta linha se quiser versionar)
-# *.ogg
+# Áudios locais do Joninha (nunca subir)
+audios que não deve subir pro GITHUB E VERCEL/
+*.ogg
 
 # SO / editor
 .DS_Store

@@ -937,7 +937,207 @@ function atualizarKPIs(db) {
     setTxt('kpiInicioPendentes', moeda(totPend));
     setTxt('kpiInicioQtdPend', pendentes.length);
     setTxt('kpiCaixa', moeda((Number(cfg.inicialBalcao) || 0) + entradas + (Number(cfg.inicialBanco) || 0) + entBanco - saidas - saiBanco));
+    var abertos = listarCarrosEmAberto(db);
+    setTxt('kpiCarrosAberto', abertos.length);
+    if (typeof renderCarrosEmAberto === 'function') renderCarrosEmAberto(db);
 }
+
+function atendimentoEmAberto(a) {
+    if (!a) return false;
+    if (String(a.statusPagamento || '').toUpperCase() === 'PAGO') return false;
+    var st = a.status || 'Em andamento';
+    if (st === 'Entregue' || st === 'Agendado') return false;
+    return true;
+}
+
+function listarCarrosEmAberto(db) {
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
+    return (db.atendimentos || []).filter(atendimentoEmAberto).sort(function (a, b) {
+        return String(b.entrada || b.criadoEm || '').localeCompare(String(a.entrada || a.criadoEm || ''));
+    });
+}
+
+function renderCarrosEmAberto(db) {
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
+    var lista = listarCarrosEmAberto(db);
+    function preencher(elId, boxId) {
+        var host = document.getElementById(elId);
+        var box = document.getElementById(boxId);
+        if (!host) return;
+        if (!lista.length) {
+            host.innerHTML = '<div class="muted" style="padding:6px 0">Nenhum carro em andamento agora.</div>';
+            if (box && boxId === 'boxCarrosAndamentoInicio') box.style.display = lista.length ? '' : '';
+            return;
+        }
+        host.innerHTML = lista.map(function (a) {
+            var nome = nomeAtendimento(db, a);
+            return '<div class="chip-agendado chip-andamento">' +
+                '<button type="button" class="chip-andamento-main" data-ed-and="' + esc(a.id) + '">' +
+                '<span class="chip-data">🔧 ' + esc(a.status || 'Em andamento') + '</span>' +
+                '<span class="chip-info">' + esc((a.placa || '—').toUpperCase()) + ' · ' + esc(a.carro || '—') + '</span>' +
+                '<span class="chip-cli">' + esc(nome) + ' · ' + moeda(a.total) + '</span>' +
+                '</button>' +
+                '<button type="button" class="btn btn-ok btn-sm btn-mandar-caixa" data-fin-cx="' + esc(a.id) + '">Mandar ao caixa</button>' +
+                '</div>';
+        }).join('');
+        host.querySelectorAll('[data-ed-and]').forEach(function (b) {
+            b.addEventListener('click', function () { editarAtendimento(b.getAttribute('data-ed-and')); });
+        });
+        host.querySelectorAll('[data-fin-cx]').forEach(function (b) {
+            b.addEventListener('click', function (e) {
+                e.stopPropagation();
+                finalizarEMandarAoCaixa(b.getAttribute('data-fin-cx'));
+            });
+        });
+    }
+    preencher('listaCarrosAndamentoInicio', 'boxCarrosAndamentoInicio');
+    preencher('listaCarrosAndamentoHist', 'boxCarrosAndamentoHist');
+}
+
+function finalizarEMandarAoCaixa(id) {
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+    var i = (db.atendimentos || []).findIndex(function (a) { return a && String(a.id) === String(id); });
+    if (i < 0) { toast('OS não encontrada.'); return; }
+    var a = db.atendimentos[i];
+    if (String(a.statusPagamento || '').toUpperCase() === 'PAGO') {
+        toast('Esta OS já foi ao caixa.');
+        editarAtendimento(id);
+        return;
+    }
+    if ((a.status || '') === 'Em andamento' || (a.status || '') === 'Aguardando peça' || !a.status) {
+        a.status = 'Pronto';
+        a.saida = a.saida || hojeISO();
+        a.atualizadoEm = new Date().toISOString();
+        db.atendimentos[i] = a;
+        if (typeof salvarMain === 'function') salvarMain(db);
+        else salvar(db);
+    }
+    renderCarrosEmAberto(db);
+    renderHistorico();
+    abrirModalReceberOs(id);
+}
+window.finalizarEMandarAoCaixa = finalizarEMandarAoCaixa;
+
+function montarLinhasRelatorioServicos(tipo) {
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+    var linhas = [];
+    if (tipo === 'andamento') {
+        listarCarrosEmAberto(db).forEach(function (a) {
+            linhas.push({
+                data: a.entrada || a.criadoEm,
+                tipo: a.status || 'Em andamento',
+                cliente: nomeAtendimento(db, a),
+                carro: a.carro || '—',
+                placa: (a.placa || '—').toUpperCase(),
+                valor: Number(a.total) || 0,
+                atendimentoId: a.id
+            });
+        });
+        return linhas;
+    }
+    if (tipo === 'oficina') {
+        var per = (typeof periodoOficina === 'function')
+            ? periodoOficina()
+            : { inicio: hojeISO(), fim: hojeISO() };
+        var r = calcularRelatorioOficina(per);
+        (r.linhas || []).forEach(function (l) {
+            linhas.push({
+                data: l.data,
+                tipo: l.origem === 'VENDA' ? ('Venda' + (l.numero != null ? ' Nº ' + l.numero : '')) : 'OS',
+                cliente: l.cliente,
+                carro: '',
+                placa: (l.placa || '—').toUpperCase(),
+                valor: l.total,
+                atendimentoId: l.atendimentoId || '',
+                vendaId: l.vendaId || ''
+            });
+        });
+        return linhas;
+    }
+    function addLanc(lista, origem) {
+        (lista || []).forEach(function (x) {
+            if (!x || x.tipo === 'saida') return;
+            var os = x.osResumo || {};
+            linhas.push({
+                data: x.criadoEm,
+                tipo: (x.atendimentoId || x.origemOficina) ? 'OS' : (origem || x.forma || 'Entrada'),
+                cliente: os.cliente || x.descricao || '—',
+                carro: os.carro || '',
+                placa: (os.placa || '—').toUpperCase(),
+                valor: Number(x.valor) || 0,
+                atendimentoId: x.atendimentoId || '',
+                vendaId: x.orcamentoId || x.vendaId || ''
+            });
+        });
+    }
+    addLanc(db.caixa, 'Balcão');
+    addLanc(db.caixaBanco, 'Banco');
+    linhas.sort(function (a, b) {
+        return String(b.data || '').localeCompare(String(a.data || ''));
+    });
+    return linhas;
+}
+
+function abrirDocumentoServico(linha) {
+    var overlay = document.getElementById('modalRelatorioServicos');
+    if (overlay) overlay.classList.remove('aberto');
+    if (linha.atendimentoId && typeof editarAtendimento === 'function') {
+        editarAtendimento(linha.atendimentoId);
+        return;
+    }
+    if (linha.vendaId && typeof editarDocumentoVenda === 'function') {
+        editarDocumentoVenda(linha.vendaId);
+        return;
+    }
+    toast('Este lançamento não tem OS/venda para abrir.');
+}
+
+function abrirRelatorioServicos(tipo) {
+    tipo = tipo || 'entradas';
+    if (tipo === 'andamento') {
+        abrirPainel('painelHistorico');
+        setTimeout(function () {
+            var box = document.getElementById('boxCarrosAndamentoHist');
+            if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 80);
+        return;
+    }
+    var titulos = {
+        entradas: ['Serviços e entradas', 'Clique na linha para abrir a OS ou a venda daquele cliente.'],
+        oficina: ['Serviços da oficina', 'OS e vendas pagas do período. Clique para abrir o documento.']
+    };
+    var t = titulos[tipo] || titulos.entradas;
+    var elT = document.getElementById('modalRelServTitulo');
+    var elH = document.getElementById('modalRelServHint');
+    var elC = document.getElementById('modalRelServCorpo');
+    var overlay = document.getElementById('modalRelatorioServicos');
+    if (!overlay || !elC) return;
+    if (elT) elT.textContent = t[0];
+    if (elH) elH.textContent = t[1];
+    var linhas = montarLinhasRelatorioServicos(tipo);
+    if (!linhas.length) {
+        elC.innerHTML = '<div class="empty">Nenhum serviço neste relatório.</div>';
+    } else {
+        elC.innerHTML = '<div class="table-wrap"><table class="tbl-click"><thead><tr>' +
+            '<th>Data</th><th>Tipo</th><th>Cliente</th><th>Carro / placa</th><th>Valor</th></tr></thead><tbody>' +
+            linhas.map(function (l, i) {
+                return '<tr data-rel-ix="' + i + '"><td>' + esc(fmtData(l.data)) + '</td><td>' + esc(l.tipo) +
+                    '</td><td>' + esc(l.cliente) + '</td><td>' + esc((l.carro ? l.carro + ' · ' : '') + l.placa) +
+                    '</td><td>' + moeda(l.valor) + '</td></tr>';
+            }).join('') + '</tbody></table></div>';
+        elC.querySelectorAll('tr[data-rel-ix]').forEach(function (tr) {
+            tr.addEventListener('click', function () {
+                var ix = Number(tr.getAttribute('data-rel-ix'));
+                abrirDocumentoServico(linhas[ix] || {});
+            });
+        });
+    }
+    overlay.setAttribute('data-rel-tipo', tipo);
+    overlay.classList.add('aberto');
+}
+window.abrirRelatorioServicos = abrirRelatorioServicos;
+window.listarCarrosEmAberto = listarCarrosEmAberto;
+
 
 function preencherSelectsCliente(db) {
     preencherListaClientesAt(db);
@@ -2019,7 +2219,10 @@ function renderHistorico() {
             : '';
         var btnReceber = jaPago
             ? ''
-            : '<button type="button" class="btn btn-receber" data-rec="' + a.id + '">💰 Receber</button>';
+            : '<button type="button" class="btn btn-receber" data-rec="' + a.id + '">💰 Receber</button>' +
+                (atendimentoEmAberto(a)
+                    ? '<button type="button" class="btn btn-ok" data-fin-cx="' + a.id + '">Mandar ao caixa</button>'
+                    : '');
         var tr = document.createElement('tr');
         if (ehAgendado) tr.className = 'linha-agendada';
         tr.innerHTML =
@@ -2057,6 +2260,9 @@ function renderHistorico() {
     tb.querySelectorAll('[data-rec]').forEach(function (b) {
         b.addEventListener('click', function () { abrirModalReceberOs(b.getAttribute('data-rec')); });
     });
+    tb.querySelectorAll('[data-fin-cx]').forEach(function (b) {
+        b.addEventListener('click', function () { finalizarEMandarAoCaixa(b.getAttribute('data-fin-cx')); });
+    });
     tb.querySelectorAll('[data-ver]').forEach(function (b) {
         b.addEventListener('click', function () { abrirNota(b.getAttribute('data-ver')); });
     });
@@ -2079,6 +2285,7 @@ function renderHistorico() {
     tb.querySelectorAll('[data-ex]').forEach(function (b) {
         b.addEventListener('click', function () { excluirAtendimento(b.getAttribute('data-ex')); });
     });
+    renderCarrosEmAberto(db);
 }
 
 /* ---------- Receber OS (Histórico → Caixa oficial ou Interno) ---------- */
@@ -2195,6 +2402,8 @@ function confirmarRecebimentoOs(forma) {
     a.recebidoEm = agora;
     a.lancamentoRecebimentoId = lancId;
     a.atualizadoEm = agora;
+    if ((a.status || '') !== 'Entregue') a.status = 'Entregue';
+    if (!a.saida) a.saida = hojeISO();
     main.atendimentos[idx] = a;
     salvarMain(main);
 
@@ -2234,6 +2443,21 @@ document.getElementById('btnReceberOsFechar').addEventListener('click', fecharMo
 document.getElementById('modalReceberOs').addEventListener('click', function (e) {
     if (e.target.id === 'modalReceberOs') fecharModalReceberOs();
 });
+(function ligarModalRelatorioServicos() {
+    var overlay = document.getElementById('modalRelatorioServicos');
+    var fechar = document.getElementById('btnRelServFechar');
+    var pasta = document.getElementById('btnRelServPasta');
+    if (fechar) fechar.addEventListener('click', function () {
+        if (overlay) overlay.classList.remove('aberto');
+    });
+    if (overlay) overlay.addEventListener('click', function (e) {
+        if (e.target.id === 'modalRelatorioServicos') overlay.classList.remove('aberto');
+    });
+    if (pasta) pasta.addEventListener('click', function () {
+        if (overlay) overlay.classList.remove('aberto');
+        if (typeof irParaPastaInicio === 'function') irParaPastaInicio('entradas');
+    });
+})();
 document.querySelectorAll('[data-rec-forma]').forEach(function (b) {
     b.addEventListener('click', function () {
         confirmarRecebimentoOs(b.getAttribute('data-rec-forma'));
@@ -4523,7 +4747,10 @@ function renderRelatorioOficina() {
             var tipo = l.origem === 'VENDA'
                 ? ('VENDA' + (l.numero != null ? ' Nº ' + l.numero : ''))
                 : 'OS';
-            return '<tr><td>' + esc(fmtData(l.data)) + '</td><td>' + esc(tipo) + '</td><td>' + esc(l.cliente) + '</td><td>' + esc(l.placa) +
+            var attrs = l.atendimentoId
+                ? ' class="row-click" data-abrir-os="' + esc(l.atendimentoId) + '"'
+                : (l.vendaId ? ' class="row-click" data-abrir-vd="' + esc(l.vendaId) + '"' : '');
+            return '<tr' + attrs + '><td>' + esc(fmtData(l.data)) + '</td><td>' + esc(tipo) + '</td><td>' + esc(l.cliente) + '</td><td>' + esc(l.placa) +
                 '</td><td>' + moeda(l.pecas) + '</td><td class="ganho-linha">' + moeda(l.ganho) +
                 '</td><td>' + moeda(l.mao) + '</td><td>' + moeda(l.comissao) +
                 '</td><td>' + moeda(l.maoCasa) + '</td></tr>';
@@ -4531,6 +4758,15 @@ function renderRelatorioOficina() {
         html += '</tbody></table>';
     }
     document.getElementById('rofDetalhe').innerHTML = html;
+    var det = document.getElementById('rofDetalhe');
+    if (det) {
+        det.querySelectorAll('[data-abrir-os]').forEach(function (tr) {
+            tr.addEventListener('click', function () { editarAtendimento(tr.getAttribute('data-abrir-os')); });
+        });
+        det.querySelectorAll('[data-abrir-vd]').forEach(function (tr) {
+            tr.addEventListener('click', function () { editarDocumentoVenda(tr.getAttribute('data-abrir-vd')); });
+        });
+    }
 }
 
 function imprimirRelatorioOficina() {

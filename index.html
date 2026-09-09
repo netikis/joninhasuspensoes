@@ -192,11 +192,16 @@
                 <img id="logoHero" src="logo-joninha.jpg" alt="Joninha Suspensões">
                 <div class="hero-tag">Timbre oficial · Joninha Suspensões</div>
             </div>
+            <div class="box box-andamento-destaque" id="boxCarrosAndamentoInicio">
+                <h2>🔧 Carros em andamento</h2>
+                <p class="hint" style="margin:0">Enquanto o serviço roda, o carro fica em aberto. Quando finalizar e receber, o valor entra no caixa.</p>
+                <div class="lista-agendados-chips" id="listaCarrosAndamentoInicio"></div>
+            </div>
             <div class="cards">
-                <button type="button" class="card card-atalho card-ent" data-atalho-pasta="entradas" title="Abrir pasta de entradas">
+                <button type="button" class="card card-atalho card-ent" data-relatorio-servicos="entradas" title="Ver relatório dos serviços e vendas">
                     <div class="k">Entradas</div>
                     <div class="v" id="kpiInicioEntradas">R$ 0</div>
-                    <div class="card-sub">Clique para entrar na pasta</div>
+                    <div class="card-sub">Clique para ver os serviços</div>
                 </button>
                 <button type="button" class="card card-atalho card-sai" data-atalho-pasta="saidas" title="Abrir pasta de saídas">
                     <div class="k">Saídas</div>
@@ -219,6 +224,11 @@
                     <div class="k">Clientes</div>
                     <div class="v" id="kpiClientes">0</div>
                     <div class="card-sub">Lista cadastrada</div>
+                </button>
+                <button type="button" class="card card-atalho" data-relatorio-servicos="andamento" title="Ver carros em aberto">
+                    <div class="k">Carros em andamento</div>
+                    <div class="v" id="kpiCarrosAberto">0</div>
+                    <div class="card-sub">Ainda não foram ao caixa</div>
                 </button>
                 <button type="button" class="card card-atalho" data-goto="painelHistorico">
                     <div class="k">Atendimentos</div>
@@ -477,6 +487,11 @@
         </section>
 
         <section id="painelHistorico" class="panel">
+            <div class="box box-andamento-destaque" id="boxCarrosAndamentoHist">
+                <h2>🔧 Carros em andamento (em aberto)</h2>
+                <p class="hint" style="margin:0">Toque no carro para editar. <strong>Mandar ao caixa</strong> finaliza e registra o pagamento.</p>
+                <div class="lista-agendados-chips" id="listaCarrosAndamentoHist"></div>
+            </div>
             <div class="box box-agendados-destaque" id="boxAgendadosDestaque" style="display:none">
                 <h2>📅 Serviços agendados</h2>
                 <p class="hint" style="margin:0">Aparecem em destaque — próximos primeiros. Toque para editar.</p>
@@ -1443,6 +1458,18 @@
     </div>
 
     <div class="toast" id="toast"></div>
+
+    <div class="modal-overlay" id="modalRelatorioServicos">
+        <div class="modal-box" style="width:min(920px,100%)">
+            <h3 id="modalRelServTitulo">Serviços</h3>
+            <p class="hint" id="modalRelServHint">Clique na linha para abrir a OS ou a venda do cliente.</p>
+            <div id="modalRelServCorpo"></div>
+            <div class="modal-acoes" style="margin-top:14px">
+                <button type="button" class="btn btn-secondary" id="btnRelServPasta">📁 Ver pasta do caixa</button>
+                <button type="button" class="btn btn-primary" id="btnRelServFechar">Fechar</button>
+            </div>
+        </div>
+    </div>
 
     <div class="modal-overlay" id="modalReceberOs">
         <div class="modal-box" style="width:min(480px,100%)">

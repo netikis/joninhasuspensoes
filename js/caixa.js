@@ -1324,7 +1324,15 @@ function irParaAtalhoCaixa(acao, origem) {
         }
         return;
     }
-    if (acao === 'entradas' || acao === 'saidas') {
+    if (acao === 'entradas') {
+        if (typeof abrirRelatorioServicos === 'function') {
+            abrirRelatorioServicos('entradas');
+        } else {
+            expandirPastaCaixa(pastaId, acao);
+        }
+        return;
+    }
+    if (acao === 'saidas') {
         expandirPastaCaixa(pastaId, acao);
         return;
     }
@@ -1336,6 +1344,12 @@ function irParaAtalhoCaixa(acao, origem) {
         var movBk = document.getElementById('tabelaBanco');
         destacarAtalhoCaixa(movBk ? (movBk.closest('.box') || movBk) : document.getElementById('arvorePastasBanco'));
         return;
+    }
+    if (acao === 'oficina-pecas' || acao === 'oficina-ganho' || acao === 'oficina-mao' || acao === 'oficina-os') {
+        if (typeof abrirRelatorioServicos === 'function') {
+            abrirRelatorioServicos('oficina');
+            return;
+        }
     }
     if (acao === 'oficina-pecas') {
         abrirRelatorioOficinaDia('rofPecasBruto');
