@@ -358,6 +358,9 @@ function classificarTipoCaixaFh(x) {
     if (x.tipo === 'saida' || x.tipo === 'DESPESA') return { sigla: 'DESPESAS', cls: 'despesas' };
     if (x.tipo === 'fechamento' || x.origemFechamento) return { sigla: 'FECH.CAIXA', cls: 'fech' };
     if (x.atendimentoId || x.origemOficina) return { sigla: 'ORDEM.SERV.', cls: 'os' };
+    var ids = resolverDocCaixa(x);
+    if (ids.idOs) return { sigla: 'ORDEM.SERV.', cls: 'os' };
+    if (ids.idVd) return { sigla: 'VENDA', cls: 'entrada' };
     return { sigla: 'ENTRADA', cls: 'entrada' };
 }
 
@@ -479,20 +482,16 @@ function renderCaixa() {
         } else {
             statusHtml = '<span class="badge-cx pago">✅ PAGO' + (forma ? ' - ' + esc(forma) : '') + '</span>';
         }
-        var assHtml = '—';
-        if (x.atendimentoId) {
-            var at = (main.atendimentos || []).find(function (a) { return a.id === x.atendimentoId; });
-            if (at && at.assinaturaCliente) assHtml = '<span style="color:#2ecc71">✍️ OK</span>';
-            else assHtml = '<span style="color:#e74c3c">❌ Pend</span>';
-        }
+        var assHtml = htmlAssinaturaCaixa(main, x);
 
         var tr = document.createElement('tr');
-        if (x.vendaId) {
-            tr.setAttribute('data-cx-abrir-vd', String(x.vendaId));
+        var idsRow = resolverDocCaixa(x);
+        if (idsRow.idVd) {
+            tr.setAttribute('data-cx-abrir-vd', idsRow.idVd);
             tr.style.cursor = 'pointer';
             tr.title = 'Clique para abrir a venda';
-        } else if (x.atendimentoId) {
-            tr.setAttribute('data-cx-abrir-os', String(x.atendimentoId));
+        } else if (idsRow.idOs) {
+            tr.setAttribute('data-cx-abrir-os', idsRow.idOs);
             tr.style.cursor = 'pointer';
             tr.title = 'Clique para abrir a OS';
         }
@@ -512,8 +511,9 @@ function renderCaixa() {
         montarAcoesDocumentoCaixa(wrap, x);
         var bEx = document.createElement('button');
         bEx.type = 'button';
-        bEx.className = 'btn btn-danger';
-        bEx.textContent = 'Excluir';
+        bEx.className = 'btn btn-danger btn-cx-acao';
+        bEx.innerHTML = '<span class="cx-acao-ico">🗑️</span><span class="cx-acao-txt">Excluir</span>';
+        bEx.title = 'Excluir lançamento';
         bEx.setAttribute('data-ex', String(x.id || ''));
         if (x.atendimentoId) bEx.setAttribute('data-ex-at', String(x.atendimentoId));
         wrap.appendChild(bEx);
@@ -569,15 +569,66 @@ function renderCaixa() {
     }
 }
 
-/** Botões Ver / Imprimir / PDF / Editar (e Link na OS) — espelho do FH Control */
-/** Botões Ver / Imprimir / PDF / Editar (e Link na OS) — no painel OPÇÕES NOTA, como o ERP PDV */
+function resolverDocCaixa(x) {
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+    var idOs = x && (x.atendimentoId || '') ? String(x.atendimentoId) : '';
+    var idVd = x && (x.vendaId || x.orcamentoId) ? String(x.vendaId || x.orcamentoId) : '';
+    if (!idVd && x) {
+        var blob = [x.descricao, x.clienteNome].join(' ');
+        var m = String(blob).match(/venda\s*n[ºo°]?\s*(\d+)/i);
+        if (m) {
+            var num = Number(m[1]);
+            var o = (db.orcamentos || []).find(function (d) {
+                return d && Number(d.numero) === num;
+            });
+            if (o && o.id) idVd = String(o.id);
+        }
+    }
+    if (!idOs && x && x.osResumo && x.osResumo.placa) {
+        var placa = String(x.osResumo.placa).toUpperCase();
+        var a = (db.atendimentos || []).find(function (at) {
+            return at && String(at.placa || '').toUpperCase() === placa;
+        });
+        if (a && a.id) idOs = String(a.id);
+    }
+    return { idOs: idOs, idVd: idVd };
+}
+
+function htmlAssinaturaCaixa(db, x) {
+    var ids = resolverDocCaixa(x);
+    if (ids.idOs) {
+        var at = (db.atendimentos || []).find(function (a) { return a && String(a.id) === ids.idOs; });
+        if (at && at.assinaturaCliente) return '<span style="color:#2ecc71">✍️ OK</span>';
+        return '<span style="color:#e74c3c">❌ Pend</span>';
+    }
+    if (ids.idVd) {
+        var vd = (db.orcamentos || []).find(function (o) { return o && String(o.id) === ids.idVd; });
+        if (vd && vd.assinaturaCliente) return '<span style="color:#2ecc71">✍️ OK</span>';
+        return '<span style="color:#e74c3c">❌ Pend</span>';
+    }
+    return '—';
+}
+
+function appendBtnIconeCaixa(wrap, cls, emoji, texto, attr, valor, title) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn ' + cls + ' btn-cx-acao';
+    b.innerHTML = '<span class="cx-acao-ico">' + emoji + '</span><span class="cx-acao-txt">' + texto + '</span>';
+    b.setAttribute(attr, valor);
+    b.title = title || texto;
+    wrap.appendChild(b);
+}
+
+/** Imprimir / PDF / Assinar / Excluir dentro da engrenagem. */
 function compactarAcoesOpcoesNota(wrap) {
     var box = document.createElement('div');
     box.className = 'cx-opcoes-wrap';
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn btn-secondary btn-opcoes-nota';
-    btn.textContent = '⚙️ OPÇÕES NOTA';
+    btn.setAttribute('title', 'Ações da nota');
+    btn.setAttribute('aria-label', 'Ações da nota');
+    btn.textContent = '⚙️';
     var menu = document.createElement('div');
     menu.className = 'cx-opcoes-menu';
     while (wrap.firstChild) menu.appendChild(wrap.firstChild);
@@ -588,21 +639,17 @@ function compactarAcoesOpcoesNota(wrap) {
 
 function montarAcoesDocumentoCaixa(wrap, x) {
     if (!wrap || !x) return;
-    if (x.atendimentoId) {
-        var idOs = String(x.atendimentoId);
-        appendBtnAcaoCaixa(wrap, 'btn-secondary', 'Ver', 'data-cx-ver', idOs);
-        appendBtnAcaoCaixa(wrap, 'btn-secondary', 'Imprimir', 'data-cx-imp', idOs);
-        appendBtnAcaoCaixa(wrap, 'btn-pdf', 'PDF', 'data-cx-pdf', idOs);
-        appendBtnAcaoCaixa(wrap, 'btn-assinar', 'Link', 'data-cx-link', idOs);
-        appendBtnAcaoCaixa(wrap, 'btn-secondary', 'Editar', 'data-cx-edit-os', idOs);
+    var ids = resolverDocCaixa(x);
+    if (ids.idOs) {
+        appendBtnIconeCaixa(wrap, 'btn-secondary', '🖨️', 'Imprimir', 'data-cx-imp', ids.idOs, 'Imprimir nota');
+        appendBtnIconeCaixa(wrap, 'btn-pdf', '📄', 'PDF', 'data-cx-pdf', ids.idOs, 'Gerar PDF');
+        appendBtnIconeCaixa(wrap, 'btn-assinar', '✍️', 'Assinar', 'data-cx-link', ids.idOs, 'Enviar para o cliente assinar');
         return;
     }
-    if (x.vendaId) {
-        var idVd = String(x.vendaId);
-        appendBtnAcaoCaixa(wrap, 'btn-secondary', 'Ver', 'data-cx-ver-vd', idVd);
-        appendBtnAcaoCaixa(wrap, 'btn-secondary', 'Imprimir', 'data-cx-imp-vd', idVd);
-        appendBtnAcaoCaixa(wrap, 'btn-pdf', 'PDF', 'data-cx-pdf-vd', idVd);
-        appendBtnAcaoCaixa(wrap, 'btn-secondary', 'Editar', 'data-cx-edit-vd', idVd);
+    if (ids.idVd) {
+        appendBtnIconeCaixa(wrap, 'btn-secondary', '🖨️', 'Imprimir', 'data-cx-imp-vd', ids.idVd, 'Imprimir nota');
+        appendBtnIconeCaixa(wrap, 'btn-pdf', '📄', 'PDF', 'data-cx-pdf-vd', ids.idVd, 'Gerar PDF');
+        appendBtnIconeCaixa(wrap, 'btn-assinar', '✍️', 'Assinar', 'data-cx-link-vd', ids.idVd, 'Enviar para o cliente assinar');
     }
 }
 
@@ -617,29 +664,48 @@ function appendBtnAcaoCaixa(wrap, cls, texto, attr, valor) {
 
 function tratarCliqueAcoesDocumentoCaixa(e) {
     var b;
+    function fecharMenus() {
+        document.querySelectorAll('.cx-opcoes-wrap.aberto').forEach(function (w) {
+            w.classList.remove('aberto');
+        });
+    }
+    function hit() {
+        e.preventDefault();
+        e.stopPropagation();
+        fecharMenus();
+    }
     b = e.target.closest('[data-cx-ver]');
-    if (b) { abrirNota(b.getAttribute('data-cx-ver')); return true; }
+    if (b) { hit(); abrirNota(b.getAttribute('data-cx-ver')); return true; }
     b = e.target.closest('[data-cx-imp]');
-    if (b) { imprimirNotaPdf(b.getAttribute('data-cx-imp')); return true; }
+    if (b) { hit(); imprimirNotaPdf(b.getAttribute('data-cx-imp')); return true; }
     b = e.target.closest('[data-cx-pdf]');
     if (b) {
+        hit();
         var idOsPdf = b.getAttribute('data-cx-pdf');
         abrirNota(idOsPdf);
         setTimeout(function () { salvarNotaPdfArquivo(); }, 80);
         return true;
     }
     b = e.target.closest('[data-cx-link]');
-    if (b) { abrirLinkAssinatura(b.getAttribute('data-cx-link')); return true; }
+    if (b) { hit(); abrirLinkAssinatura(b.getAttribute('data-cx-link')); return true; }
     b = e.target.closest('[data-cx-edit-os]');
-    if (b) { editarAtendimento(b.getAttribute('data-cx-edit-os')); return true; }
+    if (b) { hit(); editarAtendimento(b.getAttribute('data-cx-edit-os')); return true; }
     b = e.target.closest('[data-cx-ver-vd]');
-    if (b) { abrirDocumentoVenda(b.getAttribute('data-cx-ver-vd')); return true; }
+    if (b) { hit(); abrirDocumentoVenda(b.getAttribute('data-cx-ver-vd')); return true; }
     b = e.target.closest('[data-cx-imp-vd]');
-    if (b) { imprimirDocumentoVenda(b.getAttribute('data-cx-imp-vd')); return true; }
+    if (b) { hit(); imprimirDocumentoVenda(b.getAttribute('data-cx-imp-vd')); return true; }
     b = e.target.closest('[data-cx-pdf-vd]');
-    if (b) { salvarPdfDocumentoVenda(b.getAttribute('data-cx-pdf-vd')); return true; }
+    if (b) { hit(); salvarPdfDocumentoVenda(b.getAttribute('data-cx-pdf-vd')); return true; }
+    b = e.target.closest('[data-cx-link-vd]');
+    if (b) {
+        hit();
+        if (typeof abrirLinkAssinaturaVenda === 'function') {
+            abrirLinkAssinaturaVenda(b.getAttribute('data-cx-link-vd'));
+        }
+        return true;
+    }
     b = e.target.closest('[data-cx-edit-vd]');
-    if (b) { editarDocumentoVenda(b.getAttribute('data-cx-edit-vd')); return true; }
+    if (b) { hit(); editarDocumentoVenda(b.getAttribute('data-cx-edit-vd')); return true; }
     return false;
 }
 
@@ -785,13 +851,18 @@ function renderCaixaBanco() {
         var statusHtml = (tip.cls === 'despesas' || tip.cls === 'fech')
             ? '—'
             : '<span class="badge-cx pago">✅ PAGO' + (forma ? ' - ' + esc(forma) : '') + '</span>';
-        var assHtml = '—';
-        if (x.atendimentoId) {
-            var at = (mainBk.atendimentos || []).find(function (a) { return a.id === x.atendimentoId; });
-            if (at && at.assinaturaCliente) assHtml = '<span style="color:#2ecc71">✍️ OK</span>';
-            else assHtml = '<span style="color:#e74c3c">❌ Pend</span>';
-        }
+        var assHtml = htmlAssinaturaCaixa(mainBk, x);
         var tr = document.createElement('tr');
+        var idsBk = resolverDocCaixa(x);
+        if (idsBk.idVd) {
+            tr.setAttribute('data-cx-abrir-vd', idsBk.idVd);
+            tr.style.cursor = 'pointer';
+            tr.title = 'Clique para abrir a venda';
+        } else if (idsBk.idOs) {
+            tr.setAttribute('data-cx-abrir-os', idsBk.idOs);
+            tr.style.cursor = 'pointer';
+            tr.title = 'Clique para abrir a OS';
+        }
         tr.innerHTML =
             '<td style="font-weight:800">' + esc(doc) + '</td>' +
             '<td><span class="badge-cx ' + tip.cls + '">' + tip.sigla + '</span></td>' +
@@ -808,8 +879,9 @@ function renderCaixaBanco() {
         montarAcoesDocumentoCaixa(wrap, x);
         var bEx = document.createElement('button');
         bEx.type = 'button';
-        bEx.className = 'btn btn-danger';
-        bEx.textContent = 'Excluir';
+        bEx.className = 'btn btn-danger btn-cx-acao';
+        bEx.innerHTML = '<span class="cx-acao-ico">🗑️</span><span class="cx-acao-txt">Excluir</span>';
+        bEx.title = 'Excluir lançamento';
         bEx.setAttribute('data-ex', String(x.id || ''));
         if (x.atendimentoId) bEx.setAttribute('data-ex-at', String(x.atendimentoId));
         wrap.appendChild(bEx);
@@ -831,6 +903,21 @@ function renderCaixaBanco() {
                 return;
             }
             if (tratarCliqueAcoesDocumentoCaixa(e)) return;
+            if (!e.target.closest('button') && !e.target.closest('a')) {
+                var trAbrirBk = e.target.closest('tr[data-cx-abrir-vd], tr[data-cx-abrir-os]');
+                if (trAbrirBk) {
+                    var idVdBk = trAbrirBk.getAttribute('data-cx-abrir-vd');
+                    var idOsBk = trAbrirBk.getAttribute('data-cx-abrir-os');
+                    if (idVdBk && typeof editarDocumentoVenda === 'function') {
+                        editarDocumentoVenda(idVdBk);
+                        return;
+                    }
+                    if (idOsBk && typeof editarAtendimento === 'function') {
+                        editarAtendimento(idOsBk);
+                        return;
+                    }
+                }
+            }
             var b = e.target.closest('[data-ex]');
             if (!b) return;
             e.preventDefault();

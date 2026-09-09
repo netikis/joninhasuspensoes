@@ -482,6 +482,13 @@ textarea:focus,
 .btn-ok { background: var(--m3-green); }
 .btn-danger,
 .btn-pdf { background: var(--m3-red); color: #fff; }
+.btn-assinar { background: #6f42c1; color: #fff; }
+
+.btn-cx-acao.btn-secondary {
+    background: var(--m3-navy);
+    color: #fff;
+    border: 0;
+}
 
 .cx-acoes-bar {
     display: flex;
@@ -522,6 +529,9 @@ tbody tr:hover { background: #f3f6fb; }
     border-radius: 12px;
     overflow: auto;
 }
+.tbl-wrap:has(.cx-opcoes-wrap.aberto) {
+    overflow: visible;
+}
 
 .pagination-caixa button {
     background: #fff;
@@ -531,10 +541,15 @@ tbody tr:hover { background: #f3f6fb; }
 }
 
 .cx-opcoes-menu {
-    background: #fff;
-    border: 1px solid var(--m3-line);
+    background: #152642;
+    border: 1px solid rgba(255,255,255,0.12);
     border-radius: 12px;
     box-shadow: var(--shadow-lg);
+}
+.btn-opcoes-nota {
+    background: var(--m3-navy) !important;
+    color: #fff !important;
+    border: 0 !important;
 }
 
 /* ---------- Pastas ---------- */

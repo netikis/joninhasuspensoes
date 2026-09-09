@@ -170,15 +170,16 @@ function ehCelular() {
 }
 
 function cssDocumentoImpressao() {
-    return 'html,body{margin:0;padding:0;background:#fff;color:#000;}' +
-        'body{padding:10mm;font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.25;}' +
-        '.nota-espelho{background:#fff;color:#111;}' +
+    return 'html,body{margin:0;padding:0;background:#fff;color:#000;box-sizing:border-box;}' +
+        '*,*::before,*::after{box-sizing:border-box;}' +
+        'body{padding:12mm;font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.25;}' +
+        '.nota-espelho{background:#fff;color:#111;width:100%;max-width:100%;margin:0;overflow:visible;}' +
         '.nota-topo{text-align:center;border-bottom:3px solid #e61e25;padding-bottom:8pt;margin-bottom:10pt;}' +
         '.nota-topo-linha{width:100%;border-collapse:collapse;table-layout:fixed;}' +
         '.nota-topo-logo{width:42%;vertical-align:middle;padding:0 8pt 0 0;}' +
         '.nota-topo-logo img{display:block;width:100%;max-width:100%;max-height:32mm;height:auto;object-fit:contain;object-position:left center;}' +
         '.nota-topo-dados{width:58%;vertical-align:middle;text-align:left;font-size:9.5pt;line-height:1.3;color:#000;}' +
-        '.nota-topo-dados .linha{display:block;white-space:nowrap;overflow:visible;color:#000;}' +
+        '.nota-topo-dados .linha{display:block;white-space:normal;overflow-wrap:anywhere;word-break:break-word;color:#000;}' +
         '.nota-topo-dados .linha-end{font-size:9pt;}' +
         '.nota-topo-dados .linha-tel{font-weight:600;}' +
         '.nota-titulo-espelho{margin-top:8pt;margin-bottom:0;font-size:12pt;font-weight:800;color:#e61e25;letter-spacing:.06em;text-align:center;}' +
@@ -194,7 +195,7 @@ function cssDocumentoImpressao() {
         '.nota-grid-compacta .nota-valor{display:inline;font-size:9pt;margin:0;overflow-wrap:anywhere;word-break:break-word;min-width:0;flex:1 1 auto;}' +
         '.nota-chassi{font-family:Consolas,Courier New,monospace;word-break:break-all;}' +
         '.nota-itens{width:100%;border-collapse:collapse;font-size:9pt;}' +
-        '.nota-itens th,.nota-itens td{border-bottom:1px solid #ddd;padding:3pt;text-align:left;}' +
+        '.nota-itens th,.nota-itens td{border-bottom:1px solid #ddd;padding:3pt;text-align:left;overflow-wrap:anywhere;}' +
         '.nota-itens th{font-weight:800;}' +
         '.nota-valores-pad{padding:6pt;}' +
         '.nota-subtotais{margin-top:4pt;font-size:9pt;}' +
@@ -206,8 +207,8 @@ function cssDocumentoImpressao() {
         '.nota-sig img{max-height:18mm;max-width:100%;}' +
         '.nota-fotos{display:flex;flex-wrap:wrap;gap:6pt;padding:6pt;}' +
         '.nota-fotos img{width:45mm;height:34mm;object-fit:cover;}' +
-        '@page{size:A4;margin:10mm;}' +
-        '@media print{body{padding:0;}}';
+        '@page{size:A4;margin:12mm;}' +
+        '@media print{html,body{padding:0;margin:0;}.nota-espelho{width:100%;}}';
 }
 
 function montarHtmlDocumentoImpressao(htmlCorpo) {
@@ -599,56 +600,94 @@ function aguardarImagensElemento(el) {
 async function montarElementoRenderNota(html) {
     await carregarHtml2Pdf();
     var htmlFonte = html || obterHtmlNotaAtual();
-    var wrap = document.createElement('div');
-    wrap.id = 'hmPdfRenderTemp';
-    wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1;';
-    wrap.innerHTML = htmlFonte;
-    document.body.appendChild(wrap);
-    var alvo = wrap.querySelector('.nota-espelho') || wrap;
+    var velho = document.getElementById('hmPdfRenderTemp');
+    if (velho && velho.parentNode) velho.parentNode.removeChild(velho);
 
-    var tabela = wrap.querySelector('.nota-topo-linha');
+    var iframe = document.createElement('iframe');
+    iframe.id = 'hmPdfRenderTemp';
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.cssText = 'position:fixed;left:0;top:0;width:794px;height:1123px;border:0;background:#fff;z-index:-1;opacity:0.01;pointer-events:none;';
+    document.body.appendChild(iframe);
+    var idoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+    if (!idoc) {
+        iframe.remove();
+        throw new Error('iframe pdf');
+    }
+    idoc.open();
+    idoc.write(montarHtmlDocumentoImpressao(htmlFonte));
+    idoc.close();
+    idoc.documentElement.style.margin = '0';
+    idoc.body.style.margin = '0';
+    idoc.body.style.padding = '16px';
+    idoc.body.style.background = '#fff';
+    idoc.body.style.overflow = 'visible';
+
+    var alvo = idoc.querySelector('.nota-espelho') || idoc.body;
+    alvo.style.width = '100%';
+    alvo.style.maxWidth = '100%';
+    alvo.style.margin = '0';
+    alvo.style.overflow = 'visible';
+    alvo.style.transform = 'none';
+    alvo.style.boxSizing = 'border-box';
+    idoc.querySelectorAll('.nota-topo-dados .linha').forEach(function (ln) {
+        ln.style.whiteSpace = 'normal';
+        ln.style.overflowWrap = 'anywhere';
+        ln.style.wordBreak = 'break-word';
+    });
+
+    var tabela = idoc.querySelector('.nota-topo-linha');
     if (tabela) {
         tabela.style.cssText = 'width:100%;border-collapse:collapse;table-layout:fixed;display:table;';
-        var logoTd = wrap.querySelector('.nota-topo-logo');
-        var dadosTd = wrap.querySelector('.nota-topo-dados');
+        var logoTd = idoc.querySelector('.nota-topo-logo');
+        var dadosTd = idoc.querySelector('.nota-topo-dados');
         if (logoTd) logoTd.style.cssText = 'width:42%;vertical-align:middle;padding:0 10px 0 0;display:table-cell;';
         if (dadosTd) dadosTd.style.cssText = 'width:58%;vertical-align:middle;padding:0;display:table-cell;text-align:left;font-size:9.5pt;line-height:1.3;color:#222;';
-        var img = wrap.querySelector('.nota-topo-logo img');
+        var img = idoc.querySelector('.nota-topo-logo img');
         if (img) img.style.cssText = 'display:block;width:100%;max-height:110px;height:auto;object-fit:contain;object-position:left center;';
-        wrap.querySelectorAll('.nota-topo-dados .linha').forEach(function (ln) {
-            ln.style.whiteSpace = 'nowrap';
-            ln.style.display = 'block';
-            ln.style.fontSize = '9pt';
-            ln.style.lineHeight = '1.3';
-        });
     }
 
     await aguardarImagensElemento(alvo);
-    return { wrap: wrap, alvo: alvo };
+    var h = Math.max(alvo.scrollHeight + 48, idoc.body.scrollHeight + 48, 1123);
+    iframe.style.height = h + 'px';
+    return { wrap: iframe, alvo: alvo };
 }
 
 function optHtml2CanvasNota() {
     return {
-        scale: Math.min(2, window.devicePixelRatio || 1.5),
+        scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
         scrollX: 0,
         scrollY: 0,
-        windowWidth: 794
+        windowWidth: 794,
+        imageTimeout: 8000,
+        onclone: function (doc) {
+            var b = doc.body;
+            if (b) {
+                b.style.margin = '0';
+                b.style.padding = '16px';
+                b.style.background = '#fff';
+                b.style.transform = 'none';
+            }
+            doc.querySelectorAll('.nota-topo-dados .linha').forEach(function (ln) {
+                ln.style.whiteSpace = 'normal';
+                ln.style.overflowWrap = 'anywhere';
+            });
+        }
     };
 }
 
 async function gerarPdfBlobDaNota(html, nomeArq) {
     var prep = await montarElementoRenderNota(html);
     var opt = {
-        margin: [8, 8, 8, 8],
+        margin: [10, 10, 10, 10],
         filename: nomeArq || 'ORCAMENTO.pdf',
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: optHtml2CanvasNota(),
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
         enableLinks: false
     };
 
@@ -2132,6 +2171,120 @@ async function abrirLinkAssinatura(id) {
     renderHistorico();
 }
 
+function documentoAssinaturaVenda(db, o) {
+    var emp = getEmpresa(db);
+    var cad = {};
+    if (o.clienteId) {
+        var c = (db.clientes || []).find(function (x) { return x && String(x.id) === String(o.clienteId); });
+        if (c) cad = c;
+    }
+    var itens = (o.itens || []).map(function (it) {
+        var tipo = (it.origem === 'mao' || it.tipo === 'mao') ? 'mao' : 'peca';
+        var valor = Number(it.total != null ? it.total : it.venda) || 0;
+        return { tipo: tipo, desc: it.desc || '', valor: valor };
+    });
+    return {
+        vendaId: o.id,
+        nomeCliente: o.clienteNome || o.funcionarioNome || cad.nome || '',
+        clienteCadastro: cad,
+        cpf: cad.cpf || '',
+        cnpj: cad.cnpj || '',
+        telefone: o.telefone || cad.telefone || '',
+        email: cad.email || '',
+        placa: o.placa || '',
+        carro: o.carro || '',
+        entrada: o.dataEmissao || o.criadoEm || '',
+        servicos: o.descricao || itens.map(function (it) { return it.desc; }).filter(Boolean).join(', '),
+        diagnostico: o.observacao || '',
+        itens: itens,
+        total: o.valor || 0,
+        empresa: emp.nome || 'Joninha Suspensões',
+        empresaEndereco: enderecoCompleto(emp),
+        empresaTelefone: emp.telefone || '',
+        empresaCnpj: emp.cnpj || '',
+        empresaIe: emp.ie || '',
+        empresaLogo: logoSrc(emp)
+    };
+}
+
+function telefoneDaVenda(db, o) {
+    if (!o) return '';
+    if (o.telefone) return o.telefone;
+    if (o.clienteId) {
+        var c = (db.clientes || []).find(function (x) { return x && String(x.id) === String(o.clienteId); });
+        if (c && c.telefone) return c.telefone;
+    }
+    return '';
+}
+
+async function abrirLinkAssinaturaVenda(id) {
+    var db = carregar();
+    var o = obterDocumentoVendaPorId(id);
+    if (!o) { toast('Venda não encontrada.'); return; }
+    if (!o.tokenAssinatura) o.tokenAssinatura = gerarTokenAssinatura();
+
+    var mapa = carregarAssinaturas();
+    var prev = mapa[o.tokenAssinatura] || {};
+    var pack = {
+        token: o.tokenAssinatura,
+        vendaId: o.id,
+        atendimentoId: null,
+        documento: documentoAssinaturaVenda(db, o),
+        criadoEm: prev.criadoEm || new Date().toISOString(),
+        atualizadoEm: new Date().toISOString(),
+        assinaturaCliente: prev.assinaturaCliente || o.assinaturaCliente || null,
+        assinadoEm: prev.assinadoEm || o.assinadoEm || null
+    };
+    mapa[o.tokenAssinatura] = pack;
+    salvarAssinaturas(mapa);
+
+    var i = (db.orcamentos || []).findIndex(function (x) { return x && String(x.id) === String(o.id); });
+    if (i >= 0) {
+        db.orcamentos[i].tokenAssinatura = o.tokenAssinatura;
+        if (pack.assinaturaCliente) {
+            db.orcamentos[i].assinaturaCliente = pack.assinaturaCliente;
+            db.orcamentos[i].assinadoEm = pack.assinadoEm;
+        }
+        salvar(db);
+        o = db.orcamentos[i];
+    }
+
+    var nuvMsg = '';
+    var cfgN = carregarConfigNuvem();
+    if (cfgN && cfgN.apiKey && cfgN.projectId) {
+        try {
+            var packNuv = await puxarAssinaturaNuvem(o.tokenAssinatura);
+            if (packNuv && packNuv.assinaturaCliente) {
+                pack.assinaturaCliente = packNuv.assinaturaCliente;
+                pack.assinadoEm = packNuv.assinadoEm || pack.assinadoEm;
+                mapa[o.tokenAssinatura] = pack;
+                salvarAssinaturas(mapa);
+                if (i >= 0) {
+                    db.orcamentos[i].assinaturaCliente = pack.assinaturaCliente;
+                    db.orcamentos[i].assinadoEm = pack.assinadoEm;
+                    salvar(db);
+                }
+            }
+        } catch (ePull) { /* ok */ }
+        var up = await enviarPackAssinaturaNuvem(pack);
+        if (up.ok && up.pack && up.pack.assinaturaCliente) pack = up.pack;
+        nuvMsg = up.ok ? ' · nuvem OK (cliente assina no celular)' : ' · nuvem: ' + (up.motivo || 'falhou');
+    } else {
+        nuvMsg = ' · configure a nuvem para o cliente assinar pelo WhatsApp no celular';
+    }
+
+    var link = urlLinkAssinatura(o.tokenAssinatura);
+    document.getElementById('inputLinkAssinatura').value = link;
+    document.getElementById('modalLinkAssinatura').classList.add('aberto');
+    documentoVendaAtual = o;
+    atendimentoNotaAtual = null;
+    toast(
+        (pack.assinaturaCliente ? 'Cliente já assinou — link reenviado.' : 'Link pronto — envie ao cliente.') + nuvMsg
+    );
+    if (typeof renderCaixa === 'function') renderCaixa();
+    if (typeof renderCaixaBanco === 'function') renderCaixaBanco();
+}
+
 function fecharModalLink() {
     document.getElementById('modalLinkAssinatura').classList.remove('aberto');
 }
@@ -2159,6 +2312,16 @@ function aplicarAssinaturaImportada(data) {
         alvo.assinadoEm = pack.assinadoEm;
         alvo.tokenAssinatura = data.token;
         salvar(db);
+    } else {
+        var vd = (db.orcamentos || []).find(function (o) {
+            return o && (o.tokenAssinatura === data.token || o.id === data.vendaId || o.id === pack.vendaId);
+        });
+        if (vd) {
+            vd.assinaturaCliente = pack.assinaturaCliente;
+            vd.assinadoEm = pack.assinadoEm;
+            vd.tokenAssinatura = data.token;
+            salvar(db);
+        }
     }
     toast('Assinatura importada com sucesso.');
     renderHistorico();
@@ -2576,6 +2739,7 @@ document.getElementById('inputNomePdf').addEventListener('keydown', function (e)
 });
 document.getElementById('btnNotaLink').addEventListener('click', function () {
     if (atendimentoNotaAtual) abrirLinkAssinatura(atendimentoNotaAtual.id);
+    else if (documentoVendaAtual) abrirLinkAssinaturaVenda(documentoVendaAtual.id);
 });
 document.getElementById('btnNotaBuscarAssinatura').addEventListener('click', async function () {
     if (!atendimentoNotaAtual || !atendimentoNotaAtual.id) {
@@ -2619,10 +2783,25 @@ document.getElementById('btnWhatsappLink').addEventListener('click', function ()
     var link = document.getElementById('inputLinkAssinatura').value;
     var db = carregar();
     var a = atendimentoNotaAtual;
-    var nome = a ? nomeAtendimento(db, a) : 'cliente';
-    var texto = 'Olá ' + nome + '! A ' + (getEmpresa().nome || 'Joninha Suspensões') +
-        ' enviou o documento do seu veículo para você *ler e assinar* (ficar de acordo):\n' + link;
-    abrirWhatsApp(a ? telefoneDoAtendimento(db, a) : '', texto);
+    var o = documentoVendaAtual;
+    var nome = 'cliente';
+    var tel = '';
+    var texto;
+    if (a) {
+        nome = nomeAtendimento(db, a);
+        tel = telefoneDoAtendimento(db, a);
+        texto = 'Olá ' + nome + '! A ' + (getEmpresa().nome || 'Joninha Suspensões') +
+            ' enviou o documento do seu veículo para você *ler e assinar* (ficar de acordo):\n' + link;
+    } else if (o) {
+        nome = o.clienteNome || o.funcionarioNome || 'cliente';
+        tel = telefoneDaVenda(db, o);
+        texto = 'Olá ' + nome + '! A ' + (getEmpresa().nome || 'Joninha Suspensões') +
+            ' enviou a nota da venda para você *ler e assinar* (ficar de acordo):\n' + link;
+    } else {
+        texto = 'Olá! A ' + (getEmpresa().nome || 'Joninha Suspensões') +
+            ' enviou um documento para você *ler e assinar*:\n' + link;
+    }
+    abrirWhatsApp(tel, texto);
 });
 document.getElementById('btnImportarSig').addEventListener('click', function () {
     document.getElementById('fileImportSig').click();
@@ -3411,12 +3590,15 @@ function renderCarrinhoVenda() {
     } else {
         box.innerHTML = carrinhoVenda.map(function (it, idx) {
             var tag = it.origem === 'estoque' ? 'ESTOQUE' : (it.origem === 'mao' ? 'MÃO DE OBRA' : 'AVULSO');
-            var cor = it.origem === 'mao' ? '#8fe0b8' : (it.origem === 'estoque' ? '#9fd3ff' : '#ffb4a8');
-            return '<div class="row" style="margin-bottom:8px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:6px">' +
-                '<div class="col" style="flex:2"><span style="color:' + cor + ';font-size:0.7rem;font-weight:700;margin-right:6px">' + tag + '</span>' +
-                esc(it.desc) + ' <span class="muted">(' + esc(String(it.qtd)) + ' ' + esc(it.unidade || 'un') + ' × ' + moeda(it.venda) + ')</span></div>' +
-                '<div class="col">' + moeda(it.total) + '</div>' +
-                '<div class="col" style="flex:0.4"><button type="button" class="btn btn-danger" data-vd-rm="' + idx + '">×</button></div></div>';
+            var cor = it.origem === 'mao' ? '#1e9e5a' : (it.origem === 'estoque' ? '#2563a8' : '#d23b3b');
+            return '<div class="vd-cart-linha">' +
+                '<span class="vd-cart-tag" style="color:' + cor + '">' + tag + '</span>' +
+                '<span class="vd-cart-info" title="' + esc(it.desc) + '">' + esc(it.desc) +
+                ' <span class="vd-cart-qtd">(' + esc(String(it.qtd)) + ' ' + esc(it.unidade || 'un') +
+                ' × ' + moeda(it.venda) + ')</span></span>' +
+                '<span class="vd-cart-total">' + moeda(it.total) + '</span>' +
+                '<button type="button" class="btn btn-danger vd-cart-rm" data-vd-rm="' + idx + '" title="Excluir item">×</button>' +
+                '</div>';
         }).join('');
         box.querySelectorAll('[data-vd-rm]').forEach(function (b) {
             b.addEventListener('click', function () {

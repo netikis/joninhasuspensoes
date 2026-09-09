@@ -278,6 +278,7 @@
                 var leve = {
                     token: token,
                     atendimentoId: (p && p.atendimentoId) || null,
+                    vendaId: (p && p.vendaId) || null,
                     assinaturaCliente: (p && p.assinaturaCliente) || null,
                     assinadoEm: (p && p.assinadoEm) || null,
                     atualizadoEm: (p && p.atualizadoEm) || new Date().toISOString()
@@ -468,6 +469,17 @@
                             at.assinaturaCliente = dataUrl;
                             at.assinadoEm = agora;
                             at.tokenAssinatura = token;
+                            localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+                        }
+                    }
+                    if (db && Array.isArray(db.orcamentos)) {
+                        var vd = db.orcamentos.find(function (o) {
+                            return o && (o.tokenAssinatura === token || o.id === pack.vendaId);
+                        });
+                        if (vd) {
+                            vd.assinaturaCliente = dataUrl;
+                            vd.assinadoEm = agora;
+                            vd.tokenAssinatura = token;
                             localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
                         }
                     }
