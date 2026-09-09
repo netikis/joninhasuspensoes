@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-    <meta name="theme-color" content="#c8102e">
+    <meta name="theme-color" content="#152642">
     <meta name="color-scheme" content="dark light">
     <meta name="format-detection" content="telephone=no">
     <meta name="mobile-web-app-capable" content="yes">
@@ -30,8 +30,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/app.css">
+    <link rel="stylesheet" href="css/tema-m3.css">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -76,8 +77,13 @@
     <aside class="sidebar" id="sidebar">
         <button type="button" class="sidebar-close-mobile" id="btnFecharMenu">✕ Fechar menu</button>
         <div class="brand">
-            <img id="logoSidebar" src="logo-joninha.jpg" alt="Joninha Suspensões">
-            <div class="brand-tag">Oficina · Suspensões</div>
+            <div class="logo">
+                <div class="mark"><img id="logoSidebar" src="logo-joninha.jpg" alt="Joninha Suspensões"></div>
+                <div class="txt">
+                    <b>JONINHA</b>
+                    <span>Suspensões</span>
+                </div>
+            </div>
         </div>
 
         <!-- Menu: grupos recolhíveis + subtópicos -->
@@ -163,17 +169,22 @@
     <main class="main">
         <div class="topbar">
             <div class="topbar-left">
-                <button type="button" class="btn-menu" id="btnAbrirMenu" aria-label="Abrir menu">☰</button>
-                <div>
+                <button type="button" class="btn-menu" id="btnAbrirMenu" aria-label="Abrir menu">
+                    <span class="burger" aria-hidden="true"><span></span><span></span><span></span></span>
+                </button>
+                <div class="topbar-titles">
                     <h1 id="tituloPainel">Painel</h1>
-                    <p id="subtituloPainel">Sistema Joninha Suspensões — banco local exclusivo</p>
+                    <p id="subtituloPainel" class="sub">Sistema Joninha Suspensões — banco local exclusivo</p>
                 </div>
             </div>
-            <span class="badge-db" id="badgeDb">DB isolado · joninha_suspensoes_v1</span>
-            <span class="badge-db" id="badgeAppVersion" style="margin-left:6px">v?</span>
-            <button type="button" class="btn btn-danger btn-sair-top" id="btnSairTopbar" title="Sair / Trocar usuário">Sair</button>
+            <div class="top-actions">
+                <span class="badge-db" id="badgeDb">DB isolado · joninha_suspensoes_v1</span>
+                <span class="badge-db" id="badgeAppVersion">v?</span>
+                <button type="button" class="btn-logout" id="btnSairTopbar" title="Sair / Trocar usuário">Sair</button>
+            </div>
         </div>
         <div class="banner-canal" id="bannerCanal" style="display:none" aria-hidden="true"></div>
+        <div class="conteudo">
 
         <!-- INÍCIO -->
         <section id="painelInicio" class="panel active">
@@ -1408,6 +1419,7 @@
                 </div>
             </div>
         </section>
+        </div>
     </main>
 
     <div class="install-banner" id="installBanner" role="dialog" aria-label="Instalar aplicativo">
