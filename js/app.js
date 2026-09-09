@@ -5522,7 +5522,7 @@ if ('serviceWorker' in navigator) {
         window.location.reload();
     });
 
-    navigator.serviceWorker.register('./sw.js').then(function (reg) {
+    navigator.serviceWorker.register('./sw.js?v=22').then(function (reg) {
         function checarAtualizacao() {
             try { reg.update(); } catch (e) { /* ok */ }
         }

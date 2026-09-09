@@ -1,5 +1,5 @@
 /* Joninha Suspensões — PWA com atualização automática (PC + celular) */
-var CACHE = 'joninha-suspensoes-v21';
+var CACHE = 'joninha-suspensoes-v22';
 var ASSETS = [
   './',
   './index.html',
@@ -46,53 +46,26 @@ self.addEventListener('activate', function (event) {
   );
 });
 
-function isDocumento(request, url) {
-  if (request.mode === 'navigate') return true;
-  var path = url.pathname || '';
-  return path.endsWith('/') ||
-    path.endsWith('.html') ||
-    path.endsWith('sw.js') ||
-    path.endsWith('manifest.webmanifest') ||
-    path.endsWith('firebase-env.js') ||
-    path.endsWith('firebase-config.js');
-}
-
+/* Sempre busca na rede quando online. Cache só entra se estiver sem internet.
+   Evita ficar preso em versão antiga (ex.: 1.3.18) depois do deploy. */
 self.addEventListener('fetch', function (event) {
   if (event.request.method !== 'GET') return;
   var url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (isDocumento(event.request, url)) {
-    event.respondWith(
-      fetch(event.request).then(function (res) {
-        if (res && res.ok) {
-          var copy = res.clone();
-          caches.open(CACHE).then(function (cache) {
-            cache.put(event.request, copy);
-          });
-        }
-        return res;
-      }).catch(function () {
-        return caches.match(event.request).then(function (cached) {
-          return cached || caches.match('./index.html');
-        });
-      })
-    );
-    return;
-  }
-
   event.respondWith(
-    caches.match(event.request).then(function (cached) {
-      var network = fetch(event.request).then(function (res) {
-        if (res && res.ok) {
-          var copy = res.clone();
-          caches.open(CACHE).then(function (cache) {
-            cache.put(event.request, copy);
-          });
-        }
-        return res;
-      }).catch(function () { return cached; });
-      return cached || network;
+    fetch(event.request).then(function (res) {
+      if (res && res.ok) {
+        var copy = res.clone();
+        caches.open(CACHE).then(function (cache) {
+          cache.put(event.request, copy);
+        });
+      }
+      return res;
+    }).catch(function () {
+      return caches.match(event.request).then(function (cached) {
+        return cached || caches.match('./index.html');
+      });
     })
   );
 });
