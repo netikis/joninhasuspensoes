@@ -253,24 +253,29 @@ function htmlLinhaItemOs(it, idx) {
             '</div>';
     }
 
+    var tipoMaoLinha = it.tipoMao || 'servico';
+    var dadosLinha = it.funcionarioId ? obterDadosComissaoFuncionario(it.funcionarioId, tipoMaoLinha) : { pct: 0, valorFixo: 0, nome: '' };
     var pctLinha = Number(it.comissaoPct);
     if (isNaN(pctLinha)) pctLinha = 0;
-    if (it.funcionarioId && pctLinha <= 0) {
-        var dRecalc = obterDadosComissaoFuncionario(it.funcionarioId, it.tipoMao || 'servico');
-        if (dRecalc.pct > 0) {
-            pctLinha = dRecalc.pct;
-            it.comissaoPct = pctLinha;
-            if (!it.funcionarioNome) it.funcionarioNome = dRecalc.nome;
-        }
+    if (!ehTipoMaoAmortOriginal(tipoMaoLinha) && it.funcionarioId && pctLinha <= 0 && dadosLinha.pct > 0) {
+        pctLinha = dadosLinha.pct;
+        it.comissaoPct = pctLinha;
+        if (!it.funcionarioNome) it.funcionarioNome = dadosLinha.nome;
     }
-    var comVal = calcularValorComissaoMao(it.valor, pctLinha);
+    var comVal = valorComissaoDoItemMao(it, dadosLinha);
     it.comissaoValor = comVal;
     var tipoLbl = it.tipoMao ? rotuloTipoMaoComissao(it.tipoMao) : 'Serviço';
     var nomeF = it.funcionarioNome || (it.funcionarioId ? 'Funcionário' : 'sem funcionário');
     var extraM = '<div class="muted" style="font-size:0.8rem;margin-top:2px">' +
         esc(tipoLbl) + ' · ' + esc(nomeF);
     if (it.funcionarioId) {
-        if (pctLinha > 0) {
+        if (ehTipoMaoAmortOriginal(tipoMaoLinha)) {
+            if (comVal > 0) {
+                extraM += ' · Pagamento fixo <span class="ganho-linha" style="font-weight:800">' + moeda(comVal) + '</span>';
+            } else {
+                extraM += ' · <span style="color:#ffb4b4">sem R$ cadastrado neste tipo</span>';
+            }
+        } else if (pctLinha > 0) {
             extraM += ' · Comissão <strong style="color:#8fe0b8">' + esc(String(pctLinha)) + '%</strong>' +
                 ' = <span class="ganho-linha" style="font-weight:800">' + moeda(comVal) + '</span>';
         } else {
@@ -412,13 +417,26 @@ document.getElementById('btnAddItem').addEventListener('click', function () {
 
 function rotuloTipoMaoComissao(tipo) {
     if (tipo === 'alinhamento') return 'Alinhamento';
+    if (tipo === 'amortecedor-original' || tipo === 'amortecedorOriginal') return 'Amortecedor original';
     if (tipo === 'amortecedor') return 'Amortecedor';
     return 'Serviço';
+}
+
+function ehTipoMaoAmortOriginal(tipo) {
+    return tipo === 'amortecedor-original' || tipo === 'amortecedorOriginal';
+}
+
+function valorFixoAmortecedorOriginal(f) {
+    if (!f) return 0;
+    var v = Number(f.comissaoAmortecedorOriginalValor);
+    if (isNaN(v) || v < 0) v = 0;
+    return +v.toFixed(2);
 }
 
 function pctComissaoPorTipo(f, tipo) {
     if (!f) return 0;
     var t = tipo || 'servico';
+    if (ehTipoMaoAmortOriginal(t)) return 0;
     var pct = 0;
     if (t === 'alinhamento') pct = Number(f.comissaoAlinhamentoPct);
     else if (t === 'amortecedor') pct = Number(f.comissaoAmortecedorPct);
@@ -433,7 +451,7 @@ function pctComissaoPorTipo(f, tipo) {
 }
 
 function obterDadosComissaoFuncionario(fid, tipoMao) {
-    var out = { nome: '', pct: 0, tipo: tipoMao || 'servico' };
+    var out = { nome: '', pct: 0, valorFixo: 0, tipo: tipoMao || 'servico' };
     if (!fid) return out;
     var f = null;
     try {
@@ -448,9 +466,25 @@ function obterDadosComissaoFuncionario(fid, tipoMao) {
     }
     if (f) {
         out.nome = f.nome || '';
-        out.pct = pctComissaoPorTipo(f, out.tipo);
+        if (ehTipoMaoAmortOriginal(out.tipo)) {
+            out.valorFixo = valorFixoAmortecedorOriginal(f);
+            out.pct = 0;
+        } else {
+            out.pct = pctComissaoPorTipo(f, out.tipo);
+        }
     }
     return out;
+}
+
+function valorComissaoDoItemMao(it, dados) {
+    var tipo = (it && it.tipoMao) || (dados && dados.tipo) || 'servico';
+    if (ehTipoMaoAmortOriginal(tipo)) {
+        if (dados && Number(dados.valorFixo) > 0) return +Number(dados.valorFixo).toFixed(2);
+        var vFix = it && it.comissaoValor != null ? Number(it.comissaoValor) : 0;
+        return vFix > 0 ? +vFix.toFixed(2) : 0;
+    }
+    var pct = (dados && Number(dados.pct) > 0) ? Number(dados.pct) : (it && Number(it.comissaoPct)) || 0;
+    return calcularValorComissaoMao(it && it.valor, pct);
 }
 
 function calcularValorComissaoMao(valorMo, pct) {
@@ -471,6 +505,17 @@ function atualizarPreviewComissaoMao() {
         return;
     }
     var dados = obterDadosComissaoFuncionario(fid, tipo);
+    if (ehTipoMaoAmortOriginal(tipo)) {
+        if (!(dados.valorFixo > 0)) {
+            el.textContent = (dados.nome || 'Funcionário') + ' — sem R$ de amortecedor original no cadastro.';
+            el.style.color = '#ffb4b4';
+            return;
+        }
+        el.style.color = '#8fe0b8';
+        el.textContent = (dados.nome || 'Funcionário') + ' · Amortecedor original — recebe ' +
+            moeda(dados.valorFixo) + ' (valor fixo do cadastro)';
+        return;
+    }
     var com = calcularValorComissaoMao(valor, dados.pct);
     if (!dados.pct) {
         el.textContent = (dados.nome || 'Funcionário') + ' — sem % de ' + rotuloTipoMaoComissao(tipo) + ' no cadastro.';
@@ -489,8 +534,8 @@ document.getElementById('btnAddMao').addEventListener('click', function () {
     var fid = document.getElementById('maoFuncId').value;
     var tipoMao = (document.getElementById('maoTipoComissao') && document.getElementById('maoTipoComissao').value) || 'servico';
     var dados = obterDadosComissaoFuncionario(fid, tipoMao);
-    var comissaoPct = dados.pct;
-    var comissaoValor = calcularValorComissaoMao(valor, comissaoPct);
+    var comissaoPct = ehTipoMaoAmortOriginal(tipoMao) ? 0 : dados.pct;
+    var comissaoValor = valorComissaoDoItemMao({ tipoMao: tipoMao, valor: valor, comissaoPct: comissaoPct }, dados);
     itensTemp.push({
         tipo: 'mao',
         tipoMao: tipoMao,
@@ -510,6 +555,63 @@ document.getElementById('btnAddMao').addEventListener('click', function () {
         toast('MO ' + rotuloTipoMaoComissao(tipoMao) + ' · comissão ' + moeda(comissaoValor) + ' — vai para Comissões ao salvar.');
     }
 });
+
+window._mapaEnterOs = {
+    itemDesc: 'btnAddItem',
+    itemCusto: 'btnAddItem',
+    itemValor: 'btnAddItem',
+    itemQtd: 'btnAddItem',
+    maoDesc: 'btnAddMao',
+    maoValor: 'btnAddMao',
+    maoTipoComissao: 'btnAddMao',
+    maoFuncId: 'btnAddMao'
+};
+window._osEnterLock = 0;
+window._osSalvando = false;
+
+(function ligarEnterPecaMaoOs() {
+    function tecla(e) {
+        if (typeof teclaEhEnter === 'function') return teclaEhEnter(e);
+        return !!(e && (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) && !e.isComposing);
+    }
+    function clicarAdd(botaoId, ev) {
+        var ts = ev && ev.timeStamp;
+        if (ts && ts === window._osEnterLock) return;
+        window._osEnterLock = ts || Date.now();
+        var btnAdd = document.getElementById(botaoId);
+        if (btnAdd) btnAdd.click();
+    }
+    document.addEventListener('keydown', function (e) {
+        if (!tecla(e)) return;
+        var t = e.target;
+        if (!t || t.tagName === 'TEXTAREA') return;
+        var botaoId = window._mapaEnterOs[t.id];
+        if (!botaoId) return;
+        e.preventDefault();
+        e.stopPropagation();
+        clicarAdd(botaoId, e);
+    }, true);
+    if (typeof window.enterClicaBotao === 'function') {
+        window.enterClicaBotao(['itemDesc', 'itemCusto', 'itemValor', 'itemQtd'], 'btnAddItem');
+        window.enterClicaBotao(['maoDesc', 'maoValor', 'maoTipoComissao', 'maoFuncId'], 'btnAddMao');
+    }
+    var btnS = document.getElementById('btnSalvarAt');
+    if (btnS && !btnS.getAttribute('data-os-save')) {
+        btnS.setAttribute('data-os-save', '1');
+        btnS.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (typeof salvarAtendimentoAtual === 'function') salvarAtendimentoAtual();
+        });
+    }
+    var formS = document.getElementById('formAtendimento');
+    if (formS && !formS.getAttribute('data-os-save')) {
+        formS.setAttribute('data-os-save', '1');
+        formS.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (typeof salvarAtendimentoAtual === 'function') salvarAtendimentoAtual();
+        });
+    }
+})();
 
 (function ligarPreviewComissaoMao() {
     var v = document.getElementById('maoValor');
@@ -560,40 +662,107 @@ document.getElementById('atClienteBusca').addEventListener('keydown', function (
     }
 });
 
-/* Enter em peça/MO deve adicionar a linha — não salvar a OS nem recarregar a página. */
-document.getElementById('formAtendimento').addEventListener('keydown', function (e) {
-    if (e.key !== 'Enter' && e.keyCode !== 13) return;
-    var t = e.target;
-    if (!t || t.tagName === 'TEXTAREA') return;
-    if (t.tagName === 'BUTTON' || t.type === 'submit') return;
-    e.preventDefault();
-    e.stopPropagation();
-    var id = t.id || '';
-    if (id === 'itemDesc' || id === 'itemCusto' || id === 'itemValor' || id === 'itemQtd') {
-        var btnPeca = document.getElementById('btnAddItem');
-        if (btnPeca) btnPeca.click();
-        return;
-    }
-    if (id === 'maoDesc' || id === 'maoValor' || id === 'maoTipoComissao' || id === 'maoFuncId') {
-        var btnMao = document.getElementById('btnAddMao');
-        if (btnMao) btnMao.click();
-    }
-});
+function teclaEnterOs(e) {
+    if (typeof teclaEhEnter === 'function') return teclaEhEnter(e);
+    return !!(e && (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) && !e.isComposing);
+}
 
-document.getElementById('formAtendimento').addEventListener('submit', async function (e) {
-    e.preventDefault();
+function mostrarErroSalvarOs(msg, focusId) {
+    var errEl = document.getElementById('atSalvarErro');
+    if (errEl) {
+        errEl.textContent = msg;
+        errEl.style.display = 'block';
+    }
+    toast(msg);
+    var foco = focusId ? document.getElementById(focusId) : null;
+    if (foco) {
+        try { foco.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (eScr) { /* ok */ }
+        try { foco.focus(); } catch (eFoco) { /* ok */ }
+    }
+}
+
+function aplicarFotosNuvemNoAtendimento(payload, nuvAt) {
+    if (!payload || !nuvAt) return;
+    var dbX = carregar();
+    var ix = dbX.atendimentos.findIndex(function (a) { return a.id === payload.id; });
+    if (ix < 0) return;
+    var locais = dbX.atendimentos[ix].fotos || payload.fotos || [];
+    var nuvFotos = nuvAt.fotos || [];
+    if (nuvFotos.length) {
+        dbX.atendimentos[ix].fotos = nuvFotos.map(function (fn, idx) {
+            var fl = locais.find(function (x) { return x && fn && x.id === fn.id; }) || locais[idx] || {};
+            return {
+                id: (fn && fn.id) || fl.id || uid(),
+                data: fl.data || null,
+                url: fl.url || (fn && fn.url) || null
+            };
+        });
+        if (!dbX.atendimentos[ix].fotos.length && locais.length) {
+            dbX.atendimentos[ix].fotos = locais;
+        }
+    }
+    dbX.atendimentos[ix].syncNuvemEm = new Date().toISOString();
+    salvar(dbX);
+}
+
+async function extrasPosSalvarAtendimento(payload, resolvido) {
+    var extras = [];
+    try {
+        if (typeof salvarAtendimentoNaPastaPC === 'function') {
+            var pasta = await salvarAtendimentoNaPastaPC(payload, resolvido.clienteNome);
+            if (pasta && pasta.ok) extras.push('PC: ' + pasta.pasta);
+        }
+    } catch (errPasta) { /* opcional — não pode travar a tela */ }
+
+    var cfgN = typeof carregarConfigNuvem === 'function' ? carregarConfigNuvem() : null;
+    if (!(cfgN && cfgN.apiKey && cfgN.projectId)) return extras;
+    try {
+        var okSess = (typeof usuarioNuvemLogado === 'function' && usuarioNuvemLogado()) ||
+            (typeof garantirSessaoNuvemQualquer === 'function' && await garantirSessaoNuvemQualquer());
+        if (!okSess) {
+            extras.push('nuvem: sem auth');
+            return extras;
+        }
+        if (sessaoFuncionarioId) {
+            var nuvF = await enviarAtendimentoNuvem(payload);
+            if (nuvF && nuvF.ok) {
+                extras.push('nuvem OK');
+                aplicarFotosNuvemNoAtendimento(payload, nuvF.atendimento);
+            } else extras.push('nuvem: ' + ((nuvF && nuvF.motivo) || 'falhou'));
+        } else {
+            if (typeof enviarBaseNuvem === 'function') await enviarBaseNuvem(carregar());
+            var nuv = await enviarAtendimentoNuvem(payload);
+            if (nuv && nuv.ok) {
+                extras.push('nuvem OK');
+                aplicarFotosNuvemNoAtendimento(payload, nuv.atendimento);
+            } else extras.push('nuvem: ' + ((nuv && nuv.motivo) || 'falhou'));
+        }
+    } catch (errN) {
+        extras.push('nuvem: erro');
+    }
+    return extras;
+}
+
+async function salvarAtendimentoAtual() {
+    if (window._osSalvando) return;
+    var errEl = document.getElementById('atSalvarErro');
+    if (errEl) {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+    }
     var db = carregar();
     var resolvido = resolverClienteAtendimento(db, document.getElementById('atClienteBusca').value);
-    if (!resolvido.ok) { toast('Informe o nome do cliente (cadastrado ou avulso).'); return; }
+    if (!resolvido.ok) {
+        mostrarErroSalvarOs('Informe o nome do cliente (cadastrado ou avulso).', 'atClienteBusca');
+        return;
+    }
     var st = document.getElementById('atStatus').value;
     var agData = document.getElementById('atAgendadoPara').value;
     if (st === 'Agendado' && !agData) {
-        toast('Informe a data agendada (ex.: segunda-feira).');
-        document.getElementById('atAgendadoPara').focus();
+        mostrarErroSalvarOs('Informe a data agendada.', 'atAgendadoPara');
         return;
     }
     var id = document.getElementById('atId').value;
-    /* Garante qtd/totais nas peças e comissão gravada em cada mão de obra */
     itensTemp.forEach(function (it) {
         if (!it) return;
         if ((it.tipo || 'peca') !== 'mao') {
@@ -604,15 +773,23 @@ document.getElementById('formAtendimento').addEventListener('submit', async func
         if (it.funcionarioId) {
             var dCom = obterDadosComissaoFuncionario(it.funcionarioId, it.tipoMao);
             if (!it.funcionarioNome) it.funcionarioNome = dCom.nome;
+            if (ehTipoMaoAmortOriginal(it.tipoMao)) {
+                it.comissaoPct = 0;
+                it.comissaoValor = valorComissaoDoItemMao(it, dCom);
+                return;
+            }
             if (!(Number(it.comissaoPct) > 0) && dCom.pct > 0) it.comissaoPct = dCom.pct;
+        }
+        if (ehTipoMaoAmortOriginal(it.tipoMao)) {
+            it.comissaoPct = 0;
+            it.comissaoValor = Number(it.comissaoValor) || 0;
+            return;
         }
         var pctSave = Number(it.comissaoPct) || 0;
         it.comissaoPct = pctSave;
         it.comissaoValor = calcularValorComissaoMao(it.valor, pctSave);
     });
     var tots = totaisItens(itensTemp);
-    var pecas = tots.pecas;
-    var mao = tots.mao;
     var payload = {
         id: id || uid(),
         clienteId: resolvido.clienteId,
@@ -640,111 +817,86 @@ document.getElementById('formAtendimento').addEventListener('submit', async func
         fotos: fotosAtuais.map(function (f) {
             return { id: f.id || uid(), data: f.data || null, url: f.url || null };
         }).filter(function (f) { return f.data || f.url; }),
-        maoObra: mao,
-        totalPecas: pecas,
+        maoObra: tots.mao,
+        totalPecas: tots.pecas,
         custoPecas: tots.custoPecas,
         ganhoPecas: tots.ganhoPecas,
         total: tots.total,
         atualizadoEm: new Date().toISOString()
     };
 
-    /* Comprime todas as fotos antes de gravar/subir */
-    if (payload.fotos && payload.fotos.length) {
-        for (var pf = 0; pf < payload.fotos.length; pf++) {
-            if (payload.fotos[pf] && payload.fotos[pf].data) {
-                payload.fotos[pf].data = await garantirFotoComprimida(payload.fotos[pf].data);
+    var btn = document.getElementById('btnSalvarAt');
+    var txtBtn = btn ? btn.textContent : '';
+    window._osSalvando = true;
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Salvando...';
+    }
+    try {
+        if (payload.fotos && payload.fotos.length) {
+            for (var pf = 0; pf < payload.fotos.length; pf++) {
+                if (payload.fotos[pf] && payload.fotos[pf].data) {
+                    payload.fotos[pf].data = await garantirFotoComprimida(payload.fotos[pf].data);
+                }
             }
+            fotosAtuais = payload.fotos.map(function (f) {
+                return { id: f.id, data: f.data || null, url: f.url || null };
+            });
         }
-        fotosAtuais = payload.fotos.map(function (f) {
-            return { id: f.id, data: f.data || null, url: f.url || null };
+
+        if (id) {
+            var i = db.atendimentos.findIndex(function (a) { return a.id === id; });
+            if (i >= 0) db.atendimentos[i] = Object.assign({}, db.atendimentos[i], payload);
+            else db.atendimentos.push(payload);
+        } else {
+            payload.criadoEm = new Date().toISOString();
+            db.atendimentos.push(payload);
+        }
+        limparExcluido(db, 'atendimentos', payload.id);
+        salvar(db);
+
+        toast(
+            (id ? 'Atendimento atualizado' : 'Atendimento salvo') +
+            (resolvido.clienteAvulso ? ' (cliente avulso)' : '.')
+        );
+        limparAtendimento();
+        renderHistorico();
+        atualizarKPIs(carregar());
+        if (typeof abrirPainel === 'function') abrirPainel('painelHistorico');
+
+        extrasPosSalvarAtendimento(payload, resolvido).then(function (extras) {
+            if (extras && extras.length) toast('Sync: ' + extras.join(' · '));
+        }).catch(function () { /* ok */ });
+    } catch (errSave) {
+        console.warn('salvarAtendimentoAtual', errSave);
+        mostrarErroSalvarOs('Não deu para salvar. Tente de novo.', null);
+    } finally {
+        window._osSalvando = false;
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = txtBtn || 'Salvar Atendimento';
+        }
+    }
+}
+
+(function ligarSalvarAtendimentoOs() {
+    var btn = document.getElementById('btnSalvarAt');
+    if (btn && !btn.getAttribute('data-os-save')) {
+        btn.setAttribute('data-os-save', '1');
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            salvarAtendimentoAtual();
         });
     }
-
-    if (id) {
-        var i = db.atendimentos.findIndex(function (a) { return a.id === id; });
-        if (i >= 0) db.atendimentos[i] = Object.assign({}, db.atendimentos[i], payload);
-    } else {
-        payload.criadoEm = new Date().toISOString();
-        db.atendimentos.push(payload);
+    var form = document.getElementById('formAtendimento');
+    if (form && !form.getAttribute('data-os-save')) {
+        form.setAttribute('data-os-save', '1');
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            salvarAtendimentoAtual();
+        });
     }
-    limparExcluido(db, 'atendimentos', payload.id);
-    salvar(db);
-
-    var extras = [];
-    try {
-        var pasta = await salvarAtendimentoNaPastaPC(payload, resolvido.clienteNome);
-        if (pasta.ok) extras.push('PC: ' + pasta.pasta);
-    } catch (errPasta) { /* opcional */ }
-
-    var cfgN = carregarConfigNuvem();
-    if (cfgN && cfgN.apiKey && cfgN.projectId) {
-        try {
-            var okSess = usuarioNuvemLogado() || await garantirSessaoNuvemQualquer();
-            if (!okSess) {
-                extras.push('nuvem: sem auth (ative Anônimo no Firebase)');
-            } else if (sessaoFuncionarioId) {
-                var nuvF = await enviarAtendimentoNuvem(payload);
-                if (nuvF.ok) {
-                    extras.push('nuvem OK (fotos comprimidas)');
-                    var dbF = carregar();
-                    var ixF = dbF.atendimentos.findIndex(function (a) { return a.id === payload.id; });
-                    if (ixF >= 0 && nuvF.atendimento) {
-                        var locF = dbF.atendimentos[ixF].fotos || payload.fotos || [];
-                        var nuvFotosF = nuvF.atendimento.fotos || [];
-                        dbF.atendimentos[ixF].fotos = nuvFotosF.map(function (fn, idx) {
-                            var fl = locF.find(function (x) { return x && fn && x.id === fn.id; }) || locF[idx] || {};
-                            return {
-                                id: (fn && fn.id) || fl.id || uid(),
-                                data: fl.data || null,
-                                url: fl.url || (fn && fn.url) || null
-                            };
-                        });
-                        dbF.atendimentos[ixF].syncNuvemEm = new Date().toISOString();
-                        salvar(dbF);
-                    }
-                } else extras.push('nuvem: ' + (nuvF.motivo || 'falhou'));
-            } else {
-                await enviarBaseNuvem(carregar());
-                var nuv = await enviarAtendimentoNuvem(payload);
-                if (nuv.ok) {
-                    extras.push('nuvem OK (fotos comprimidas)');
-                    if (nuv.atendimento && nuv.atendimento.fotos) {
-                        var db2 = carregar();
-                        var ix = db2.atendimentos.findIndex(function (a) { return a.id === payload.id; });
-                        if (ix >= 0) {
-                            var locais = db2.atendimentos[ix].fotos || payload.fotos || [];
-                            var nuvFotos = nuv.atendimento.fotos || [];
-                            db2.atendimentos[ix].fotos = nuvFotos.map(function (fn, idx) {
-                                var fl = locais.find(function (x) { return x && fn && x.id === fn.id; }) || locais[idx] || {};
-                                return {
-                                    id: (fn && fn.id) || fl.id || uid(),
-                                    data: fl.data || null,
-                                    url: fl.url || (fn && fn.url) || null
-                                };
-                            });
-                            if (!db2.atendimentos[ix].fotos.length && locais.length) {
-                                db2.atendimentos[ix].fotos = locais;
-                            }
-                            db2.atendimentos[ix].syncNuvemEm = new Date().toISOString();
-                            salvar(db2);
-                        }
-                    }
-                } else extras.push('nuvem: ' + (nuv.motivo || 'falhou'));
-            }
-        } catch (errN) {
-            extras.push('nuvem: erro');
-        }
-    }
-
-    toast(
-        (id ? 'Atendimento atualizado' : 'Atendimento salvo') +
-        (resolvido.clienteAvulso ? ' (cliente avulso)' : '') +
-        (extras.length ? ' · ' + extras.join(' · ') : '.')
-    );
-    limparAtendimento();
-    renderHistorico();
-    atualizarKPIs(carregar());
-});
+})();
 
 function editarAtendimento(id) {
     var db = carregar();
@@ -789,13 +941,17 @@ function editarAtendimento(id) {
         if (fid && ((it.tipo || '') === 'mao')) {
             var dados = obterDadosComissaoFuncionario(fid, tipoMao);
             if (!nome) nome = dados.nome;
-            if (isNaN(pct) || pct <= 0) pct = dados.pct;
+            if (ehTipoMaoAmortOriginal(tipoMao)) {
+                pct = 0;
+            } else if (isNaN(pct) || pct <= 0) pct = dados.pct;
         }
         if (isNaN(pct)) pct = 0;
         var valorMo = Number(it.valor) || 0;
-        var comVal = it.comissaoValor != null
-            ? Number(it.comissaoValor)
-            : calcularValorComissaoMao(valorMo, pct);
+        var comVal = ehTipoMaoAmortOriginal(tipoMao)
+            ? valorComissaoDoItemMao({ tipoMao: tipoMao, valor: valorMo, comissaoValor: it.comissaoValor }, fid ? obterDadosComissaoFuncionario(fid, tipoMao) : { valorFixo: 0, tipo: tipoMao })
+            : (it.comissaoValor != null
+                ? Number(it.comissaoValor)
+                : calcularValorComissaoMao(valorMo, pct));
         var row = {
             tipo: it.tipo || 'peca',
             tipoMao: tipoMao,

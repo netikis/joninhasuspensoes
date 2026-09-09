@@ -1439,7 +1439,14 @@ async function configurarPastaRaiz() {
 async function salvarAtendimentoNaPastaPC(atendimento, clienteNome) {
     var root = await carregarHandlePastaRaiz();
     if (!root) return { ok: false, motivo: 'pasta não configurada' };
-    if (!(await solicitarPermissaoPasta(root))) return { ok: false, motivo: 'sem permissão na pasta' };
+    /* Não pede permissão aqui: o popup do Chrome trava o "Salvar atendimento". */
+    var perm = 'denied';
+    try {
+        perm = await root.queryPermission({ mode: 'readwrite' });
+    } catch (ePerm) {
+        return { ok: false, motivo: 'sem permissão na pasta' };
+    }
+    if (perm !== 'granted') return { ok: false, motivo: 'sem permissão na pasta' };
     var pastaCliente = await root.getDirectoryHandle(slugPasta(clienteNome), { create: true });
     var base = slugPasta((atendimento.placa || 'placa') + '_' + String(atendimento.id || '').slice(-6));
     var copia = JSON.parse(JSON.stringify(atendimento));
@@ -5386,11 +5393,11 @@ function imprimirRelatorioOficina() {
     /* —— Blindagem / Diagnóstico —— */
     function aplicarVersaoUI() {
         var elVer = document.getElementById('loginAppVersion');
-        if (elVer) elVer.textContent = 'Build ' + APP_VERSION;
+        if (elVer) elVer.textContent = typeof textoBuildApp === 'function' ? textoBuildApp() : ('Build ' + APP_VERSION);
         var badgeVer = document.getElementById('badgeAppVersion');
-        if (badgeVer) badgeVer.textContent = APP_VERSION;
+        if (badgeVer) badgeVer.textContent = typeof textoBuildApp === 'function' ? textoBuildApp() : ('Build ' + APP_VERSION);
         var bl = document.getElementById('blindagemVersao');
-        if (bl) bl.textContent = APP_VERSION;
+        if (bl) bl.textContent = typeof textoBuildApp === 'function' ? textoBuildApp() : ('Build ' + APP_VERSION);
     }
     aplicarVersaoUI();
 
@@ -5522,7 +5529,7 @@ if ('serviceWorker' in navigator) {
         window.location.reload();
     });
 
-    navigator.serviceWorker.register('./sw.js?v=22').then(function (reg) {
+    navigator.serviceWorker.register('./sw.js?v=25').then(function (reg) {
         function checarAtualizacao() {
             try { reg.update(); } catch (e) { /* ok */ }
         }

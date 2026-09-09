@@ -263,10 +263,16 @@ function esc(s) {
 }
 
 /* SPA: Enter em <form> dispara submit nativo e recarrega o index → volta ao Início.
-   Trava o reload; cada form continua salvando no listener próprio. */
+   Só cancela o reload da página. O listener de cada form (e o clique do botão) continua valendo. */
 document.addEventListener('submit', function (e) {
     e.preventDefault();
 }, true);
+
+function teclaEhEnter(e) {
+    if (!e) return false;
+    if (e.isComposing || e.keyCode === 229) return false;
+    return e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13;
+}
 
 /* Enter no campo clica o botão de adicionar (peça, produto, MO), sem enviar o form. */
 window.enterClicaBotao = function (campoIds, botaoId) {
@@ -274,12 +280,12 @@ window.enterClicaBotao = function (campoIds, botaoId) {
         var el = document.getElementById(id);
         if (!el) return;
         el.addEventListener('keydown', function (e) {
-            if (e.key !== 'Enter' && e.keyCode !== 13) return;
+            if (!teclaEhEnter(e)) return;
             e.preventDefault();
             e.stopPropagation();
             var btn = document.getElementById(botaoId);
             if (btn) btn.click();
-        });
+        }, true);
     });
 };
 

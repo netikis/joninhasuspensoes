@@ -1076,7 +1076,7 @@
             pointer-events: none;
             transform: translateY(8px);
             transition: 0.25s ease;
-            z-index: 50;
+            z-index: 10000;
             max-width: min(360px, calc(100vw - 32px));
             font-weight: 600;
         }

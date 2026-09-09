@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=22">
-    <link rel="stylesheet" href="css/tema-m3.css?v=22">
+    <link rel="stylesheet" href="css/app.css?v=25">
+    <link rel="stylesheet" href="css/tema-m3.css?v=25">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -315,6 +315,7 @@
 
         <!-- OFICINA -->
         <section id="painelVeiculo" class="panel">
+            <form id="formAtendimento" onsubmit="return false;">
             <div class="grid-2">
                 <div class="box">
                     <h2>Cliente do atendimento</h2>
@@ -336,7 +337,6 @@
                 </div>
             </div>
 
-            <form id="formAtendimento" onsubmit="return false;">
                 <input type="hidden" id="atId">
                 <div class="box">
                     <h2>Especificações do Veículo</h2>
@@ -444,6 +444,7 @@
                                 <option value="servico">Mão de obra — Serviço</option>
                                 <option value="alinhamento">Mão de obra — Alinhamento</option>
                                 <option value="amortecedor">Mão de obra — Amortecedor</option>
+                                <option value="amortecedor-original">Mão de obra — Amortecedor original</option>
                             </select>
                         </div>
                         <div class="col"><label>Valor (R$)</label><input id="maoValor" inputmode="decimal" placeholder="0,00"></div>
@@ -481,10 +482,11 @@
                             <p class="hint" style="margin-top:6px;color:#333;font-weight:600">Se o cliente estiver cadastrado, o número preenche sozinho. Se for avulso, digite aqui antes de enviar.</p>
                         </div>
                     </div>
+                    <p id="atSalvarErro" style="display:none;margin:10px 0 0;color:#ff8a80;font-weight:800"></p>
                     <div class="wa-actions">
                         <button type="button" class="btn btn-ok" id="btnWaChecklist">📱 Checklist no WhatsApp</button>
                         <button type="button" class="btn btn-secondary" id="btnWaOrcamento">📱 Orçamento / diagnóstico no WhatsApp</button>
-                        <button type="submit" class="btn btn-primary" id="btnSalvarAt">Salvar Atendimento</button>
+                        <button type="button" class="btn btn-primary" id="btnSalvarAt">Salvar Atendimento</button>
                         <button type="button" class="btn btn-secondary" id="btnLimparAt">Limpar formulário</button>
                     </div>
                     <p class="hint" style="margin-top:8px;font-weight:600;color:#333">Ao clicar no WhatsApp, você escolhe: texto, JPEG, PDF ou link para o cliente ler e assinar.</p>
@@ -1155,9 +1157,10 @@
                         <div class="col"><label>MO Alinhamento (%)</label><input id="pfComissaoAlinhamento" type="number" min="0" max="100" step="0.5" placeholder="Ex: 30" value="30"></div>
                         <div class="col"><label>MO Serviço (%)</label><input id="pfComissaoServico" type="number" min="0" max="100" step="0.5" placeholder="Ex: 40" value="40"></div>
                         <div class="col"><label>MO Amortecedor (%)</label><input id="pfComissaoAmortecedor" type="number" min="0" max="100" step="0.5" placeholder="Ex: 50" value="50"></div>
-                        <div class="col"><label>PIN (opcional)</label><input id="pfPinFunc" type="password" inputmode="numeric" maxlength="8" placeholder="Ex: 1234"></div>
+                        <div class="col"><label>MO Amortecedor original (R$)</label><input id="pfComissaoAmortecedorOriginal" inputmode="decimal" placeholder="Ex: 80,00"></div>
                     </div>
                     <div class="row" style="margin-top:10px">
+                        <div class="col"><label>PIN (opcional)</label><input id="pfPinFunc" type="password" inputmode="numeric" maxlength="8" placeholder="Ex: 1234"></div>
                         <div class="col" style="flex:2"><label>Observação</label><input id="pfObsFunc" placeholder="Opcional"></div>
                         <div class="col" style="flex:0.9;align-self:end">
                             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0 0 8px">
@@ -1165,7 +1168,7 @@
                             </label>
                         </div>
                     </div>
-                    <p class="hint" style="margin-top:8px">Na OS, ao lançar mão de obra, escolha o tipo (Alinhamento / Serviço / Amortecedor) — o sistema usa a % correspondente deste cadastro.</p>
+                    <p class="hint" style="margin-top:8px">Na OS, Alinhamento / Serviço / Amortecedor usam a <strong>%</strong>. Amortecedor original usa o <strong>R$ fixo</strong> cadastrado (o que o funcionário recebe naquele serviço).</p>
                     <input type="hidden" id="pfComissaoPct" value="40">
                     <div class="row" style="margin-top:14px">
                         <button type="submit" class="btn btn-primary" id="btnSalvarFunc">Salvar funcionário</button>
@@ -1195,6 +1198,7 @@
                                 <th>Alinh.%</th>
                                 <th>Serv.%</th>
                                 <th>Amort.%</th>
+                                <th>Orig. R$</th>
                                 <th>Status</th>
                                 <th style="min-width:220px">Ações</th>
                             </tr>
@@ -1426,7 +1430,7 @@
             <div class="box">
                 <h2>🛡️ Blindagem / Diagnóstico</h2>
                 <p class="hint">Rode isto no PC e no celular. Se algum item falhar, <strong>não invente feature</strong> — corrija o item vermelho.</p>
-                <p><strong>Versão deste build:</strong> <span id="blindagemVersao">—</span></p>
+                <p id="blindagemVersaoLinha"><span id="blindagemVersao">—</span></p>
                 <div class="row" style="margin-top:12px">
                     <button type="button" class="btn btn-primary" id="btnRodarBlindagem">Rodar checklist agora</button>
                     <button type="button" class="btn btn-ok" id="btnEnviarLoginsBlindagem">Enviar logins à nuvem</button>
@@ -1628,16 +1632,16 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=22"></script>
-    <script src="js/storage.js?v=22"></script>
-    <script src="js/ui.js?v=22"></script>
-    <script src="js/auth.js?v=22"></script>
-    <script src="js/os.js?v=22"></script>
-    <script src="js/nuvem.js?v=22"></script>
-    <script src="js/caixa.js?v=22"></script>
-    <script src="js/comissoes.js?v=22"></script>
-    <script src="js/app.js?v=22"></script>
-    <script src="js/navegacao.js?v=22"></script>
+    <script src="js/config.js?v=25"></script>
+    <script src="js/storage.js?v=25"></script>
+    <script src="js/ui.js?v=25"></script>
+    <script src="js/auth.js?v=25"></script>
+    <script src="js/os.js?v=25"></script>
+    <script src="js/nuvem.js?v=25"></script>
+    <script src="js/caixa.js?v=25"></script>
+    <script src="js/comissoes.js?v=25"></script>
+    <script src="js/app.js?v=25"></script>
+    <script src="js/navegacao.js?v=25"></script>
 </body>
 </html>
 

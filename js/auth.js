@@ -137,9 +137,9 @@ function mensagemErronuvem(err) { return mensagemErroFirebase(err); }
 function prepararTelaLogin() {
     document.getElementById('loginTitulo').textContent = 'Entrar no sistema';
     var elVer = document.getElementById('loginAppVersion');
-    if (elVer) elVer.textContent = 'Build ' + APP_VERSION;
+    if (elVer) elVer.textContent = typeof textoBuildApp === 'function' ? textoBuildApp() : ('Build ' + APP_VERSION);
     var badgeVer = document.getElementById('badgeAppVersion');
-    if (badgeVer) badgeVer.textContent = APP_VERSION;
+    if (badgeVer) badgeVer.textContent = typeof textoBuildApp === 'function' ? textoBuildApp() : ('Build ' + APP_VERSION);
     var cfg = carregarConfigNuvem();
     if (cfg && cfg.apiKey && cfg.projectId) {
 document.getElementById('loginHint').textContent = 'Use o e-mail e a senha do Firebase Authentication (nuvem Joninha).';

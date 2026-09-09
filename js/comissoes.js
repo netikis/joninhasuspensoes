@@ -45,13 +45,24 @@ function lerPctsComissaoFormFunc() {
         if (isNaN(v) || v < 0) v = fallback;
         return v;
     }
+    function nMoeda(id) {
+        var el = document.getElementById(id);
+        if (!el) return 0;
+        var v = typeof parseMoeda === 'function'
+            ? parseMoeda(el.value)
+            : Number(String(el.value || '').replace(/\./g, '').replace(',', '.'));
+        if (isNaN(v) || v < 0) v = 0;
+        return +Number(v).toFixed(2);
+    }
     var alin = n('pfComissaoAlinhamento', 0);
     var serv = n('pfComissaoServico', 0);
     var amort = n('pfComissaoAmortecedor', 0);
+    var amortOrig = nMoeda('pfComissaoAmortecedorOriginal');
     return {
         comissaoAlinhamentoPct: alin,
         comissaoServicoPct: serv,
         comissaoAmortecedorPct: amort,
+        comissaoAmortecedorOriginalValor: amortOrig,
         comissaoPct: serv
     };
 }
@@ -63,9 +74,11 @@ function limparFormFuncionario() {
     var a = document.getElementById('pfComissaoAlinhamento');
     var s = document.getElementById('pfComissaoServico');
     var m = document.getElementById('pfComissaoAmortecedor');
+    var o = document.getElementById('pfComissaoAmortecedorOriginal');
     if (a) a.value = 30;
     if (s) s.value = 40;
     if (m) m.value = 50;
+    if (o) o.value = '';
     var pctEl = document.getElementById('pfComissaoPct');
     if (pctEl) pctEl.value = 40;
     var pinEl = document.getElementById('pfPinFunc');
@@ -87,9 +100,14 @@ function preencherFormFuncionario(f) {
     var a = document.getElementById('pfComissaoAlinhamento');
     var s = document.getElementById('pfComissaoServico');
     var m = document.getElementById('pfComissaoAmortecedor');
+    var o = document.getElementById('pfComissaoAmortecedorOriginal');
     if (a) a.value = f.comissaoAlinhamentoPct != null ? f.comissaoAlinhamentoPct : leg;
     if (s) s.value = f.comissaoServicoPct != null ? f.comissaoServicoPct : leg;
     if (m) m.value = f.comissaoAmortecedorPct != null ? f.comissaoAmortecedorPct : leg;
+    if (o) {
+        var vOrig = f.comissaoAmortecedorOriginalValor != null ? Number(f.comissaoAmortecedorOriginalValor) : 0;
+        o.value = vOrig > 0 ? String(vOrig).replace('.', ',') : '';
+    }
     var pctEl = document.getElementById('pfComissaoPct');
     if (pctEl) pctEl.value = f.comissaoServicoPct != null ? f.comissaoServicoPct : leg;
     var pinEl = document.getElementById('pfPinFunc');
@@ -174,6 +192,8 @@ function abrirModalVerFuncionario(id) {
         var alin = f.comissaoAlinhamentoPct != null ? Number(f.comissaoAlinhamentoPct) : leg;
         var serv = f.comissaoServicoPct != null ? Number(f.comissaoServicoPct) : leg;
         var amort = f.comissaoAmortecedorPct != null ? Number(f.comissaoAmortecedorPct) : leg;
+        var amortOrig = f.comissaoAmortecedorOriginalValor != null ? Number(f.comissaoAmortecedorOriginalValor) : 0;
+        if (isNaN(amortOrig) || amortOrig < 0) amortOrig = 0;
         var ativo = f.ativo !== false;
         document.getElementById('modalVerFuncTitulo').textContent = f.nome || 'Funcionário';
         document.getElementById('modalVerFuncCorpo').innerHTML =
@@ -184,6 +204,7 @@ function abrirModalVerFuncionario(id) {
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO ALINHAMENTO</span><div>' + esc(String(alin)) + '%</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO SERVIÇO</span><div>' + esc(String(serv)) + '%</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO AMORTECEDOR</span><div>' + esc(String(amort)) + '%</div></div>' +
+            '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO AMORTECEDOR ORIGINAL</span><div>' + moeda(amortOrig) + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">STATUS</span><div style="color:' + (ativo ? '#2ecc71' : '#e74c3c') + '">' + (ativo ? 'Ativo' : 'Inativo') + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">PIN</span><div>' + (f.pin ? 'Definido' : 'Não definido') + '</div></div>' +
             '<div style="grid-column:1/-1"><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">OBSERVAÇÃO</span><div>' + esc(f.obs || '—') + '</div></div>' +
@@ -222,6 +243,8 @@ function renderListaFuncionarios() {
                 var alin = f.comissaoAlinhamentoPct != null ? Number(f.comissaoAlinhamentoPct) : leg;
                 var serv = f.comissaoServicoPct != null ? Number(f.comissaoServicoPct) : leg;
                 var amort = f.comissaoAmortecedorPct != null ? Number(f.comissaoAmortecedorPct) : leg;
+                var amortOrig = f.comissaoAmortecedorOriginalValor != null ? Number(f.comissaoAmortecedorOriginalValor) : 0;
+                if (isNaN(amortOrig) || amortOrig < 0) amortOrig = 0;
                 return '<tr>' +
                     '<td style="color:#fff;font-weight:800">' + esc(f.nome || '—') + '</td>' +
                     '<td style="color:#fff;font-weight:700">' + esc(f.telefone || '—') + '</td>' +
@@ -229,6 +252,7 @@ function renderListaFuncionarios() {
                     '<td style="color:#fff;font-weight:800">' + esc(String(alin)) + '%</td>' +
                     '<td style="color:#fff;font-weight:800">' + esc(String(serv)) + '%</td>' +
                     '<td style="color:#fff;font-weight:800">' + esc(String(amort)) + '%</td>' +
+                    '<td style="color:#fff;font-weight:800">' + moeda(amortOrig) + '</td>' +
                     '<td>' + (ativo
                         ? '<span style="color:#2ecc71;font-weight:700">Ativo</span>'
                         : '<span style="color:#e74c3c;font-weight:700">Inativo</span>') + '</td>' +
@@ -360,11 +384,12 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
                 comissaoAlinhamentoPct: pcts.comissaoAlinhamentoPct,
                 comissaoServicoPct: pcts.comissaoServicoPct,
                 comissaoAmortecedorPct: pcts.comissaoAmortecedorPct,
+                comissaoAmortecedorOriginalValor: pcts.comissaoAmortecedorOriginalValor,
                 comissaoPct: pcts.comissaoPct,
                 pin: pin || prevPin,
                 atualizadoEm: agora
             });
-            toast('Funcionário atualizado — Alinh. ' + pcts.comissaoAlinhamentoPct + '% · Serv. ' + pcts.comissaoServicoPct + '% · Amort. ' + pcts.comissaoAmortecedorPct + '%.');
+            toast('Funcionário atualizado — Alinh. ' + pcts.comissaoAlinhamentoPct + '% · Serv. ' + pcts.comissaoServicoPct + '% · Amort. ' + pcts.comissaoAmortecedorPct + '% · Orig. ' + moeda(pcts.comissaoAmortecedorOriginalValor) + '.');
         } else {
             db.funcionarios.push({
                 id: uid(),
@@ -376,12 +401,13 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
                 comissaoAlinhamentoPct: pcts.comissaoAlinhamentoPct,
                 comissaoServicoPct: pcts.comissaoServicoPct,
                 comissaoAmortecedorPct: pcts.comissaoAmortecedorPct,
+                comissaoAmortecedorOriginalValor: pcts.comissaoAmortecedorOriginalValor,
                 comissaoPct: pcts.comissaoPct,
                 pin: pin,
                 criadoEm: agora,
                 atualizadoEm: agora
             });
-            toast('Funcionário cadastrado — % por tipo de mão de obra salvas.');
+            toast('Funcionário cadastrado — % por tipo e R$ do amortecedor original salvos.');
         }
         salvar(db);
         limparFormFuncionario();
@@ -586,6 +612,32 @@ function preencherSelectMecanicoVenda() {
 }
 
 
+function resolverComissaoLinha(it, f, tipoMao, base) {
+    var valorSalvo = it && it.comissaoValor != null ? Number(it.comissaoValor) : NaN;
+    if (typeof ehTipoMaoAmortOriginal === 'function' && ehTipoMaoAmortOriginal(tipoMao)) {
+        var fixo = (!isNaN(valorSalvo) && valorSalvo > 0)
+            ? +valorSalvo.toFixed(2)
+            : (typeof valorFixoAmortecedorOriginal === 'function'
+                ? valorFixoAmortecedorOriginal(f)
+                : (Number(f && f.comissaoAmortecedorOriginalValor) || 0));
+        return { pct: 0, pctTxt: 'fixo', valor: +Number(fixo || 0).toFixed(2) };
+    }
+    var pct = it && it.comissaoPct != null ? Number(it.comissaoPct) : NaN;
+    if (isNaN(pct) || pct <= 0) {
+        pct = typeof pctComissaoPorTipo === 'function'
+            ? pctComissaoPorTipo(f, tipoMao)
+            : (Number(f && (f.comissaoServicoPct != null ? f.comissaoServicoPct : f.comissaoPct)) || 0);
+    }
+    if (isNaN(pct) || pct < 0) pct = 0;
+    var valor = (!isNaN(valorSalvo) && valorSalvo > 0)
+        ? +valorSalvo.toFixed(2)
+        : +((Number(base) || 0) * pct / 100).toFixed(2);
+    if (!(valor > 0) && pct > 0 && (Number(base) || 0) > 0) {
+        valor = +((Number(base) || 0) * pct / 100).toFixed(2);
+    }
+    return { pct: pct, pctTxt: String(pct) + '%', valor: valor };
+}
+
 function listarComissoes(filtroFuncId, mesYYYYMM) {
     var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
     var funcsMap = {};
@@ -621,21 +673,10 @@ function listarComissoes(filtroFuncId, mesYYYYMM) {
             if (filtroFuncId && fid !== String(filtroFuncId)) return;
             var f = funcsMap[fid] || {};
             var tipoMao = it.tipoMao || 'servico';
-            var pct = it.comissaoPct != null ? Number(it.comissaoPct) : NaN;
-            if (isNaN(pct) || pct <= 0) {
-                pct = typeof pctComissaoPorTipo === 'function'
-                    ? pctComissaoPorTipo(f, tipoMao)
-                    : (Number(f.comissaoServicoPct != null ? f.comissaoServicoPct : f.comissaoPct) || 0);
-            }
-            if (isNaN(pct) || pct < 0) pct = 0;
             var base = Number(it.valor) || 0;
-            var valorSalvo = it.comissaoValor != null ? Number(it.comissaoValor) : NaN;
-            var valor = (!isNaN(valorSalvo) && valorSalvo > 0)
-                ? +valorSalvo.toFixed(2)
-                : +(base * pct / 100).toFixed(2);
-            if (!(valor > 0) && pct > 0 && base > 0) {
-                valor = +(base * pct / 100).toFixed(2);
-            }
+            var calc = resolverComissaoLinha(it, f, tipoMao, base);
+            var pct = calc.pct;
+            var valor = calc.valor;
             var descMo = it.desc || 'Mão de obra';
             if (it.tipoMao) descMo = '[' + rotuloTipoMaoComissao(tipoMao) + '] ' + descMo;
             out.push({
@@ -645,6 +686,7 @@ function listarComissoes(filtroFuncId, mesYYYYMM) {
                 desc: descMo,
                 base: base,
                 pct: pct,
+                pctTxt: calc.pctTxt,
                 valor: valor,
                 funcionarioId: fid,
                 funcionarioNome: f.nome || it.funcionarioNome || '—'
@@ -666,29 +708,17 @@ function listarComissoes(filtroFuncId, mesYYYYMM) {
             if (filtroFuncId && fid !== String(filtroFuncId)) return;
             var f = funcsMap[fid] || {};
             var tipoMao = it.tipoMao || 'servico';
-            var pct = it.comissaoPct != null ? Number(it.comissaoPct) : NaN;
-            if (isNaN(pct) || pct <= 0) {
-                pct = typeof pctComissaoPorTipo === 'function'
-                    ? pctComissaoPorTipo(f, tipoMao)
-                    : (Number(f.comissaoServicoPct != null ? f.comissaoServicoPct : f.comissaoPct) || 0);
-            }
-            if (isNaN(pct) || pct < 0) pct = 0;
             var base = Number(it.total != null ? it.total : (it.venda != null ? it.venda : it.valor)) || 0;
-            var valorSalvo = it.comissaoValor != null ? Number(it.comissaoValor) : NaN;
-            var valor = (!isNaN(valorSalvo) && valorSalvo > 0)
-                ? +valorSalvo.toFixed(2)
-                : +(base * pct / 100).toFixed(2);
-            if (!(valor > 0) && pct > 0 && base > 0) {
-                valor = +(base * pct / 100).toFixed(2);
-            }
+            var calc = resolverComissaoLinha(it, f, tipoMao, base);
             out.push({
                 data: dV,
                 cliente: o.clienteNome || ('Venda Nº ' + (o.numero || '')),
                 placa: o.placa || '',
                 desc: '[Venda] ' + (it.desc || 'Mão de obra'),
                 base: base,
-                pct: pct,
-                valor: valor,
+                pct: calc.pct,
+                pctTxt: calc.pctTxt,
+                valor: calc.valor,
                 funcionarioId: fid,
                 funcionarioNome: f.nome || o.mecanicoNome || o.funcionarioNome || '—'
             });
@@ -755,7 +785,7 @@ function renderComissoes() {
         tb.innerHTML = lista.map(function (c) {
             return '<tr><td>' + esc(fmtData(c.data)) + '</td><td>' + esc(c.cliente) + (c.placa ? ' · ' + esc(c.placa) : '') +
                 (sessaoFuncionarioId ? '' : ' <span class="muted">(' + esc(c.funcionarioNome) + ')</span>') +
-                '</td><td>' + esc(c.desc) + '</td><td>' + moeda(c.base) + '</td><td>' + esc(String(c.pct)) + '%</td><td class="ganho-linha">' + moeda(c.valor) + '</td></tr>';
+                '</td><td>' + esc(c.desc) + '</td><td>' + moeda(c.base) + '</td><td>' + esc(c.pctTxt || (String(c.pct) + '%')) + '</td><td class="ganho-linha">' + moeda(c.valor) + '</td></tr>';
         }).join('');
     }
 }
