@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=26">
-    <link rel="stylesheet" href="css/tema-m3.css?v=26">
+    <link rel="stylesheet" href="css/app.css?v=28">
+    <link rel="stylesheet" href="css/tema-m3.css?v=28">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -439,6 +439,9 @@
                     </div>
                     <div class="row" style="margin-top:10px">
                         <div class="col" style="flex:1.4"><label>Descrição mão de obra</label><input id="maoDesc" placeholder="Ex: Troca amortecedor, alinhamento..."></div>
+                        <div class="col"><label>Funcionário</label>
+                            <select id="maoFuncId"><option value="">— sem funcionário —</option></select>
+                        </div>
                         <div class="col"><label>Tipo (comissão)</label>
                             <select id="maoTipoComissao">
                                 <option value="servico">Mão de obra — Serviço</option>
@@ -449,9 +452,6 @@
                             </select>
                         </div>
                         <div class="col"><label>Valor (R$)</label><input id="maoValor" inputmode="decimal" placeholder="0,00"></div>
-                        <div class="col"><label>Funcionário</label>
-                            <select id="maoFuncId"><option value="">— sem funcionário —</option></select>
-                        </div>
                         <div class="col" style="flex:0.7;align-self:end"><button type="button" class="btn btn-ok" id="btnAddMao" style="width:100%">+ Mão de obra</button></div>
                     </div>
                     <p class="hint" id="maoComissaoPreview" style="margin-top:8px;margin-bottom:0;color:#8fe0b8;font-weight:700"></p>
@@ -1637,16 +1637,16 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=26"></script>
-    <script src="js/storage.js?v=26"></script>
-    <script src="js/ui.js?v=26"></script>
-    <script src="js/auth.js?v=26"></script>
-    <script src="js/os.js?v=26"></script>
-    <script src="js/nuvem.js?v=26"></script>
-    <script src="js/caixa.js?v=26"></script>
-    <script src="js/comissoes.js?v=26"></script>
-    <script src="js/app.js?v=26"></script>
-    <script src="js/navegacao.js?v=26"></script>
+    <script src="js/config.js?v=28"></script>
+    <script src="js/storage.js?v=28"></script>
+    <script src="js/ui.js?v=28"></script>
+    <script src="js/auth.js?v=28"></script>
+    <script src="js/os.js?v=28"></script>
+    <script src="js/nuvem.js?v=28"></script>
+    <script src="js/caixa.js?v=28"></script>
+    <script src="js/comissoes.js?v=28"></script>
+    <script src="js/app.js?v=28"></script>
+    <script src="js/navegacao.js?v=28"></script>
 </body>
 </html>
 
