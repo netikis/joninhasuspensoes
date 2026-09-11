@@ -802,6 +802,66 @@ function nomeAtendimento(db, a) {
     return nomeCliente(db, a.clienteId);
 }
 
+function soDigitosTel(s) {
+    return String(s || '').replace(/\D/g, '');
+}
+
+function telefoneClienteDigitos(c) {
+    if (!c) return '';
+    return soDigitosTel(c.telefone || c.tel || c.whatsapp || '');
+}
+
+function textoPareceTelefone(texto) {
+    var d = soDigitosTel(texto);
+    var letras = String(texto || '').replace(/[^a-zA-ZÀ-ÿ]/g, '');
+    return d.length >= 8 && letras.length === 0;
+}
+
+function telefonesEquivalentes(a, b) {
+    a = soDigitosTel(a);
+    b = soDigitosTel(b);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    function semPais(d) {
+        if (d.length >= 12 && d.indexOf('55') === 0) return d.slice(2);
+        return d;
+    }
+    a = semPais(a);
+    b = semPais(b);
+    if (a === b) return true;
+    if (a.length >= 8 && b.length >= 8) {
+        var menor = a.length <= b.length ? a : b;
+        var maior = a.length <= b.length ? b : a;
+        return maior.slice(-menor.length) === menor;
+    }
+    return false;
+}
+
+function clientesPorTelefone(db, texto, minDigitos) {
+    var q = soDigitosTel(texto);
+    var min = minDigitos != null ? minDigitos : 3;
+    if (q.length < min) return [];
+    return (db.clientes || []).filter(function (c) {
+        var t = telefoneClienteDigitos(c);
+        if (!t) return false;
+        if (telefonesEquivalentes(t, q)) return true;
+        return t.indexOf(q) >= 0;
+    });
+}
+
+function clienteUnicoPorTelefone(db, texto) {
+    if (!textoPareceTelefone(texto)) return null;
+    var hits = clientesPorTelefone(db, texto, 8).filter(function (c) {
+        return telefonesEquivalentes(telefoneClienteDigitos(c), soDigitosTel(texto));
+    });
+    if (hits.length === 1) return hits[0];
+    if (!hits.length) {
+        var sug = clientesPorTelefone(db, texto, 8);
+        if (sug.length === 1) return sug[0];
+    }
+    return null;
+}
+
 function resolverClienteAtendimento(db, texto) {
     var nome = String(texto || '').trim();
     if (!nome) return { ok: false };
@@ -811,6 +871,10 @@ function resolverClienteAtendimento(db, texto) {
     });
     if (exato) {
         return { ok: true, clienteId: exato.id, clienteNome: exato.nome, clienteAvulso: false };
+    }
+    var porTel = clienteUnicoPorTelefone(db, nome);
+    if (porTel) {
+        return { ok: true, clienteId: porTel.id, clienteNome: porTel.nome, clienteAvulso: false };
     }
     return { ok: true, clienteId: null, clienteNome: nome, clienteAvulso: true };
 }
@@ -878,7 +942,8 @@ function htmlCardClienteOs(cad) {
     if (cad.cep) linhas.push('<div class="linha"><strong>CEP:</strong> ' + esc(cad.cep) + '</div>');
     if (cad.cidade) linhas.push('<div class="linha"><strong>Cidade:</strong> ' + esc(cad.cidade) + '</div>');
     return '<div style="font-weight:700;margin-bottom:6px;color:#8fe0b8">Cadastro: ' + esc(cad.nome || '—') + '</div>' +
-        (linhas.length ? linhas.join('') : '<div class="linha muted">Sem CPF/telefone no cadastro — complete em Clientes.</div>');
+        (linhas.length ? linhas.join('') : '<div class="linha muted">Sem CPF/telefone no cadastro — complete em Clientes.</div>') +
+        '<div class="linha muted" style="margin-top:8px">Clique neste cartão para ver histórico, carros e notas.</div>';
 }
 
 function atualizarStatusClienteAt() {
@@ -890,7 +955,7 @@ function atualizarStatusClienteAt() {
     var waTel = document.getElementById('atWaTel');
     if (!texto) {
         hid.value = '';
-        status.innerHTML = 'Digite as primeiras letras do nome para buscar no cadastro; se não existir, fica como cliente avulso.';
+        status.innerHTML = 'Digite o nome ou o telefone cadastrado para buscar; se não existir, fica como cliente avulso.';
         card.style.display = 'none';
         card.innerHTML = '';
         return;
@@ -898,6 +963,10 @@ function atualizarStatusClienteAt() {
     var r = resolverClienteAtendimento(db, texto);
     if (!r.clienteAvulso) {
         hid.value = r.clienteId;
+        var buscaEl = document.getElementById('atClienteBusca');
+        if (buscaEl && textoPareceTelefone(texto) && r.clienteNome) {
+            buscaEl.value = r.clienteNome;
+        }
         status.innerHTML = '<span style="color:#8fe0b8;font-weight:700">Cliente cadastrado</span> — dados do cadastro carregados abaixo.';
         var snap = snapshotClienteCadastro(db, r);
         card.innerHTML = htmlCardClienteOs(snap);
@@ -930,7 +999,15 @@ function preencherListaClientesAt(db, filtroTexto) {
     db.clientes.slice()
         .filter(function (c) {
             var nome = String(c.nome || '').toLowerCase();
-            return nome.indexOf(q) === 0;
+            if (nome.indexOf(q) === 0) return true;
+            var qDig = q.replace(/\D/g, '');
+            if (qDig.length >= 4) {
+                var t = telefoneClienteDigitos(c);
+                if (!t) return false;
+                if (t.indexOf(qDig) >= 0) return true;
+                if (qDig.length >= 8 && telefonesEquivalentes(t, qDig)) return true;
+            }
+            return false;
         })
         .sort(function (a, b) {
             return a.nome.localeCompare(b.nome, 'pt-BR');
@@ -1312,16 +1389,22 @@ function renderClientes() {
     lista.forEach(function (c) {
         var tr = document.createElement('tr');
         tr.innerHTML =
-            '<td style="color:#fff;font-weight:800">' + esc(c.nome) + '</td>' +
+            '<td class="cli-nome-perfil" data-perfil="' + esc(c.id) + '" style="color:#fff;font-weight:800">' + esc(c.nome) + '</td>' +
             '<td style="color:#fff;font-weight:600">' + esc(docCliente(c)) + '</td>' +
             '<td style="color:#fff;font-weight:600">' + esc(c.telefone || '—') + '</td>' +
             '<td style="color:#fff;font-weight:600">' + esc(c.cidade || '—') + '</td>' +
             '<td class="actions">' +
+            '<button type="button" class="btn btn-ver" data-perfil="' + esc(c.id) + '">Ver</button>' +
             '<button type="button" class="btn btn-secondary" data-ed="' + c.id + '">Editar</button>' +
             '<button type="button" class="btn btn-primary" data-at="' + c.id + '">Atendimento</button>' +
             '<button type="button" class="btn btn-danger" data-ex="' + c.id + '">Excluir</button>' +
             '</td>';
         tb.appendChild(tr);
+    });
+    tb.querySelectorAll('[data-perfil]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            if (typeof abrirPerfilCliente === 'function') abrirPerfilCliente(b.getAttribute('data-perfil'));
+        });
     });
     tb.querySelectorAll('[data-ed]').forEach(function (b) {
         b.addEventListener('click', function () { editarCliente(b.getAttribute('data-ed')); });
@@ -5529,7 +5612,7 @@ if ('serviceWorker' in navigator) {
         window.location.reload();
     });
 
-    navigator.serviceWorker.register('./sw.js?v=29').then(function (reg) {
+    navigator.serviceWorker.register('./sw.js?v=31').then(function (reg) {
         function checarAtualizacao() {
             try { reg.update(); } catch (e) { /* ok */ }
         }
