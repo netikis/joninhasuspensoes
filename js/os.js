@@ -685,41 +685,6 @@ function limparAtendimento() {
 document.getElementById('btnLimparAt').addEventListener('click', limparAtendimento);
 document.getElementById('atStatus').addEventListener('change', atualizarCampoAgendamentoUI);
 
-document.getElementById('atClienteBusca').addEventListener('input', atualizarSugestoesClienteAt);
-document.getElementById('atClienteBusca').addEventListener('change', atualizarStatusClienteAt);
-document.getElementById('atClienteBusca').addEventListener('focus', function () {
-    preencherListaClientesAt(carregar(), this.value);
-});
-document.getElementById('atClienteBusca').addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') {
-        if (typeof esconderSugestoesClienteAt === 'function') esconderSugestoesClienteAt();
-        return;
-    }
-    if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) {
-        if (typeof selecionarPrimeiraSugestaoClienteAt === 'function' && selecionarPrimeiraSugestaoClienteAt()) {
-            e.preventDefault();
-        }
-    }
-});
-(function ligarCliqueSugestaoClienteAt() {
-    var box = document.getElementById('sugestoesClienteAt');
-    if (!box || box.getAttribute('data-cli-sug')) return;
-    box.setAttribute('data-cli-sug', '1');
-    box.addEventListener('mousedown', function (e) {
-        var btn = e.target.closest('[data-cli-id]');
-        if (!btn || !box.contains(btn)) return;
-        e.preventDefault();
-        var db = carregar();
-        var c = (db.clientes || []).find(function (x) { return String(x.id) === String(btn.getAttribute('data-cli-id')); });
-        if (c && typeof selecionarClienteAtendimento === 'function') selecionarClienteAtendimento(c);
-    });
-    document.addEventListener('mousedown', function (e) {
-        if (!box.hidden && !box.contains(e.target) && e.target.id !== 'atClienteBusca') {
-            if (typeof esconderSugestoesClienteAt === 'function') esconderSugestoesClienteAt();
-        }
-    });
-})();
-
 function teclaEnterOs(e) {
     if (typeof teclaEhEnter === 'function') return teclaEhEnter(e);
     return !!(e && (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) && !e.isComposing);

@@ -1081,9 +1081,48 @@ function preencherListaClientesAt(db, filtroTexto) {
 }
 
 function atualizarSugestoesClienteAt() {
-    preencherListaClientesAt(carregar(), document.getElementById('atClienteBusca').value);
+    var busca = document.getElementById('atClienteBusca');
+    preencherListaClientesAt(carregar(), busca ? busca.value : '');
     atualizarStatusClienteAt();
 }
+
+(function ligarBuscaClienteOs() {
+    var busca = document.getElementById('atClienteBusca');
+    var box = document.getElementById('sugestoesClienteAt');
+    if (!busca || busca.getAttribute('data-cli-busca')) return;
+    busca.setAttribute('data-cli-busca', '1');
+    busca.addEventListener('input', atualizarSugestoesClienteAt);
+    busca.addEventListener('keyup', atualizarSugestoesClienteAt);
+    busca.addEventListener('change', atualizarStatusClienteAt);
+    busca.addEventListener('focus', function () {
+        preencherListaClientesAt(carregar(), this.value);
+    });
+    busca.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            esconderSugestoesClienteAt();
+            return;
+        }
+        if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) {
+            if (selecionarPrimeiraSugestaoClienteAt()) e.preventDefault();
+        }
+    });
+    if (box && !box.getAttribute('data-cli-sug')) {
+        box.setAttribute('data-cli-sug', '1');
+        box.addEventListener('mousedown', function (e) {
+            var btn = e.target.closest('[data-cli-id]');
+            if (!btn || !box.contains(btn)) return;
+            e.preventDefault();
+            var db = carregar();
+            var c = (db.clientes || []).find(function (x) { return String(x.id) === String(btn.getAttribute('data-cli-id')); });
+            if (c) selecionarClienteAtendimento(c);
+        });
+    }
+    document.addEventListener('mousedown', function (e) {
+        if (!box || box.hidden) return;
+        if (box.contains(e.target) || e.target === busca) return;
+        esconderSugestoesClienteAt();
+    });
+})();
 
 /* ui nav: ver js/ui.js */
 
@@ -5673,7 +5712,7 @@ if ('serviceWorker' in navigator) {
         window.location.reload();
     });
 
-    navigator.serviceWorker.register('./sw.js?v=32').then(function (reg) {
+    navigator.serviceWorker.register('./sw.js?v=33').then(function (reg) {
         function checarAtualizacao() {
             try { reg.update(); } catch (e) { /* ok */ }
         }

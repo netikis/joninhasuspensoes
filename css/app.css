@@ -1195,13 +1195,13 @@
         .cliente-card-os .linha { margin-top: 4px; color: var(--text); }
 
         .busca-cli-os-wrap { position: relative; }
+        .box-cliente-atendimento {
+            overflow: visible;
+        }
         .sugestoes-cliente-at {
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 100%;
+            position: relative;
             z-index: 50;
-            margin-top: 4px;
+            margin-top: 8px;
             background: #fff;
             border: 1px solid #c9a227;
             border-radius: 8px;
