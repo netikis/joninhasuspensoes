@@ -1237,7 +1237,7 @@
             position: fixed;
             inset: 0;
             background: rgba(0, 0, 0, 0.72);
-            z-index: 80;
+            z-index: 200;
             align-items: flex-start;
             justify-content: center;
             padding: 24px 12px;
@@ -1254,12 +1254,16 @@
             margin: auto;
             overflow: visible;
         }
+        #modalNota.modal-overlay {
+            z-index: 210;
+        }
         #modalNota .modal-box {
-            overflow-x: visible;
-            width: min(960px, 100%);
+            overflow: auto;
+            width: min(960px, calc(100vw - 32px));
+            max-height: calc(100dvh - 32px);
         }
         #modalNotaCorpo {
-            overflow: visible;
+            overflow: auto;
             max-width: 100%;
         }
         #modalNotaCorpo .nota-espelho {
@@ -1276,7 +1280,7 @@
             display: none;
             position: fixed;
             inset: 0;
-            z-index: 120;
+            z-index: 220;
             background: #0b121b;
             flex-direction: column;
         }
@@ -1375,7 +1379,7 @@
             line-height: 1.3 !important;
             overflow: visible !important;
         }
-        #modalNomePdf.modal-overlay { z-index: 140; }
+        #modalNomePdf.modal-overlay { z-index: 230; }
         #modalNomePdf .modal-box { width: min(420px, 100%); }
         .modal-link-input {
             width: 100%;
