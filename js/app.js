@@ -1399,6 +1399,118 @@ function preencherListaProdutosVenda(db) {
 }
 
 /* ---------- Clientes ---------- */
+function nomeClienteChave(nome) {
+    return String(nome || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function telefoneClienteChave(cOuTel) {
+    var t = typeof cOuTel === 'string' ? soDigitosTel(cOuTel) : telefoneClienteDigitos(cOuTel);
+    if (t.length >= 12 && t.indexOf('55') === 0) t = t.slice(2);
+    if (t.length >= 8) return t.slice(-8);
+    return t;
+}
+
+function chaveClienteNomeTel(c) {
+    if (!c) return '';
+    var n = nomeClienteChave(c.nome);
+    var t = telefoneClienteChave(c);
+    if (!n || t.length < 8) return '';
+    return n + '|' + t;
+}
+
+function _campoCliMaisCompleto(a, b) {
+    a = String(a || '').trim();
+    b = String(b || '').trim();
+    if (!a) return b;
+    if (!b) return a;
+    return b.length > a.length ? b : a;
+}
+
+function _mesclarDadosCliente(dest, src) {
+    if (!dest || !src) return dest;
+    ['nome', 'cpf', 'cnpj', 'telefone', 'email', 'cidade', 'cep', 'endereco', 'numero'].forEach(function (k) {
+        dest[k] = _campoCliMaisCompleto(dest[k], src[k]);
+    });
+    dest.atualizadoEm = new Date().toISOString();
+    return dest;
+}
+
+function _scoreClienteParaManter(db, c) {
+    var preench = ['cpf', 'cnpj', 'telefone', 'email', 'cidade', 'cep', 'endereco', 'numero']
+        .reduce(function (n, k) { return n + (String(c[k] || '').trim() ? 1 : 0); }, 0);
+    var oss = (db.atendimentos || []).filter(function (a) {
+        return a && String(a.clienteId) === String(c.id);
+    }).length;
+    var vds = (db.orcamentos || []).filter(function (o) {
+        return o && String(o.clienteId) === String(c.id);
+    }).length;
+    return preench * 10 + oss * 3 + vds;
+}
+
+function _reapontarDocsCliente(lista, deIds, paraId, nome) {
+    var set = {};
+    (deIds || []).forEach(function (id) { set[String(id)] = true; });
+    (lista || []).forEach(function (item) {
+        if (!item || !item.clienteId || !set[String(item.clienteId)]) return;
+        item.clienteId = paraId;
+        if (nome) item.clienteNome = nome;
+        item.atualizadoEm = new Date().toISOString();
+    });
+}
+
+function unirClientesDuplicadosNoDb(db) {
+    if (!db || !Array.isArray(db.clientes) || db.clientes.length < 2) return 0;
+    var grupos = {};
+    db.clientes.forEach(function (c) {
+        var k = chaveClienteNomeTel(c);
+        if (!k) return;
+        if (!grupos[k]) grupos[k] = [];
+        grupos[k].push(c);
+    });
+    var unidos = 0;
+    Object.keys(grupos).forEach(function (k) {
+        var g = grupos[k];
+        if (g.length < 2) return;
+        g.sort(function (a, b) {
+            var dif = _scoreClienteParaManter(db, b) - _scoreClienteParaManter(db, a);
+            if (dif) return dif;
+            return String(a.criadoEm || a.id || '').localeCompare(String(b.criadoEm || b.id || ''));
+        });
+        var keep = g[0];
+        var drop = g.slice(1);
+        drop.forEach(function (d) { _mesclarDadosCliente(keep, d); });
+        var dropIds = drop.map(function (d) { return d.id; });
+        _reapontarDocsCliente(db.atendimentos, dropIds, keep.id, keep.nome);
+        _reapontarDocsCliente(db.orcamentos, dropIds, keep.id, keep.nome);
+        dropIds.forEach(function (id) { marcarExcluido(db, 'clientes', id); });
+        var dropSet = {};
+        dropIds.forEach(function (id) { dropSet[String(id)] = true; });
+        db.clientes = db.clientes.filter(function (c) { return c && !dropSet[String(c.id)]; });
+        unidos += drop.length;
+    });
+    return unidos;
+}
+
+function garantirClientesUnicos(opts) {
+    opts = opts || {};
+    var db = carregar();
+    var n = unirClientesDuplicadosNoDb(db);
+    if (n) {
+        salvar(db);
+        if (!opts.silencio) {
+            toast(n === 1
+                ? 'Cadastros iguais (mesmo nome e telefone) foram juntos em um só.'
+                : n + ' cadastros repetidos foram juntos em um só.');
+        }
+    }
+    return db;
+}
+
 document.getElementById('formCliente').addEventListener('submit', function (e) {
     e.preventDefault();
     var db = carregar();
@@ -1416,17 +1528,51 @@ document.getElementById('formCliente').addEventListener('submit', function (e) {
         numero: document.getElementById('cliNumero').value.trim(),
         atualizadoEm: new Date().toISOString()
     };
-    if (id) {
+    if (!payload.nome) {
+        toast('Informe o nome do cliente.');
+        return;
+    }
+    var chaveNova = chaveClienteNomeTel(payload);
+    var outro = chaveNova
+        ? db.clientes.find(function (c) {
+            return c && String(c.id) !== String(id || '') && chaveClienteNomeTel(c) === chaveNova;
+        })
+        : null;
+    var msg = '';
+    if (outro && !id) {
+        payload.id = outro.id;
+        payload.criadoEm = outro.criadoEm || payload.criadoEm;
+        payload = _mesclarDadosCliente(Object.assign({}, outro), payload);
+        var ixNovo = db.clientes.findIndex(function (c) { return String(c.id) === String(outro.id); });
+        if (ixNovo >= 0) db.clientes[ixNovo] = payload;
+        else db.clientes.push(payload);
+        msg = 'Já existia o mesmo nome e telefone — ficou um único cadastro.';
+    } else if (outro && id) {
+        payload = _mesclarDadosCliente(Object.assign({}, outro), payload);
+        payload.id = id;
+        var ixA = db.clientes.findIndex(function (c) { return String(c.id) === String(id); });
+        if (ixA >= 0) db.clientes[ixA] = Object.assign({}, db.clientes[ixA], payload);
+        else db.clientes.push(payload);
+        _reapontarDocsCliente(db.atendimentos, [outro.id], id, payload.nome);
+        _reapontarDocsCliente(db.orcamentos, [outro.id], id, payload.nome);
+        marcarExcluido(db, 'clientes', outro.id);
+        db.clientes = db.clientes.filter(function (c) { return String(c.id) !== String(outro.id); });
+        msg = 'Cadastros iguais foram juntos em um só.';
+    } else if (id) {
         var i = db.clientes.findIndex(function (c) { return c.id === id; });
         if (i >= 0) db.clientes[i] = Object.assign({}, db.clientes[i], payload);
+        else db.clientes.push(payload);
+        msg = 'Cliente atualizado.';
     } else {
         payload.criadoEm = new Date().toISOString();
         db.clientes.push(payload);
+        msg = 'Cliente cadastrado.';
     }
     limparExcluido(db, 'clientes', payload.id);
+    unirClientesDuplicadosNoDb(db);
     salvar(db);
     limparFormCliente();
-    toast(id ? 'Cliente atualizado.' : 'Cliente cadastrado.');
+    toast(msg);
     renderClientes();
     preencherSelectsCliente(db);
     atualizarKPIs(db);
@@ -1471,7 +1617,7 @@ function excluirCliente(id) {
 }
 
 function renderClientes() {
-    var db = carregar();
+    var db = garantirClientesUnicos();
     var q = (document.getElementById('buscaCliente').value || '').toLowerCase().trim();
     var lista = db.clientes.filter(function (c) {
         if (!q) return true;
@@ -5712,7 +5858,7 @@ if ('serviceWorker' in navigator) {
         window.location.reload();
     });
 
-    navigator.serviceWorker.register('./sw.js?v=33').then(function (reg) {
+    navigator.serviceWorker.register('./sw.js?v=34').then(function (reg) {
         function checarAtualizacao() {
             try { reg.update(); } catch (e) { /* ok */ }
         }
