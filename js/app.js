@@ -851,13 +851,20 @@ function clientesPorTelefone(db, texto, minDigitos) {
 
 function clienteUnicoPorTelefone(db, texto) {
     if (!textoPareceTelefone(texto)) return null;
+    var q = soDigitosTel(texto);
     var hits = clientesPorTelefone(db, texto, 8).filter(function (c) {
-        return telefonesEquivalentes(telefoneClienteDigitos(c), soDigitosTel(texto));
+        return telefonesEquivalentes(telefoneClienteDigitos(c), q);
     });
     if (hits.length === 1) return hits[0];
     if (!hits.length) {
-        var sug = clientesPorTelefone(db, texto, 8);
+        var sug = (db.clientes || []).filter(function (c) {
+            var t = telefoneClienteDigitos(c);
+            if (!t || t.length < 8) return false;
+            return t.slice(-8) === q.slice(-8);
+        });
         if (sug.length === 1) return sug[0];
+        var porTrecho = clientesPorTelefone(db, texto, 8);
+        if (porTrecho.length === 1) return porTrecho[0];
     }
     return null;
 }
@@ -963,10 +970,6 @@ function atualizarStatusClienteAt() {
     var r = resolverClienteAtendimento(db, texto);
     if (!r.clienteAvulso) {
         hid.value = r.clienteId;
-        var buscaEl = document.getElementById('atClienteBusca');
-        if (buscaEl && textoPareceTelefone(texto) && r.clienteNome) {
-            buscaEl.value = r.clienteNome;
-        }
         status.innerHTML = '<span style="color:#8fe0b8;font-weight:700">Cliente cadastrado</span> — dados do cadastro carregados abaixo.';
         var snap = snapshotClienteCadastro(db, r);
         card.innerHTML = htmlCardClienteOs(snap);
@@ -974,49 +977,107 @@ function atualizarStatusClienteAt() {
         if (waTel && snap && snap.telefone) waTel.value = snap.telefone;
     } else {
         hid.value = '';
-        status.innerHTML = '<span style="color:#9fd3ff;font-weight:700">Cliente avulso</span> — informe o WhatsApp abaixo para enviar.';
+        status.innerHTML = '<span style="color:#9fd3ff;font-weight:700">Cliente avulso</span> — informe o WhatsApp abaixo para enviar. Ou escolha o cadastro na lista embaixo.';
         card.style.display = 'none';
         card.innerHTML = '';
     }
 }
 
-function preencherListaClientesAt(db, filtroTexto) {
-    var lista = document.getElementById('listaClientesAt');
+function esconderSugestoesClienteAt() {
+    var box = document.getElementById('sugestoesClienteAt');
+    if (!box) return;
+    box.innerHTML = '';
+    box.hidden = true;
+}
+
+function selecionarClienteAtendimento(c) {
+    if (!c) return;
     var busca = document.getElementById('atClienteBusca');
-    if (!lista) return;
-    lista.innerHTML = '';
-    var q = String(
+    var hid = document.getElementById('atClienteId');
+    if (hid) hid.value = c.id || '';
+    if (busca) busca.value = c.nome || '';
+    esconderSugestoesClienteAt();
+    atualizarStatusClienteAt();
+}
+
+function selecionarPrimeiraSugestaoClienteAt() {
+    var box = document.getElementById('sugestoesClienteAt');
+    var btn = box && !box.hidden ? box.querySelector('[data-cli-id]') : null;
+    if (!btn) return false;
+    var db = carregar();
+    var c = (db.clientes || []).find(function (x) { return String(x.id) === String(btn.getAttribute('data-cli-id')); });
+    if (!c) return false;
+    selecionarClienteAtendimento(c);
+    return true;
+}
+
+function _clienteCombinaBuscaOs(c, texto) {
+    var q = String(texto || '').trim().toLowerCase();
+    if (!q) return false;
+    var nome = String(c.nome || '').toLowerCase();
+    if (nome.indexOf(q) === 0 || (q.length >= 3 && nome.indexOf(q) >= 0)) return true;
+    var qDig = soDigitosTel(texto);
+    if (qDig.length < 3) return false;
+    var t = telefoneClienteDigitos(c);
+    if (!t) return false;
+    if (t.indexOf(qDig) >= 0) return true;
+    if (qDig.length >= 8 && telefonesEquivalentes(t, qDig)) return true;
+    if (qDig.length >= 8 && t.length >= 8 && t.slice(-8) === qDig.slice(-8)) return true;
+    return false;
+}
+
+function _scoreClienteBuscaOs(c, texto) {
+    var qDig = soDigitosTel(texto);
+    var t = telefoneClienteDigitos(c);
+    var nome = String(c.nome || '').toLowerCase();
+    var q = String(texto || '').trim().toLowerCase();
+    if (qDig.length >= 8 && t && telefonesEquivalentes(t, qDig)) return 0;
+    if (qDig.length >= 8 && t && t.slice(-8) === qDig.slice(-8)) return 1;
+    if (nome.indexOf(q) === 0) return 2;
+    return 3;
+}
+
+function preencherListaClientesAt(db, filtroTexto) {
+    var box = document.getElementById('sugestoesClienteAt');
+    var busca = document.getElementById('atClienteBusca');
+    if (busca) busca.removeAttribute('list');
+    if (!box) return;
+    var texto = String(
         filtroTexto != null
             ? filtroTexto
             : (busca ? busca.value : '')
-    ).trim().toLowerCase();
-    /* Só sugere depois de digitar ao menos 1 letra — evita abrir a lista inteira ao clicar vazio */
+    ).trim();
+    var q = texto.toLowerCase();
+    var qDig = soDigitosTel(texto);
     if (q.length < 1) {
-        if (busca) busca.removeAttribute('list');
+        esconderSugestoesClienteAt();
         return;
     }
-    if (busca) busca.setAttribute('list', 'listaClientesAt');
-    db.clientes.slice()
-        .filter(function (c) {
-            var nome = String(c.nome || '').toLowerCase();
-            if (nome.indexOf(q) === 0) return true;
-            var qDig = q.replace(/\D/g, '');
-            if (qDig.length >= 4) {
-                var t = telefoneClienteDigitos(c);
-                if (!t) return false;
-                if (t.indexOf(qDig) >= 0) return true;
-                if (qDig.length >= 8 && telefonesEquivalentes(t, qDig)) return true;
-            }
-            return false;
-        })
-        .sort(function (a, b) {
-            return a.nome.localeCompare(b.nome, 'pt-BR');
-        })
-        .forEach(function (c) {
-            var opt = document.createElement('option');
-            opt.value = c.nome;
-            lista.appendChild(opt);
-        });
+    var hits = (db.clientes || []).filter(function (c) {
+        return _clienteCombinaBuscaOs(c, texto);
+    }).sort(function (a, b) {
+        var sa = _scoreClienteBuscaOs(a, texto);
+        var sb = _scoreClienteBuscaOs(b, texto);
+        if (sa !== sb) return sa - sb;
+        return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR');
+    }).slice(0, 12);
+    if (!hits.length) {
+        if (qDig.length >= 8) {
+            box.innerHTML = '<div style="padding:10px 12px;color:#64748b;font-weight:600;font-size:0.82rem">Nenhum cadastro com este telefone. Pode seguir como cliente avulso.</div>';
+            box.hidden = false;
+            return;
+        }
+        esconderSugestoesClienteAt();
+        return;
+    }
+    box.innerHTML = hits.map(function (c, i) {
+        var tel = c.telefone || c.tel || c.whatsapp || 'sem telefone';
+        var extra = [tel, c.cidade].filter(Boolean).join(' · ');
+        return '<button type="button" data-cli-id="' + esc(c.id) + '"' + (i === 0 ? ' class="ativo"' : '') + '>' +
+            '<strong>' + esc(c.nome || 'Cliente') + '</strong>' +
+            '<span>' + esc(extra) + '</span></button>';
+    }).join('');
+    box.hidden = false;
 }
 
 function atualizarSugestoesClienteAt() {
@@ -5612,7 +5673,7 @@ if ('serviceWorker' in navigator) {
         window.location.reload();
     });
 
-    navigator.serviceWorker.register('./sw.js?v=31').then(function (reg) {
+    navigator.serviceWorker.register('./sw.js?v=32').then(function (reg) {
         function checarAtualizacao() {
             try { reg.update(); } catch (e) { /* ok */ }
         }

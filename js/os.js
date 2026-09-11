@@ -663,6 +663,12 @@ function limparAtendimento() {
     document.getElementById('atAgendadoPara').value = '';
     var waTel = document.getElementById('atWaTel');
     if (waTel) waTel.value = '';
+    var card = document.getElementById('atClienteCard');
+    if (card) {
+        card.style.display = 'none';
+        card.innerHTML = '';
+    }
+    if (typeof esconderSugestoesClienteAt === 'function') esconderSugestoesClienteAt();
     itensTemp = [];
     fotosAtuais = [];
     aplicarChecklistUI({});
@@ -686,9 +692,33 @@ document.getElementById('atClienteBusca').addEventListener('focus', function () 
 });
 document.getElementById('atClienteBusca').addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
-        preencherListaClientesAt(carregar(), '');
+        if (typeof esconderSugestoesClienteAt === 'function') esconderSugestoesClienteAt();
+        return;
+    }
+    if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) {
+        if (typeof selecionarPrimeiraSugestaoClienteAt === 'function' && selecionarPrimeiraSugestaoClienteAt()) {
+            e.preventDefault();
+        }
     }
 });
+(function ligarCliqueSugestaoClienteAt() {
+    var box = document.getElementById('sugestoesClienteAt');
+    if (!box || box.getAttribute('data-cli-sug')) return;
+    box.setAttribute('data-cli-sug', '1');
+    box.addEventListener('mousedown', function (e) {
+        var btn = e.target.closest('[data-cli-id]');
+        if (!btn || !box.contains(btn)) return;
+        e.preventDefault();
+        var db = carregar();
+        var c = (db.clientes || []).find(function (x) { return String(x.id) === String(btn.getAttribute('data-cli-id')); });
+        if (c && typeof selecionarClienteAtendimento === 'function') selecionarClienteAtendimento(c);
+    });
+    document.addEventListener('mousedown', function (e) {
+        if (!box.hidden && !box.contains(e.target) && e.target.id !== 'atClienteBusca') {
+            if (typeof esconderSugestoesClienteAt === 'function') esconderSugestoesClienteAt();
+        }
+    });
+})();
 
 function teclaEnterOs(e) {
     if (typeof teclaEhEnter === 'function') return teclaEhEnter(e);
@@ -885,12 +915,20 @@ async function salvarAtendimentoAtual() {
 
         toast(
             (id ? 'Atendimento atualizado' : 'Atendimento salvo') +
-            (resolvido.clienteAvulso ? ' (cliente avulso)' : '.')
+            (resolvido.clienteAvulso ? ' (cliente avulso). ' : '. ') +
+            'Pode começar outra OS.'
         );
         limparAtendimento();
         renderHistorico();
         atualizarKPIs(carregar());
-        if (typeof abrirPainel === 'function') abrirPainel('painelHistorico');
+        if (typeof abrirPainel === 'function') abrirPainel('painelVeiculo');
+        try { window.scrollTo(0, 0); } catch (eScr) { /* ok */ }
+        setTimeout(function () {
+            limparAtendimento();
+            var buscaNova = document.getElementById('atClienteBusca');
+            if (buscaNova) buscaNova.value = '';
+            if (typeof atualizarStatusClienteAt === 'function') atualizarStatusClienteAt();
+        }, 40);
 
         extrasPosSalvarAtendimento(payload, resolvido).then(function (extras) {
             if (extras && extras.length) toast('Sync: ' + extras.join(' · '));

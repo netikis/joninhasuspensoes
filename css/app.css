@@ -1194,6 +1194,49 @@
         .cliente-card-os strong { color: #9fd3ff; }
         .cliente-card-os .linha { margin-top: 4px; color: var(--text); }
 
+        .busca-cli-os-wrap { position: relative; }
+        .sugestoes-cliente-at {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 100%;
+            z-index: 50;
+            margin-top: 4px;
+            background: #fff;
+            border: 1px solid #c9a227;
+            border-radius: 8px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+            max-height: 260px;
+            overflow: auto;
+        }
+        .sugestoes-cliente-at[hidden] { display: none !important; }
+        .sugestoes-cliente-at button {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: 0;
+            border-bottom: 1px solid #e2e8f0;
+            background: #fff;
+            padding: 10px 12px;
+            cursor: pointer;
+            color: #1e293b;
+        }
+        .sugestoes-cliente-at button:last-child { border-bottom: 0; }
+        .sugestoes-cliente-at button:hover,
+        .sugestoes-cliente-at button.ativo { background: #f8fafc; }
+        .sugestoes-cliente-at strong {
+            display: block;
+            color: #152642;
+            font-size: 0.92rem;
+        }
+        .sugestoes-cliente-at span {
+            display: block;
+            margin-top: 2px;
+            font-size: 0.78rem;
+            color: #64748b;
+            font-weight: 600;
+        }
+
         #modalPerfilCliente.modal-overlay { z-index: 205; }
         #modalPerfilCliente .modal-box {
             width: min(960px, calc(100vw - 32px));
