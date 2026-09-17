@@ -995,6 +995,7 @@ function receberPendente(id, destino) {
         forma: destino === 'banco' ? 'PIX' : 'Dinheiro',
         conta: destino,
         pendenteId: p.id,
+        vendaId: p.vendaId || '',
         criadoEm: new Date().toISOString()
     };
     if (destino === 'banco') {
@@ -1004,6 +1005,19 @@ function receberPendente(id, destino) {
         if (!db.caixa) db.caixa = [];
         db.caixa.push(lanc);
     }
+    if (p.vendaId) {
+        var o = (db.orcamentos || []).find(function (x) { return x && String(x.id) === String(p.vendaId); });
+        if (o) {
+            var rec = (Number(o.valorRecebido) || 0) + (Number(p.valor) || 0);
+            var tot = Number(o.valor) || 0;
+            o.valorRecebido = +rec.toFixed(2);
+            o.saldoAberto = Math.max(0, +(tot - rec).toFixed(2));
+            o.statusPagamento = o.saldoAberto < 0.01 ? 'PAGO' : 'PARCIAL';
+            if (!o.recebimentos) o.recebimentos = [];
+            o.recebimentos.push({ forma: lanc.forma, valor: lanc.valor, em: lanc.criadoEm });
+            o.atualizadoEm = new Date().toISOString();
+        }
+    }
     if (canalVendas !== 'interno') marcarExcluido(db, 'pendentes', p.id);
     db.pendentes.splice(i, 1);
     salvar(db);
@@ -1011,6 +1025,7 @@ function receberPendente(id, destino) {
     renderPendentes();
     renderCaixa();
     renderCaixaBanco();
+    if (typeof renderOrcamentos === 'function') renderOrcamentos();
     atualizarKPIs(db);
 }
 
@@ -1037,10 +1052,20 @@ function renderPendentes() {
               '<button type="button" class="btn btn-pdf" data-cx-pdf-vd="' + esc(p.vendaId) + '">PDF</button>' +
               '<button type="button" class="btn btn-secondary" data-cx-edit-vd="' + esc(p.vendaId) + '">Editar</button>'
             : '';
+        var atraso = 0;
+        if (p.vencimento) {
+            var dv = new Date(String(p.vencimento).slice(0, 10) + 'T12:00:00');
+            var hj = new Date();
+            hj.setHours(12, 0, 0, 0);
+            if (!isNaN(dv.getTime())) atraso = Math.floor((hj.getTime() - dv.getTime()) / 86400000);
+        }
+        var vencHtml = esc(fmtData(p.vencimento));
+        if (atraso >= 30) vencHtml += ' <span style="color:#ffb4b4;font-weight:800">30+ dias vencido</span>';
+        else if (atraso > 0) vencHtml += ' <span style="color:#fbbf24;font-weight:800">Vencido</span>';
         tr.innerHTML =
             '<td>' + esc(p.cliente) + '</td>' +
             '<td>' + esc(p.descricao) + '</td>' +
-            '<td>' + esc(fmtData(p.vencimento)) + '</td>' +
+            '<td>' + vencHtml + '</td>' +
             '<td>' + moeda(p.valor) + '</td>' +
             '<td class="actions"><div class="cx-acoes-fh">' + acoesDoc +
             '<button type="button" class="btn btn-ok" data-rec-b="' + p.id + '">Receber balcão</button>' +

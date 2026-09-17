@@ -3552,7 +3552,16 @@ function htmlDocumentoVenda(db, o) {
     var nome = o.funcionarioNome || o.clienteNome || nomeCliente(db, o.clienteId) || '—';
     var tipo = o.tipo || 'VENDA';
     var rows = (o.itens || []).map(function (it) {
-        return '<tr><td>' + esc(it.desc || '') + '</td>' +
+        var extraMo = '';
+        if ((it.origem || it.tipo) === 'mao') {
+            var tipoLbl = (typeof rotuloTipoMaoComissao === 'function')
+                ? rotuloTipoMaoComissao(it.tipoMao || 'servico')
+                : '';
+            extraMo = '<div style="font-size:0.78rem;color:#475569">' +
+                esc(it.funcionarioNome || '') +
+                (tipoLbl ? ' · ' + esc(tipoLbl) : '') + '</div>';
+        }
+        return '<tr><td>' + esc(it.desc || '') + extraMo + '</td>' +
             '<td style="text-align:center">' + esc(String(it.qtd != null ? it.qtd : 1)) + '</td>' +
             '<td style="text-align:right">' + moeda(it.venda != null ? it.venda : it.total) + '</td>' +
             '<td style="text-align:right">' + moeda(it.total != null ? it.total : ((Number(it.qtd) || 1) * (Number(it.venda) || 0))) + '</td></tr>';
@@ -3560,7 +3569,29 @@ function htmlDocumentoVenda(db, o) {
     if (!rows) rows = '<tr><td colspan="4" style="text-align:center">Sem itens</td></tr>';
     var extras = '';
     if (o.placa) extras += '<div><b>Placa:</b> ' + esc(String(o.placa).toUpperCase()) + '</div>';
+    var funcsDoc = [o.mecanicoNome, o.mecanicoNome2].filter(Boolean);
+    if (funcsDoc.length) extras += '<div><b>Funcionário(s):</b> ' + esc(funcsDoc.join(' + ')) + '</div>';
     if (o.observacao) extras += '<div style="margin-top:8px"><b>Obs:</b> ' + esc(o.observacao) + '</div>';
+    var sub = Number(o.subtotal != null ? o.subtotal : o.valor) || 0;
+    var descR = Number(o.descontoReais) || 0;
+    var descP = Number(o.descontoPerc) || 0;
+    var descPercValor = Number(o.descontoPercValor);
+    if (!(descPercValor > 0) && descP > 0) {
+        descPercValor = +(Math.max(0, sub - descR) * descP / 100).toFixed(2);
+    }
+    var recs = (o.recebimentos || []).slice();
+    if (!recs.length && Number(o.valorRecebido) > 0) {
+        recs = [{ forma: o.formaPagamento || 'Recebido', valor: Number(o.valorRecebido) }];
+    }
+    var recebido = Number(o.valorRecebido) || recs.reduce(function (s, r) { return s + (Number(r.valor) || 0); }, 0);
+    var aberto = o.saldoAberto != null
+        ? Number(o.saldoAberto)
+        : Math.max(0, (Number(o.valor) || 0) - recebido);
+    var recHtml = recs.length
+        ? recs.map(function (r) {
+            return '<div>' + esc(r.forma || '—') + ': <strong>' + moeda(r.valor) + '</strong></div>';
+        }).join('')
+        : '';
     return '<div class="nota-espelho">' +
         htmlCabecalhoNotaEmpresa(emp) +
         '<h2 class="nota-titulo-espelho">' + esc(tipo) + ' Nº ' + esc(String(o.numero || '—')) + '</h2>' +
@@ -3573,13 +3604,16 @@ function htmlDocumentoVenda(db, o) {
         '<table class="nota-itens compacta"><thead><tr><th>Descrição</th><th style="text-align:center">Qtd</th>' +
         '<th style="text-align:right">Unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>' +
         rows + '</tbody></table>' +
-        '<div class="nota-subtotais compacto">Subtotal: <strong>' + moeda(o.subtotal != null ? o.subtotal : o.valor) + '</strong>' +
-        (Number(o.descontoReais) > 0 || Number(o.descontoPerc) > 0
-            ? ' · Desconto: <strong>' + moeda(o.descontoReais || 0) +
-              (Number(o.descontoPerc) > 0 ? ' (' + esc(String(o.descontoPerc)) + '%)' : '') + '</strong>'
-            : '') +
+        '<div class="nota-subtotais compacto">Subtotal: <strong>' + moeda(sub) + '</strong>' +
+        (descR > 0 ? '<br>Desconto R$: <strong>− ' + moeda(descR) + '</strong>' : '') +
+        (descP > 0 ? '<br>Desconto ' + esc(String(descP)) + '%: <strong>− ' + moeda(descPercValor) + '</strong>' : '') +
         '</div>' +
-        '<div class="nota-total compacto">Total: ' + moeda(o.valor) + '</div></div></div>';
+        '<div class="nota-total compacto">Total: ' + moeda(o.valor) + '</div>' +
+        (recHtml ? '<div class="nota-subtotais compacto" style="margin-top:8px"><b>Recebido</b>' + recHtml +
+            '<div>Total recebido: <strong>' + moeda(recebido) + '</strong></div>' +
+            (aberto > 0.009 ? '<div>Em aberto: <strong>' + moeda(aberto) + '</strong></div>' : '') +
+            '</div>' : (aberto > 0.009 ? '<div class="nota-subtotais compacto">Em aberto: <strong>' + moeda(aberto) + '</strong></div>' : '')) +
+        '</div></div>';
 }
 
 function abrirDocumentoVenda(id) {
@@ -3685,6 +3719,7 @@ function editarDocumentoVenda(id) {
     document.getElementById('vdDescReais').value = o.descontoReais != null ? o.descontoReais : 0;
     document.getElementById('vdDescPerc').value = o.descontoPerc != null ? o.descontoPerc : 0;
     document.getElementById('vdRecebido').value = o.valorRecebido != null ? o.valorRecebido : '';
+    if (typeof preencherRecebimentosVenda === 'function') preencherRecebimentosVenda(o.recebimentos);
     if (canalVendas === 'interno') {
         preencherSelectFuncionariosVenda();
         var selF = document.getElementById('vdFuncionarioId');
@@ -3697,6 +3732,8 @@ function editarDocumentoVenda(id) {
         if (typeof preencherSelectMecanicoVenda === 'function') preencherSelectMecanicoVenda();
         var selM = document.getElementById('vdMecanicoId');
         if (selM) selM.value = o.mecanicoId || o.funcionarioId || '';
+        var selM2 = document.getElementById('vdMecanicoId2');
+        if (selM2) selM2.value = o.mecanicoId2 || '';
     }
     carrinhoVenda = (o.itens || []).map(function (it) {
         return Object.assign({}, it);
@@ -3737,6 +3774,8 @@ function atualizarUIVendaPorCanal() {
     var hint = document.querySelector('#painelOrcamento .venda-form .box > .hint');
     if (wrapN) wrapN.style.display = interno ? 'none' : '';
     if (wrapI) wrapI.style.display = interno ? '' : 'none';
+    var wrapMec = document.getElementById('wrapVdMecanicos');
+    if (wrapMec) wrapMec.style.display = interno ? 'none' : '';
     if (titulo) {
         titulo.textContent = interno
             ? '🛒 Venda interna — somente para funcionário'
@@ -3908,15 +3947,111 @@ function preencherCamposProdutoEstoque() {
 
 function calcTotaisVenda() {
     var sub = carrinhoVenda.reduce(function (s, it) { return s + (Number(it.total) || 0); }, 0);
-    var descR = Number(document.getElementById('vdDescReais').value) || 0;
-    var descP = Number(document.getElementById('vdDescPerc').value) || 0;
-    var total = Math.max(0, sub - descR - (sub * descP / 100));
-    var recebido = Number(document.getElementById('vdRecebido').value) || 0;
-    var troco = Math.max(0, recebido - total);
-    document.getElementById('vdSubtotalTxt').textContent = moeda(sub);
-    document.getElementById('vdTotalTxt').textContent = 'TOTAL: ' + moeda(total);
-    document.getElementById('vdTrocoTxt').textContent = 'Troco: ' + moeda(troco);
-    return { subtotal: sub, total: total, troco: troco, descontoReais: descR, descontoPerc: descP, valorRecebido: recebido };
+    var descR = Number(document.getElementById('vdDescReais') && document.getElementById('vdDescReais').value) || 0;
+    var descP = Number(document.getElementById('vdDescPerc') && document.getElementById('vdDescPerc').value) || 0;
+    if (descR < 0) descR = 0;
+    if (descP < 0) descP = 0;
+    var aposReais = Math.max(0, sub - descR);
+    var descPercValor = +(aposReais * descP / 100).toFixed(2);
+    var total = Math.max(0, +(aposReais - descPercValor).toFixed(2));
+    var splits = lerRecebimentosVenda();
+    var somaSplit = splits.reduce(function (s, r) { return s + r.valor; }, 0);
+    var recEl = document.getElementById('vdRecebido');
+    var recebido;
+    if (somaSplit > 0) {
+        recebido = somaSplit;
+        window._vdRecebidoFromSplit = true;
+        if (recEl && !window._vdRecalcLock) {
+            window._vdRecalcLock = true;
+            recEl.value = String(recebido);
+            window._vdRecalcLock = false;
+        }
+    } else {
+        if (window._vdRecebidoFromSplit) {
+            window._vdRecebidoFromSplit = false;
+            if (recEl && !window._vdRecalcLock) recEl.value = '';
+            recebido = 0;
+        } else {
+            recebido = Number(recEl && recEl.value) || 0;
+        }
+    }
+    var status = (document.getElementById('vdStatus') && document.getElementById('vdStatus').value) || 'PAGO';
+    if (status === 'PENDENTE') recebido = 0;
+    var aberto = Math.max(0, +(total - recebido).toFixed(2));
+    var troco = Math.max(0, +(recebido - total).toFixed(2));
+    if (status === 'PAGO' && aberto > 0.009 && recebido > 0) {
+        /* permanece parcial se não cobriu */
+    }
+    var setTxt = function (id, txt) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = txt;
+    };
+    setTxt('vdSubtotalTxt', moeda(sub));
+    setTxt('vdDescReaisTxt', descR ? ('− ' + moeda(descR)) : moeda(0));
+    setTxt('vdDescPercTxt', descP ? ('− ' + moeda(descPercValor) + ' (' + descP + '%)') : moeda(0));
+    setTxt('vdTotalTxt', moeda(total));
+    setTxt('vdRecebidoTxt', moeda(recebido));
+    setTxt('vdAbertoTxt', moeda(aberto));
+    var trocoEl = document.getElementById('vdTrocoTxt');
+    if (trocoEl) trocoEl.textContent = 'Troco: ' + moeda(troco);
+    var resumo = document.getElementById('vdResumoOrcamentoTxt');
+    if (resumo) {
+        resumo.innerHTML =
+            'Itens: ' + moeda(sub) +
+            (descR ? '<br>Desconto R$: − ' + moeda(descR) : '') +
+            (descP ? '<br>Desconto ' + descP + '%: − ' + moeda(descPercValor) : '') +
+            '<br><span style="color:#86efac">TOTAL: ' + moeda(total) + '</span>' +
+            (recebido ? '<br>Recebido: ' + moeda(recebido) : '') +
+            (aberto > 0.009 ? '<br><span style="color:#fbbf24">Em aberto: ' + moeda(aberto) + '</span>' : '');
+    }
+    return {
+        subtotal: sub,
+        total: total,
+        troco: troco,
+        descontoReais: descR,
+        descontoPerc: descP,
+        descontoPercValor: descPercValor,
+        valorRecebido: recebido,
+        saldoAberto: aberto,
+        recebimentos: splits
+    };
+}
+
+function lerRecebimentosVenda() {
+    var campos = [
+        { id: 'vdRecDinheiro', forma: 'Dinheiro' },
+        { id: 'vdRecPix', forma: 'PIX' },
+        { id: 'vdRecDebito', forma: 'Cartão de Débito' },
+        { id: 'vdRecCredito', forma: 'Cartão de Crédito' },
+        { id: 'vdRecBoleto', forma: 'Boleto' }
+    ];
+    var out = [];
+    campos.forEach(function (c) {
+        var el = document.getElementById(c.id);
+        var v = Number(el && el.value) || 0;
+        if (v > 0) out.push({ forma: c.forma, valor: +v.toFixed(2) });
+    });
+    return out;
+}
+
+function preencherRecebimentosVenda(lista) {
+    var map = {
+        'Dinheiro': 'vdRecDinheiro',
+        'PIX': 'vdRecPix',
+        'Cartão de Débito': 'vdRecDebito',
+        'Cartão de Crédito': 'vdRecCredito',
+        'Boleto': 'vdRecBoleto'
+    };
+    Object.keys(map).forEach(function (k) {
+        var el = document.getElementById(map[k]);
+        if (el) el.value = '';
+    });
+    (lista || []).forEach(function (r) {
+        var id = map[r.forma];
+        if (!id) return;
+        var el = document.getElementById(id);
+        if (el) el.value = String(r.valor || '');
+    });
 }
 
 function renderCarrinhoVenda() {
@@ -3927,9 +4062,18 @@ function renderCarrinhoVenda() {
         box.innerHTML = carrinhoVenda.map(function (it, idx) {
             var tag = it.origem === 'estoque' ? 'ESTOQUE' : (it.origem === 'mao' ? 'MÃO DE OBRA' : 'AVULSO');
             var cor = it.origem === 'mao' ? '#1e9e5a' : (it.origem === 'estoque' ? '#2563a8' : '#d23b3b');
+            var extra = '';
+            if (it.origem === 'mao') {
+                var tipoLbl = (typeof rotuloTipoMaoComissao === 'function')
+                    ? rotuloTipoMaoComissao(it.tipoMao || 'servico')
+                    : (it.tipoMao || '');
+                extra = '<span class="vd-cart-func">' +
+                    esc(it.funcionarioNome || 'sem funcionário') +
+                    (tipoLbl ? ' · ' + esc(tipoLbl) : '') + '</span>';
+            }
             return '<div class="vd-cart-linha">' +
                 '<span class="vd-cart-tag" style="color:' + cor + '">' + tag + '</span>' +
-                '<span class="vd-cart-info" title="' + esc(it.desc) + '">' + esc(it.desc) +
+                '<span class="vd-cart-info" title="' + esc(it.desc) + '">' + esc(it.desc) + extra +
                 ' <span class="vd-cart-qtd">(' + esc(String(it.qtd)) + ' ' + esc(it.unidade || 'un') +
                 ' × ' + moeda(it.venda) + ')</span></span>' +
                 '<span class="vd-cart-total">' + moeda(it.total) + '</span>' +
@@ -4084,21 +4228,37 @@ document.getElementById('btnVdAddMao').addEventListener('click', function () {
     var desc = document.getElementById('vdMaoDesc').value.trim();
     var valor = parseMoeda(document.getElementById('vdMaoValor').value);
     if (!desc) { toast('Informe a descrição da mão de obra.'); return; }
+    var tipoMao = (document.getElementById('vdMaoTipoComissao') && document.getElementById('vdMaoTipoComissao').value) || 'servico';
     var mecId = '';
     var mecNome = '';
-    var mecSel = document.getElementById('vdMecanicoId') || document.getElementById('vdFuncionarioId');
+    var mecSelLinha = document.getElementById('vdMaoFuncId');
+    var mecSel1 = document.getElementById('vdMecanicoId');
+    var mecSel2 = document.getElementById('vdMecanicoId2');
+    var mecSelInt = document.getElementById('vdFuncionarioId');
+    var mecSel = (mecSelLinha && mecSelLinha.value)
+        ? mecSelLinha
+        : ((mecSel1 && mecSel1.value) ? mecSel1 : ((mecSel2 && mecSel2.value) ? mecSel2 : mecSelInt));
     if (mecSel && mecSel.value) {
         mecId = mecSel.value;
         mecNome = (mecSel.options[mecSel.selectedIndex] && mecSel.options[mecSel.selectedIndex].text) || '';
+        if (mecNome.indexOf('usar funcionário') >= 0) mecNome = '';
     }
-    var dadosMo = { pct: 0 };
+    var dadosMo = { pct: 0, valorFixo: 0, nome: '' };
     if (mecId && typeof obterDadosComissaoFuncionario === 'function') {
-        dadosMo = obterDadosComissaoFuncionario(mecId, 'servico');
+        dadosMo = obterDadosComissaoFuncionario(mecId, tipoMao);
+    }
+    var comissaoValor = 0;
+    if (typeof ehTipoMaoAmortOriginal === 'function' && ehTipoMaoAmortOriginal(tipoMao)) {
+        comissaoValor = Number(dadosMo.valorFixo) || 0;
+    } else if (typeof calcularValorComissaoMao === 'function') {
+        comissaoValor = calcularValorComissaoMao(valor, dadosMo.pct || 0);
+    } else {
+        comissaoValor = +((valor * (dadosMo.pct || 0)) / 100).toFixed(2);
     }
     addItemCarrinho({
         origem: 'mao',
         tipo: 'mao',
-        tipoMao: 'servico',
+        tipoMao: tipoMao,
         produtoId: null,
         desc: desc,
         qtd: 1,
@@ -4110,18 +4270,63 @@ document.getElementById('btnVdAddMao').addEventListener('click', function () {
         funcionarioId: mecId,
         funcionarioNome: mecNome || dadosMo.nome || '',
         comissaoPct: dadosMo.pct || 0,
-        comissaoValor: typeof calcularValorComissaoMao === 'function'
-            ? calcularValorComissaoMao(valor, dadosMo.pct || 0)
-            : +((valor * (dadosMo.pct || 0)) / 100).toFixed(2)
+        comissaoValor: comissaoValor
     });
     document.getElementById('vdMaoDesc').value = '';
     document.getElementById('vdMaoValor').value = '';
     document.getElementById('vdMaoDesc').focus();
+    if (typeof atualizarPreviewComissaoVd === 'function') atualizarPreviewComissaoVd();
 });
 
-['vdDescReais', 'vdDescPerc', 'vdRecebido'].forEach(function (id) {
-    document.getElementById(id).addEventListener('input', calcTotaisVenda);
+function atualizarPreviewComissaoVd() {
+    if (typeof atualizarRotulosTipoMaoOriginal === 'function') atualizarRotulosTipoMaoOriginal();
+    var el = document.getElementById('vdMaoComissaoPreview');
+    if (!el) return;
+    var fid = (document.getElementById('vdMaoFuncId') && document.getElementById('vdMaoFuncId').value) ||
+        (document.getElementById('vdMecanicoId') && document.getElementById('vdMecanicoId').value) ||
+        (document.getElementById('vdMecanicoId2') && document.getElementById('vdMecanicoId2').value) || '';
+    var tipo = (document.getElementById('vdMaoTipoComissao') && document.getElementById('vdMaoTipoComissao').value) || 'servico';
+    var valor = parseMoeda(document.getElementById('vdMaoValor') && document.getElementById('vdMaoValor').value);
+    if (!fid) {
+        el.textContent = 'Escolha o funcionário desta linha (ou o Funcionário 1 / 2 acima).';
+        el.style.color = '#fbbf24';
+        return;
+    }
+    if (typeof obterDadosComissaoFuncionario !== 'function') {
+        el.textContent = '';
+        return;
+    }
+    var dados = obterDadosComissaoFuncionario(fid, tipo);
+    var tipoLbl = (typeof rotuloTipoMaoComissao === 'function') ? rotuloTipoMaoComissao(tipo) : tipo;
+    if (typeof ehTipoMaoAmortOriginal === 'function' && ehTipoMaoAmortOriginal(tipo)) {
+        if (!(dados.valorFixo > 0)) {
+            el.textContent = (dados.nome || 'Funcionário') + ' — sem R$ de ' + tipoLbl.toLowerCase() + ' no cadastro.';
+            el.style.color = '#ffb4b4';
+            return;
+        }
+        el.textContent = (dados.nome || 'Funcionário') + ' · ' + tipoLbl + ': ' + moeda(dados.valorFixo) + ' (fixo)';
+        el.style.color = '#8fe0b8';
+        return;
+    }
+    var com = (typeof calcularValorComissaoMao === 'function')
+        ? calcularValorComissaoMao(valor, dados.pct || 0)
+        : +((valor * (dados.pct || 0)) / 100).toFixed(2);
+    el.textContent = (dados.nome || 'Funcionário') + ' · ' + tipoLbl + ': ' + (dados.pct || 0) + '%' +
+        (valor > 0 ? ' → ' + moeda(com) : '');
+    el.style.color = '#8fe0b8';
+}
+
+['vdDescReais', 'vdDescPerc', 'vdRecebido', 'vdRecDinheiro', 'vdRecPix', 'vdRecDebito', 'vdRecCredito', 'vdRecBoleto', 'vdStatus'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', calcTotaisVenda);
+    if (el && id === 'vdStatus') el.addEventListener('change', calcTotaisVenda);
 });
+['vdMaoFuncId', 'vdMaoTipoComissao', 'vdMecanicoId', 'vdMecanicoId2'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', atualizarPreviewComissaoVd);
+});
+var vdMaoValorEl = document.getElementById('vdMaoValor');
+if (vdMaoValorEl) vdMaoValorEl.addEventListener('input', atualizarPreviewComissaoVd);
 
 function limparVendaForm() {
     vendaEmEdicaoId = null;
@@ -4135,17 +4340,23 @@ function limparVendaForm() {
     if (selFunc) selFunc.value = '';
     var selMec = document.getElementById('vdMecanicoId');
     if (selMec) selMec.value = '';
+    var selMec2 = document.getElementById('vdMecanicoId2');
+    if (selMec2) selMec2.value = '';
+    var selMaoF = document.getElementById('vdMaoFuncId');
+    if (selMaoF) selMaoF.value = '';
     document.getElementById('vdProdBusca').value = '';
     document.getElementById('vdObs').value = '';
     document.getElementById('vdDescReais').value = '0';
     document.getElementById('vdDescPerc').value = '0';
     document.getElementById('vdRecebido').value = '';
+    if (typeof preencherRecebimentosVenda === 'function') preencherRecebimentosVenda([]);
     document.getElementById('vdTipo').value = 'VENDA';
     document.getElementById('vdStatus').value = 'PAGO';
     document.getElementById('vdForma').value = 'Dinheiro';
     prepararVendaForm();
     renderCarrinhoVenda();
     atualizarResumoEstoqueVenda();
+    if (typeof atualizarPreviewComissaoVd === 'function') atualizarPreviewComissaoVd();
 }
 
 document.getElementById('btnVdLimpar').addEventListener('click', function () {
@@ -4179,7 +4390,10 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
     }
     var mecanicoId = '';
     var mecanicoNome = '';
+    var mecanicoId2 = '';
+    var mecanicoNome2 = '';
     var selMecDoc = document.getElementById('vdMecanicoId');
+    var selMecDoc2 = document.getElementById('vdMecanicoId2');
     if (!interno && selMecDoc && selMecDoc.value) {
         mecanicoId = selMecDoc.value;
         mecanicoNome = (selMecDoc.options[selMecDoc.selectedIndex] && selMecDoc.options[selMecDoc.selectedIndex].text) || '';
@@ -4187,20 +4401,31 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
         mecanicoId = funcionarioId || '';
         mecanicoNome = funcionarioNome || '';
     }
+    if (!interno && selMecDoc2 && selMecDoc2.value) {
+        mecanicoId2 = selMecDoc2.value;
+        mecanicoNome2 = (selMecDoc2.options[selMecDoc2.selectedIndex] && selMecDoc2.options[selMecDoc2.selectedIndex].text) || '';
+    }
     carrinhoVenda.forEach(function (it) {
         if (!it) return;
         var ehMao = (it.origem || it.tipo || '') === 'mao';
         if (!ehMao) return;
-        if (!it.funcionarioId && mecanicoId) {
-            it.funcionarioId = mecanicoId;
-            it.funcionarioNome = mecanicoNome;
+        if (!it.funcionarioId) {
+            if (mecanicoId) {
+                it.funcionarioId = mecanicoId;
+                it.funcionarioNome = mecanicoNome;
+            } else if (mecanicoId2) {
+                it.funcionarioId = mecanicoId2;
+                it.funcionarioNome = mecanicoNome2;
+            }
         }
         if (it.funcionarioId && typeof obterDadosComissaoFuncionario === 'function') {
             var dM = obterDadosComissaoFuncionario(it.funcionarioId, it.tipoMao || 'servico');
-            if (!(Number(it.comissaoPct) > 0) && dM.pct > 0) it.comissaoPct = dM.pct;
+            it.comissaoPct = dM.pct || 0;
             if (!it.funcionarioNome) it.funcionarioNome = dM.nome;
             var baseMo = Number(it.total != null ? it.total : it.venda) || 0;
-            if (typeof calcularValorComissaoMao === 'function') {
+            if (typeof ehTipoMaoAmortOriginal === 'function' && ehTipoMaoAmortOriginal(it.tipoMao)) {
+                it.comissaoValor = Number(dM.valorFixo) || 0;
+            } else if (typeof calcularValorComissaoMao === 'function') {
                 it.comissaoValor = calcularValorComissaoMao(baseMo, it.comissaoPct || 0);
             }
         }
@@ -4220,6 +4445,31 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
     var totais = calcTotaisVenda();
     var status = document.getElementById('vdStatus').value;
     var forma = document.getElementById('vdForma').value;
+    var recebidoSave = Number(totais.valorRecebido) || 0;
+    var abertoSave = Number(totais.saldoAberto) || 0;
+    if (status === 'PENDENTE' && recebidoSave < 0.01) {
+        status = 'PENDENTE';
+        recebidoSave = 0;
+        abertoSave = totais.total;
+    } else if (abertoSave < 0.01 && recebidoSave > 0) {
+        status = 'PAGO';
+        abertoSave = 0;
+    } else if (recebidoSave > 0.009 && abertoSave > 0.009) {
+        status = 'PARCIAL';
+    } else if (status === 'PARCIAL' && recebidoSave < 0.01) {
+        status = 'PENDENTE';
+        abertoSave = totais.total;
+    } else if (status === 'PAGO' && recebidoSave < 0.01 && tipo === 'VENDA') {
+        recebidoSave = totais.total;
+        abertoSave = 0;
+        totais.valorRecebido = recebidoSave;
+        totais.saldoAberto = 0;
+        if (!(totais.recebimentos && totais.recebimentos.length)) {
+            totais.recebimentos = [{ forma: forma, valor: recebidoSave }];
+        }
+    }
+    totais.valorRecebido = recebidoSave;
+    totais.saldoAberto = abertoSave;
     var numero = Number(document.getElementById('vdNumero').value) || proximoNumeroVenda(db);
     var editando = !!vendaEmEdicaoId;
     var docExistente = editando
@@ -4277,6 +4527,8 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
         funcionarioNome: funcionarioNome,
         mecanicoId: mecanicoId || funcionarioId || '',
         mecanicoNome: mecanicoNome || funcionarioNome || '',
+        mecanicoId2: mecanicoId2 || '',
+        mecanicoNome2: mecanicoNome2 || '',
         placa: placa,
         statusPagamento: status,
         formaPagamento: forma,
@@ -4286,8 +4538,11 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
         subtotal: totais.subtotal,
         descontoReais: totais.descontoReais,
         descontoPerc: totais.descontoPerc,
+        descontoPercValor: totais.descontoPercValor,
         valor: totais.total,
         valorRecebido: totais.valorRecebido,
+        saldoAberto: totais.saldoAberto,
+        recebimentos: (totais.recebimentos || []).slice(),
         troco: totais.troco,
         observacao: document.getElementById('vdObs').value.trim(),
         descricao: carrinhoVenda.map(function (x) { return x.desc; }).join(', '),
@@ -4309,20 +4564,38 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
         db.pendentes = (db.pendentes || []).filter(function (l) { return String(l.vendaId || '') !== String(vid); });
     }
 
-    /* Destino financeiro — igual FH (na edição, regrava o lançamento ligado à venda) */
+    /* Destino financeiro — splits, parcial e orçamento também lançam */
     if (tipo === 'VENDA' || tipo === 'ORCAMENTO') {
         if (editando) removerLancamentosVenda(doc.id);
-        if (status === 'PAGO' && tipo === 'VENDA') {
+        var rotuloDoc = (tipo === 'ORCAMENTO' ? 'Orçamento' : 'Venda') + ' Nº ' + numero;
+        var splitsPost = (totais.recebimentos && totais.recebimentos.length)
+            ? totais.recebimentos.slice()
+            : [];
+        if (!splitsPost.length && status !== 'PENDENTE' && (Number(totais.valorRecebido) || 0) > 0.009) {
+            splitsPost = [{ forma: forma, valor: Number(totais.valorRecebido) }];
+        }
+        if (Number(totais.troco) > 0.009) {
+            var trocoRest = Number(totais.troco);
+            splitsPost = splitsPost.map(function (r) { return { forma: r.forma, valor: r.valor }; });
+            for (var si = 0; si < splitsPost.length; si++) {
+                if (String(splitsPost[si].forma || '') === 'Dinheiro' && splitsPost[si].valor >= trocoRest) {
+                    splitsPost[si].valor = +(splitsPost[si].valor - trocoRest).toFixed(2);
+                    break;
+                }
+            }
+            splitsPost = splitsPost.filter(function (r) { return (Number(r.valor) || 0) > 0.009; });
+        }
+        splitsPost.forEach(function (r) {
             var lanc = {
                 id: uid(),
                 tipo: 'entrada',
-                descricao: 'Venda Nº ' + numero + ' — ' + clienteNome,
-                valor: totais.total,
-                forma: forma,
+                descricao: rotuloDoc + ' — ' + clienteNome + ' (' + (r.forma || forma) + ')',
+                valor: Number(r.valor) || 0,
+                forma: r.forma || forma,
                 vendaId: doc.id,
                 criadoEm: new Date().toISOString()
             };
-            if (formaPagamentoEhDigital(forma)) {
+            if (formaPagamentoEhDigital(lanc.forma)) {
                 if (!db.caixaBanco) db.caixaBanco = [];
                 lanc.conta = 'banco';
                 db.caixaBanco.push(lanc);
@@ -4331,17 +4604,23 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
                 lanc.conta = 'balcao';
                 db.caixa.push(lanc);
             }
-        } else if (status === 'PENDENTE' && tipo === 'VENDA') {
+        });
+        var valorPend = 0;
+        if (status === 'PENDENTE') valorPend = Number(totais.total) || 0;
+        else if (status === 'PARCIAL') valorPend = Number(totais.saldoAberto) || 0;
+        if (valorPend > 0.009) {
             if (!db.pendentes) db.pendentes = [];
             db.pendentes.push({
                 id: uid(),
                 cliente: clienteNome,
-                descricao: 'Venda Nº ' + numero + ' — ' + (doc.descricao || 'Venda'),
-                valor: totais.total,
+                clienteId: doc.clienteId || null,
+                descricao: rotuloDoc + ' — saldo em aberto',
+                valor: +valorPend.toFixed(2),
                 vencimento: doc.dataVencimento || hojeISO(),
                 status: 'aberto',
                 vendaId: doc.id,
                 formaPrevista: forma,
+                ehBoleto: String(forma || '').toLowerCase().indexOf('boleto') >= 0,
                 criadoEm: new Date().toISOString()
             });
         }
@@ -4352,10 +4631,13 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
     if (editando) {
         msg = (tipo === 'ORCAMENTO' ? 'Orçamento' : 'Venda') + ' Nº ' + numero + ' atualizado(a). Estoque não foi alterado na edição.';
     } else if (tipo === 'ORCAMENTO') {
-        msg = 'Orçamento Nº ' + numero + ' salvo (sem baixa de estoque).';
+        if (status === 'PARCIAL') msg = 'Orçamento Nº ' + numero + ' salvo. Recebido parcial; saldo em aberto no perfil.';
+        else if (status === 'PENDENTE') msg = 'Orçamento Nº ' + numero + ' salvo. Valor em contas a receber.';
+        else msg = 'Orçamento Nº ' + numero + ' salvo (sem baixa de estoque).';
     } else if (status === 'PAGO') {
-        msg = 'Venda Nº ' + numero + ' salva. Estoque baixado. ' +
-            (formaPagamentoEhDigital(forma) ? 'Valor no Caixa do Banco (PIX/cartão).' : 'Valor no Caixa Balcão (dinheiro).');
+        msg = 'Venda Nº ' + numero + ' salva. Estoque baixado. Recebimento lançado no caixa.';
+    } else if (status === 'PARCIAL') {
+        msg = 'Venda Nº ' + numero + ' salva. Estoque baixado. Saldo em aberto no perfil do cliente.';
     } else {
         msg = 'Venda Nº ' + numero + ' salva. Estoque baixado. Valor em Contas a Receber.';
     }
@@ -4385,7 +4667,12 @@ function renderOrcamentos() {
         var tagFunc = o.vendaFuncionario || o.funcionarioId
             ? ' <span style="font-size:0.68rem;font-weight:700;color:#f1c40f">FUNCIONÁRIO</span>'
             : '';
-        var pgto = (o.statusPagamento || '—') + (o.formaPagamento ? ' / ' + o.formaPagamento : '');
+        var stPg = String(o.statusPagamento || '—').toUpperCase();
+        var recsTxt = (o.recebimentos || []).map(function (r) {
+            return (r.forma || '') + ' ' + moeda(r.valor);
+        }).join(' + ');
+        var pgto = stPg + (recsTxt ? ' · ' + recsTxt : (o.formaPagamento ? ' / ' + o.formaPagamento : ''));
+        if (stPg === 'PARCIAL' && Number(o.saldoAberto) > 0) pgto += ' · aberto ' + moeda(o.saldoAberto);
         var tr = document.createElement('tr');
         tr.innerHTML =
             '<td>' + esc(o.numero || '—') + '</td>' +

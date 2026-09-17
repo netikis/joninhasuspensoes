@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=34">
-    <link rel="stylesheet" href="css/tema-m3.css?v=34">
+    <link rel="stylesheet" href="css/app.css?v=35">
+    <link rel="stylesheet" href="css/tema-m3.css?v=35">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -451,7 +451,7 @@
                                 <option value="alinhamento">Mão de obra — Alinhamento</option>
                                 <option value="amortecedor">Mão de obra — Amortecedor</option>
                                 <option value="amortecedor-original">Mão de obra — Amortecedor original 1</option>
-                                <option value="amortecedor-original-2">Mão de obra — Amortecedor original 2</option>
+                                <option value="amortecedor-original-2">Mão de obra — Rebaixados</option>
                             </select>
                         </div>
                         <div class="col"><label>Valor (R$)</label><input id="maoValor" inputmode="decimal" placeholder="0,00"></div>
@@ -604,8 +604,9 @@
                             <div class="col">
                                 <label>Status pgto</label>
                                 <select id="vdStatus">
-                                    <option value="PAGO" selected>✅ PAGO (Soma no Caixa)</option>
-                                    <option value="PENDENTE">⏳ PENDENTE (Não Soma)</option>
+                                    <option value="PAGO" selected>✅ PAGO (finalizado)</option>
+                                    <option value="PARCIAL">◐ PARCIAL (fica em aberto)</option>
+                                    <option value="PENDENTE">⏳ PENDENTE (não recebeu)</option>
                                 </select>
                             </div>
                             <div class="col">
@@ -629,11 +630,22 @@
                                 <datalist id="listaClientesVenda"></datalist>
                             </div>
                             <div class="col"><label>Placa (opcional)</label><input id="vdPlaca" maxlength="7" style="text-transform:uppercase"></div>
+                        </div>
+                        <div class="row" style="margin-top:12px" id="wrapVdMecanicos">
                             <div class="col">
-                                <label>Mecânico (comissão %)</label>
+                                <label>Funcionário 1 (comissão)</label>
                                 <select id="vdMecanicoId">
                                     <option value="">— sem funcionário —</option>
                                 </select>
+                            </div>
+                            <div class="col">
+                                <label>Funcionário 2 (comissão)</label>
+                                <select id="vdMecanicoId2">
+                                    <option value="">— sem funcionário —</option>
+                                </select>
+                            </div>
+                            <div class="col" style="flex:1.4">
+                                <p class="hint" style="margin:22px 0 0">Na mão de obra abaixo, escolha quem fez cada serviço e o tipo da comissão.</p>
                             </div>
                         </div>
                         <div class="row" style="margin-top:12px;display:none" id="wrapVdClienteInterno">
@@ -703,10 +715,31 @@
                     <div class="box">
                         <h3>4. Mão de obra / serviço</h3>
                         <div class="row" style="align-items:flex-end">
-                            <div class="col" style="flex:2"><label>Descrição</label><input id="vdMaoDesc" placeholder="Ex: Funilaria, pintura, polimento..."></div>
+                            <div class="col" style="flex:1.6"><label>Descrição</label><input id="vdMaoDesc" placeholder="Ex: Funilaria, pintura, polimento..."></div>
+                            <div class="col">
+                                <label>Funcionário desta linha</label>
+                                <select id="vdMaoFuncId">
+                                    <option value="">— usar funcionário 1 —</option>
+                                </select>
+                            </div>
+                            <div class="col">
+                                <label>Tipo (comissão)</label>
+                                <select id="vdMaoTipoComissao">
+                                    <option value="servico">Serviço (%)</option>
+                                    <option value="alinhamento">Alinhamento (%)</option>
+                                    <option value="amortecedor">Amortecedor (%)</option>
+                                    <option value="amortecedor-original">Amortecedor original 1 (R$)</option>
+                                    <option value="amortecedor-original-2">Rebaixados (R$)</option>
+                                </select>
+                            </div>
                             <div class="col"><label>Valor (R$)</label><input id="vdMaoValor" inputmode="decimal" placeholder="0,00"></div>
                             <div class="col" style="flex:0.55"><button type="button" class="btn btn-primary" id="btnVdAddMao" style="width:100%">➕ Serv</button></div>
                         </div>
+                        <p class="hint" id="vdMaoComissaoPreview" style="margin-top:8px;margin-bottom:0;color:#8fe0b8;font-weight:700"></p>
+                    </div>
+                    <div class="box vd-resumo-orcamento" id="vdResumoOrcamentoBox">
+                        <h3>Total do orçamento / venda</h3>
+                        <div id="vdResumoOrcamentoTxt" class="vd-resumo-linhas">Adicione itens para somar.</div>
                     </div>
                 </div>
 
@@ -717,14 +750,31 @@
                         <div class="col"><label>Desconto R$</label><input id="vdDescReais" type="number" step="0.01" value="0"></div>
                         <div class="col"><label>Desconto %</label><input id="vdDescPerc" type="number" step="0.1" value="0"></div>
                     </div>
-                    <div style="margin-top:10px">
-                        <label style="color:#f1c40f">Valor recebido (R$)</label>
-                        <input id="vdRecebido" type="number" step="0.01" placeholder="Dinheiro do cliente...">
+                    <p class="hint" style="margin-top:6px">O % incide depois do desconto em R$. O total final aparece abaixo.</p>
+                    <div class="vd-split-pgto" id="vdSplitPgto">
+                        <label style="font-weight:800;color:#f1c40f">Como recebeu (pode misturar)</label>
+                        <div class="row" style="margin-top:6px">
+                            <div class="col"><label>Dinheiro</label><input id="vdRecDinheiro" type="number" step="0.01" min="0" placeholder="0,00"></div>
+                            <div class="col"><label>PIX</label><input id="vdRecPix" type="number" step="0.01" min="0" placeholder="0,00"></div>
+                        </div>
+                        <div class="row" style="margin-top:6px">
+                            <div class="col"><label>Cartão débito</label><input id="vdRecDebito" type="number" step="0.01" min="0" placeholder="0,00"></div>
+                            <div class="col"><label>Cartão crédito</label><input id="vdRecCredito" type="number" step="0.01" min="0" placeholder="0,00"></div>
+                            <div class="col"><label>Boleto</label><input id="vdRecBoleto" type="number" step="0.01" min="0" placeholder="0,00"></div>
+                        </div>
                     </div>
-                    <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08)">
-                        <div style="font-weight:700;color:#f1c40f;margin-bottom:6px" id="vdTrocoTxt">Troco: R$ 0,00</div>
-                        <div class="muted" style="font-size:0.85rem">Subtotal: <span id="vdSubtotalTxt">R$ 0,00</span></div>
-                        <div style="font-size:1.4rem;font-weight:800;color:#8fe0b8;margin-top:4px" id="vdTotalTxt">TOTAL: R$ 0,00</div>
+                    <div style="margin-top:10px">
+                        <label style="color:#f1c40f">Valor recebido total (R$)</label>
+                        <input id="vdRecebido" type="number" step="0.01" placeholder="Soma do que entrou...">
+                    </div>
+                    <div class="vd-totais-box" id="vdTotaisBox">
+                        <div class="vd-totais-linha"><span>Itens (subtotal)</span><strong id="vdSubtotalTxt">R$ 0,00</strong></div>
+                        <div class="vd-totais-linha" id="vdLinhaDescReais"><span>Desconto R$</span><strong id="vdDescReaisTxt">R$ 0,00</strong></div>
+                        <div class="vd-totais-linha" id="vdLinhaDescPerc"><span>Desconto %</span><strong id="vdDescPercTxt">R$ 0,00</strong></div>
+                        <div class="vd-totais-linha vd-totais-total"><span>TOTAL</span><strong id="vdTotalTxt">R$ 0,00</strong></div>
+                        <div class="vd-totais-linha"><span>Recebido</span><strong id="vdRecebidoTxt">R$ 0,00</strong></div>
+                        <div class="vd-totais-linha vd-totais-aberto"><span>Em aberto</span><strong id="vdAbertoTxt">R$ 0,00</strong></div>
+                        <div class="vd-totais-linha" id="vdTrocoTxt">Troco: R$ 0,00</div>
                     </div>
                     <div style="margin-top:12px">
                         <label>Observações</label>
@@ -1164,7 +1214,7 @@
                     </div>
                     <div class="row" style="margin-top:10px">
                         <div class="col"><label>MO Amortecedor original 1 (R$)</label><input id="pfComissaoAmortecedorOriginal" inputmode="decimal" placeholder="Ex: 5,00"></div>
-                        <div class="col"><label>MO Amortecedor original 2 (R$)</label><input id="pfComissaoAmortecedorOriginal2" inputmode="decimal" placeholder="Ex: 10,00"></div>
+                        <div class="col"><label>MO Rebaixados (R$)</label><input id="pfComissaoAmortecedorOriginal2" inputmode="decimal" placeholder="Ex: 10,00"></div>
                     </div>
                     <div class="row" style="margin-top:10px">
                         <div class="col"><label>PIN (opcional)</label><input id="pfPinFunc" type="password" inputmode="numeric" maxlength="8" placeholder="Ex: 1234"></div>
@@ -1175,7 +1225,7 @@
                             </label>
                         </div>
                     </div>
-                    <p class="hint" style="margin-top:8px">Na OS, Alinhamento / Serviço / Amortecedor usam a <strong>%</strong>. Amortecedor original 1 e 2 usam o <strong>R$ fixo</strong> (ex.: 5,00 e 10,00). Na OS você escolhe qual dos dois o funcionário recebe.</p>
+                    <p class="hint" style="margin-top:8px">Na OS e no orçamento, Alinhamento / Serviço / Amortecedor usam a <strong>%</strong>. Original 1 e <strong>Rebaixados</strong> usam o <strong>R$ fixo</strong>. Você escolhe o tipo em cada linha de mão de obra.</p>
                     <input type="hidden" id="pfComissaoPct" value="40">
                     <div class="row" style="margin-top:14px">
                         <button type="submit" class="btn btn-primary" id="btnSalvarFunc">Salvar funcionário</button>
@@ -1206,7 +1256,7 @@
                                 <th>Serv.%</th>
                                 <th>Amort.%</th>
                                 <th>Orig. 1</th>
-                                <th>Orig. 2</th>
+                                <th>Rebaix.</th>
                                 <th>Status</th>
                                 <th style="min-width:220px">Ações</th>
                             </tr>
@@ -1649,17 +1699,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=34"></script>
-    <script src="js/storage.js?v=34"></script>
-    <script src="js/ui.js?v=34"></script>
-    <script src="js/auth.js?v=34"></script>
-    <script src="js/os.js?v=34"></script>
-    <script src="js/nuvem.js?v=34"></script>
-    <script src="js/caixa.js?v=34"></script>
-    <script src="js/comissoes.js?v=34"></script>
-    <script src="js/app.js?v=34"></script>
-    <script src="js/perfil-cliente.js?v=34"></script>
-    <script src="js/navegacao.js?v=34"></script>
+    <script src="js/config.js?v=35"></script>
+    <script src="js/storage.js?v=35"></script>
+    <script src="js/ui.js?v=35"></script>
+    <script src="js/auth.js?v=35"></script>
+    <script src="js/os.js?v=35"></script>
+    <script src="js/nuvem.js?v=35"></script>
+    <script src="js/caixa.js?v=35"></script>
+    <script src="js/comissoes.js?v=35"></script>
+    <script src="js/app.js?v=35"></script>
+    <script src="js/perfil-cliente.js?v=35"></script>
+    <script src="js/navegacao.js?v=35"></script>
 </body>
 </html>
 

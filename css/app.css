@@ -749,6 +749,56 @@
             letter-spacing: 0.04em;
         }
 
+        .vd-totais-box {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 10px;
+            background: #0f172a;
+            border: 1px solid #c9a227;
+            color: #fff;
+            position: sticky;
+            bottom: 0;
+            z-index: 2;
+        }
+        .vd-split-pgto {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            background: #1a252f;
+            border: 1px solid rgba(201, 162, 39, 0.35);
+        }
+        .vd-totais-linha {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 0.88rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #e2e8f0;
+        }
+        .vd-totais-total {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(201, 162, 39, 0.45);
+            font-size: 1.15rem;
+            color: #fff;
+        }
+        .vd-totais-total strong { color: #86efac; font-size: 1.25rem; }
+        .vd-totais-aberto strong { color: #fbbf24; }
+        .vd-resumo-orcamento { border: 2px solid #c9a227; }
+        .vd-resumo-linhas {
+            font-weight: 800;
+            font-size: 1.05rem;
+            line-height: 1.55;
+            color: #fff;
+        }
+        .vd-cart-func {
+            display: block;
+            font-size: 0.72rem;
+            color: #9fd3ff;
+            font-weight: 700;
+        }
+
         #vdCarrinhoLista {
             flex: 1;
             min-height: 80px;
@@ -1244,7 +1294,9 @@
             overflow: auto;
             background: #fff;
             color: #1e293b;
-            border: 2px solid #c9a227;
+            border: 3px solid #c9a227;
+            border-radius: 12px;
+            padding: 20px 22px 24px;
             position: relative;
         }
         .perfil-cli-fechar {
@@ -1266,12 +1318,15 @@
             flex-wrap: wrap;
             margin: 8px 8px 14px 0;
             padding-bottom: 12px;
-            border-bottom: 2px solid #152642;
+            border-bottom: 2px solid #2563eb;
         }
         .perfil-cli-nome {
             margin: 0;
             font-size: 1.35rem;
-            color: #152642;
+            color: #2563eb;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
         }
         .perfil-cli-meta {
             margin: 6px 0 0;
@@ -1283,6 +1338,22 @@
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
+        }
+        #modalPerfilCliente .perfil-cli-btns-top .btn {
+            background: #fff;
+            color: #1e293b;
+            border: 1px solid #cbd5e1;
+            font-weight: 700;
+        }
+        .perfil-alerta-30 {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            font-weight: 800;
+            font-size: 0.88rem;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin: 0 0 12px;
         }
         .perfil-cli-kpis {
             display: grid;
@@ -1325,11 +1396,16 @@
             cursor: pointer;
         }
         .perfil-tab.ativo {
-            background: #152642;
+            background: #1d4ed8;
             color: #fff;
-            border-color: #152642;
+            border-color: #1d4ed8;
         }
         .perfil-tab-painel { overflow: auto; }
+        .perfil-sub {
+            margin: 14px 0 8px;
+            color: #152642;
+            font-size: 0.95rem;
+        }
         .perfil-tabela {
             width: 100%;
             border-collapse: collapse;
@@ -1379,6 +1455,7 @@
         }
         .perfil-badge-ok { background: #dcfce7; color: #166534; }
         .perfil-badge-warn { background: #fef3c7; color: #92400e; }
+        .perfil-badge-danger { background: #fee2e2; color: #991b1b; }
         .cli-nome-perfil { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
         @media (max-width: 700px) {
             .perfil-cli-kpis { grid-template-columns: 1fr 1fr; }

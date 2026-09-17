@@ -424,7 +424,7 @@ function faixaAmortecedorOriginal(tipo) {
 function rotuloTipoMaoComissao(tipo) {
     if (tipo === 'alinhamento') return 'Alinhamento';
     var faixaOrig = faixaAmortecedorOriginal(tipo);
-    if (faixaOrig === 2) return 'Amortecedor original 2';
+    if (faixaOrig === 2) return 'Rebaixados';
     if (faixaOrig === 1) return 'Amortecedor original 1';
     if (tipo === 'amortecedor') return 'Amortecedor';
     return 'Serviço';
@@ -506,18 +506,23 @@ function calcularValorComissaoMao(valorMo, pct) {
 }
 
 function atualizarRotulosTipoMaoOriginal() {
-    var sel = document.getElementById('maoTipoComissao');
-    if (!sel) return;
-    var fid = document.getElementById('maoFuncId') && document.getElementById('maoFuncId').value;
+    var fid = (document.getElementById('maoFuncId') && document.getElementById('maoFuncId').value) ||
+        (document.getElementById('vdMaoFuncId') && document.getElementById('vdMaoFuncId').value) ||
+        (document.getElementById('vdMecanicoId') && document.getElementById('vdMecanicoId').value) || '';
     var d1 = fid ? obterDadosComissaoFuncionario(fid, 'amortecedor-original') : { valorFixo: 0 };
     var d2 = fid ? obterDadosComissaoFuncionario(fid, 'amortecedor-original-2') : { valorFixo: 0 };
-    function setOpt(val, base, v) {
+    function setOpt(sel, val, base, v) {
+        if (!sel) return;
         var o = sel.querySelector('option[value="' + val + '"]');
         if (!o) return;
         o.textContent = (v > 0) ? (base + ' (' + moeda(v) + ')') : base;
     }
-    setOpt('amortecedor-original', 'Mão de obra — Amortecedor original 1', d1.valorFixo);
-    setOpt('amortecedor-original-2', 'Mão de obra — Amortecedor original 2', d2.valorFixo);
+    var sel = document.getElementById('maoTipoComissao');
+    setOpt(sel, 'amortecedor-original', 'Mão de obra — Amortecedor original 1', d1.valorFixo);
+    setOpt(sel, 'amortecedor-original-2', 'Mão de obra — Rebaixados', d2.valorFixo);
+    var selVd = document.getElementById('vdMaoTipoComissao');
+    setOpt(selVd, 'amortecedor-original', 'Amortecedor original 1 (R$)', d1.valorFixo);
+    setOpt(selVd, 'amortecedor-original-2', 'Rebaixados (R$)', d2.valorFixo);
 }
 
 function atualizarPreviewComissaoMao() {
