@@ -134,11 +134,15 @@ function _coletarContasCliente(db, c) {
             doc: o
         });
     });
+    var idsOs = {};
     (db.atendimentos || []).forEach(function (a) {
         if (!_pertenceCliente(c, a)) return;
-        if (String(a.statusPagamento || '').toUpperCase() === 'PAGO') return;
-        var tot = Number(a.total) || 0;
-        if (tot < 0.01) return;
+        var st = String(a.statusPagamento || '').toUpperCase();
+        if (st === 'PAGO') return;
+        if (st !== 'PARCIAL' && st !== 'PENDENTE' && !(Number(a.saldoAberto) > 0.009)) return;
+        var aberto = _valorAbertoDoc(a);
+        if (aberto < 0.01) return;
+        idsOs[String(a.id)] = true;
         contas.push({
             kind: 'os',
             id: a.id,
@@ -147,9 +151,9 @@ function _coletarContasCliente(db, c) {
             emissao: _dataOs(a),
             vencimento: a.dataVencimento || a.entrada,
             forma: a.formaPagamento || '',
-            aberto: tot,
-            recebido: 0,
-            recebimentos: [],
+            aberto: aberto,
+            recebido: Number(a.valorRecebido) || 0,
+            recebimentos: a.recebimentos || [],
             status: a.statusPagamento || a.status || 'PENDENTE',
             ehBoleto: _formaEhBoleto(a),
             doc: a
@@ -158,6 +162,7 @@ function _coletarContasCliente(db, c) {
     (db.pendentes || []).forEach(function (p) {
         if (p.status === 'pago') return;
         if (p.vendaId && idsDoc[String(p.vendaId)]) return;
+        if (p.atendimentoId && idsOs[String(p.atendimentoId)]) return;
         if (!_pertenceCliente(c, p) && String(p.cliente || '').trim().toLowerCase() !== String(c.nome || '').trim().toLowerCase()) return;
         contas.push({
             kind: 'pendente',
@@ -279,6 +284,7 @@ function _acoesDocPerfil(item) {
     var h = '<div class="perfil-acoes-linha">';
     if (item.kind === 'os') {
         h += '<button type="button" class="btn btn-ver" data-pf="nota" data-id="' + esc(item.id) + '">Ver</button>';
+        h += '<button type="button" class="btn btn-ok" data-pf="receber-os" data-id="' + esc(item.id) + '">Receber</button>';
         h += '<button type="button" class="btn btn-secondary" data-pf="edit-os" data-id="' + esc(item.id) + '">Editar</button>';
     } else if (item.kind === 'pendente') {
         if (item.vendaId) {
@@ -337,14 +343,20 @@ function _htmlPerfilOs(lista) {
     var h = '<table class="perfil-tabela"><thead><tr><th>Data</th><th>Carro</th><th>Placa</th><th>O que foi feito</th><th>Status</th><th>Total</th><th>Ações</th></tr></thead><tbody>';
     lista.forEach(function (a) {
         var pago = String(a.statusPagamento || '').toUpperCase() === 'PAGO';
+        var stPg = String(a.statusPagamento || '').toUpperCase();
+        var stLbl = a.status || '—';
+        if (pago) stLbl += ' · PAGO';
+        else if (stPg === 'PARCIAL') stLbl += ' · PARCIAL';
+        else if (stPg === 'PENDENTE') stLbl += ' · EM ABERTO';
         h += '<tr>' +
             '<td>' + esc(fmtData(_dataOs(a)) || '—') + '</td>' +
             '<td>' + esc(a.carro || '—') + '</td>' +
             '<td>' + esc((a.placa || '—').toUpperCase()) + '</td>' +
-            '<td class="perfil-feito">' + esc(_resumoFeitoOs(a)) + '</td>' +
+            '<td class="perfil-feito">' + esc(_resumoFeitoOs(a)) +
+            (_textoRecebimentos(a) ? '<div class="perfil-feito">' + esc(_textoRecebimentos(a)) + '</div>' : '') + '</td>' +
             '<td><span class="perfil-badge ' + (pago ? 'perfil-badge-ok' : 'perfil-badge-warn') + '">' +
-            esc(a.status || '—') + (pago ? ' · PAGO' : '') + '</span></td>' +
-            '<td>' + moeda(a.total) + '</td>' +
+            esc(stLbl) + '</span></td>' +
+            '<td>' + moeda(a.total) + (Number(a.saldoAberto) > 0.009 ? '<div class="perfil-feito">Aberto ' + moeda(a.saldoAberto) + '</div>' : '') + '</td>' +
             '<td><div class="perfil-acoes-linha">' +
                 '<button type="button" class="btn btn-ver" data-pf="nota" data-id="' + esc(a.id) + '">Ver nota</button>' +
                 '<button type="button" class="btn btn-secondary" data-pf="edit-os" data-id="' + esc(a.id) + '">Editar</button>' +
@@ -457,6 +469,10 @@ function _preencherVendaComCliente(c) {
         if (acao === 'edit-os' && id && typeof editarAtendimento === 'function') {
             fecharPerfilCliente();
             editarAtendimento(id);
+            return;
+        }
+        if (acao === 'receber-os' && id && typeof abrirModalReceberOs === 'function') {
+            abrirModalReceberOs(id);
             return;
         }
         if (acao === 'venda' && id && typeof abrirDocumentoVenda === 'function') {

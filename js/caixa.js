@@ -690,6 +690,14 @@ function tratarCliqueAcoesDocumentoCaixa(e) {
     if (b) { hit(); abrirLinkAssinatura(b.getAttribute('data-cx-link')); return true; }
     b = e.target.closest('[data-cx-edit-os]');
     if (b) { hit(); editarAtendimento(b.getAttribute('data-cx-edit-os')); return true; }
+    b = e.target.closest('[data-cx-ver-os]');
+    if (b) { hit(); abrirNota(b.getAttribute('data-cx-ver-os')); return true; }
+    b = e.target.closest('[data-cx-rec-os]');
+    if (b) {
+        hit();
+        if (typeof abrirModalReceberOs === 'function') abrirModalReceberOs(b.getAttribute('data-cx-rec-os'));
+        return true;
+    }
     b = e.target.closest('[data-cx-ver-vd]');
     if (b) { hit(); abrirDocumentoVenda(b.getAttribute('data-cx-ver-vd')); return true; }
     b = e.target.closest('[data-cx-imp-vd]');
@@ -996,6 +1004,7 @@ function receberPendente(id, destino) {
         conta: destino,
         pendenteId: p.id,
         vendaId: p.vendaId || '',
+        atendimentoId: p.atendimentoId || '',
         criadoEm: new Date().toISOString()
     };
     if (destino === 'banco') {
@@ -1016,6 +1025,24 @@ function receberPendente(id, destino) {
             if (!o.recebimentos) o.recebimentos = [];
             o.recebimentos.push({ forma: lanc.forma, valor: lanc.valor, em: lanc.criadoEm });
             o.atualizadoEm = new Date().toISOString();
+        }
+    }
+    if (p.atendimentoId) {
+        var os = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(p.atendimentoId); });
+        if (os) {
+            var recOs = (Number(os.valorRecebido) || 0) + (Number(p.valor) || 0);
+            var totOs = Number(os.total) || 0;
+            os.valorRecebido = +recOs.toFixed(2);
+            os.saldoAberto = Math.max(0, +(totOs - recOs).toFixed(2));
+            os.statusPagamento = os.saldoAberto < 0.01 ? 'PAGO' : 'PARCIAL';
+            if (!os.recebimentos) os.recebimentos = [];
+            os.recebimentos.push({ forma: lanc.forma, valor: lanc.valor, em: lanc.criadoEm });
+            os.formaPagamento = (os.formaPagamento ? os.formaPagamento + ' + ' : '') + lanc.forma;
+            os.atualizadoEm = new Date().toISOString();
+            if (os.statusPagamento === 'PAGO' && (os.status || '') !== 'Entregue') {
+                os.status = 'Entregue';
+                if (!os.saida) os.saida = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
+            }
         }
     }
     if (canalVendas !== 'interno') marcarExcluido(db, 'pendentes', p.id);
@@ -1051,7 +1078,10 @@ function renderPendentes() {
               '<button type="button" class="btn btn-secondary" data-cx-imp-vd="' + esc(p.vendaId) + '">Imprimir</button>' +
               '<button type="button" class="btn btn-pdf" data-cx-pdf-vd="' + esc(p.vendaId) + '">PDF</button>' +
               '<button type="button" class="btn btn-secondary" data-cx-edit-vd="' + esc(p.vendaId) + '">Editar</button>'
-            : '';
+            : (p.atendimentoId
+                ? '<button type="button" class="btn btn-ver" data-cx-ver-os="' + esc(p.atendimentoId) + '">Ver OS</button>' +
+                  '<button type="button" class="btn btn-ok" data-cx-rec-os="' + esc(p.atendimentoId) + '">Receber OS</button>'
+                : '');
         var atraso = 0;
         if (p.vencimento) {
             var dv = new Date(String(p.vencimento).slice(0, 10) + 'T12:00:00');

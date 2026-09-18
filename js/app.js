@@ -1172,6 +1172,7 @@ function atualizarKPIs(db) {
     var abertos = listarCarrosEmAberto(db);
     setTxt('kpiCarrosAberto', abertos.length);
     if (typeof renderCarrosEmAberto === 'function') renderCarrosEmAberto(db);
+    if (typeof renderAlertaVencidos30 === 'function') renderAlertaVencidos30(db);
 }
 
 function atendimentoEmAberto(a) {
@@ -2047,6 +2048,34 @@ function htmlItensNota(itens) {
         '<div class="nota-total compacto">Total: ' + moeda(pecas + mao) + '</div>';
 }
 
+function htmlPagamentoOs(a) {
+    if (!a) return '';
+    var descR = Number(a.descontoReais) || 0;
+    var descP = Number(a.descontoPerc) || 0;
+    var recs = (a.recebimentos || []).slice();
+    var recebido = Number(a.valorRecebido) || recs.reduce(function (s, r) { return s + (Number(r.valor) || 0); }, 0);
+    var aberto = a.saldoAberto != null
+        ? Number(a.saldoAberto)
+        : Math.max(0, (Number(a.total) || 0) - recebido);
+    var st = String(a.statusPagamento || '').toUpperCase();
+    if (!(descR > 0) && !(descP > 0) && !recs.length && !(recebido > 0) && !st) return '';
+    var html = '<div class="nota-subtotais compacto" style="margin-top:10px">';
+    if (descR > 0) html += '<div>Desconto R$: <strong>− ' + moeda(descR) + '</strong></div>';
+    if (descP > 0) html += '<div>Desconto ' + esc(String(descP)) + '%: <strong>aplicado</strong></div>';
+    html += '<div>Total a receber: <strong>' + moeda(a.total) + '</strong></div>';
+    if (recs.length) {
+        html += '<div style="margin-top:6px"><b>Como recebeu</b></div>';
+        recs.forEach(function (r) {
+            html += '<div>' + esc(r.forma || '—') + ': <strong>' + moeda(r.valor) + '</strong></div>';
+        });
+    }
+    if (recebido > 0) html += '<div>Total recebido: <strong>' + moeda(recebido) + '</strong></div>';
+    if (aberto > 0.009) html += '<div>Em aberto: <strong>' + moeda(aberto) + '</strong></div>';
+    if (st) html += '<div>Status: <strong>' + esc(st) + (a.formaPagamento ? ' · ' + esc(a.formaPagamento) : '') + '</strong></div>';
+    html += '</div>';
+    return html;
+}
+
 function htmlBlocoChecklistNota(mapa) {
     if (!mapa) return '';
     var linhas = [];
@@ -2127,7 +2156,7 @@ function htmlNotaEspelho(db, a, opts) {
         '<div class="nota-campo full"><span class="nota-label">Serviços</span><span class="nota-valor" style="color:#000;font-weight:800">' + esc(a.servicos || '—') + '</span></div>' +
         '</div></div>' +
         blocoFotos +
-        '<div class="nota-bloco compacto"><div class="tit verde">Valores</div><div class="nota-valores-pad compacto">' + htmlItensNota(a.itens) + '</div></div>' +
+        '<div class="nota-bloco compacto"><div class="tit verde">Valores</div><div class="nota-valores-pad compacto">' + htmlItensNota(a.itens) + htmlPagamentoOs(a) + '</div></div>' +
         '<div class="nota-sigs compacto">' +
         '<div class="nota-sig"><div class="nota-sig-espaco"></div><div class="nota-sig-base">Assinatura do Responsável</div></div>' +
         '<div class="nota-sig"><div class="nota-sig-espaco">' + sigEspaco + '</div><div class="nota-sig-base">' + sigBase + '</div></div>' +
@@ -2743,14 +2772,19 @@ function renderHistorico() {
                 (a.agendadoPara ? ' · ' + esc(fmtData(a.agendadoPara)) : '') + '</div>'
             : '';
         var jaPago = String(a.statusPagamento || '').toUpperCase() === 'PAGO';
+        var stPg = String(a.statusPagamento || '').toUpperCase();
         var badgePago = jaPago
             ? '<div class="badge-pago-os">PAGO · ' + esc(a.formaPagamento || '—') +
                 (a.canalRecebimento === 'interno' ? ' · Interno' : ' · Oficial') + '</div>'
-            : '';
+            : (stPg === 'PARCIAL'
+                ? '<div class="badge-pago-os" style="background:#7a4b00">PARCIAL · aberto ' + moeda(Number(a.saldoAberto) || 0) + '</div>'
+                : (stPg === 'PENDENTE'
+                    ? '<div class="badge-pago-os" style="background:#7a4b00">EM ABERTO · ' + moeda(Number(a.saldoAberto != null ? a.saldoAberto : a.total) || 0) + '</div>'
+                    : ''));
         var btnReceber = jaPago
             ? ''
             : '<button type="button" class="btn btn-receber" data-rec="' + a.id + '">💰 Receber</button>' +
-                (atendimentoEmAberto(a)
+                ((stPg !== 'PARCIAL' && stPg !== 'PENDENTE' && atendimentoEmAberto(a))
                     ? '<button type="button" class="btn btn-ok" data-fin-cx="' + a.id + '">Mandar ao caixa</button>'
                     : '');
         var tr = document.createElement('tr');
@@ -2849,160 +2883,366 @@ function renderHistorico() {
     renderCarrosEmAberto(db);
 }
 
-/* ---------- Receber OS (Histórico → Caixa oficial ou Interno) ---------- */
+/* ---------- Receber OS (total, desconto, parcial, formas mistas) ---------- */
 var receberOsIdAtual = null;
-var receberOsCanalDestino = null;
+
+function nRecOs(id) {
+    var el = document.getElementById(id);
+    return Number(el && el.value) || 0;
+}
 
 function fecharModalReceberOs() {
     receberOsIdAtual = null;
-    receberOsCanalDestino = null;
-    document.getElementById('modalReceberOs').classList.remove('aberto');
-    document.getElementById('receberOsPasso1').style.display = '';
-    document.getElementById('receberOsPasso2').style.display = 'none';
+    var m = document.getElementById('modalReceberOs');
+    if (m) m.classList.remove('aberto');
+}
+
+function obterAtendimentoParaReceber(id) {
+    var atual = carregar();
+    var a = (atual.atendimentos || []).find(function (x) { return x && String(x.id) === String(id); });
+    if (a) return { db: atual, a: a, viaMain: canalVendas !== 'interno' };
+    var main = carregarMain();
+    a = (main.atendimentos || []).find(function (x) { return x && String(x.id) === String(id); });
+    if (a) return { db: main, a: a, viaMain: true };
+    return null;
+}
+
+function brutoOrcamentoOs(a) {
+    if (!a) return 0;
+    if (a.totalBruto != null && Number(a.totalBruto) > 0) return Number(a.totalBruto) || 0;
+    if (typeof totaisItens === 'function' && a.itens && a.itens.length) {
+        var t = totaisItens(a.itens);
+        if (t && t.total > 0) return t.total;
+    }
+    return Number(a.total) || 0;
+}
+
+function lerSplitsReceberOs() {
+    var campos = [
+        { id: 'recOsDinheiro', forma: 'Dinheiro', caixa: true },
+        { id: 'recOsPix', forma: 'PIX', caixa: true },
+        { id: 'recOsDebito', forma: 'Cartão de Débito', caixa: true },
+        { id: 'recOsCredito', forma: 'Cartão de Crédito', caixa: true }
+    ];
+    var out = [];
+    campos.forEach(function (c) {
+        var v = nRecOs(c.id);
+        if (v > 0) out.push({ forma: c.forma, valor: +v.toFixed(2), caixa: c.caixa });
+    });
+    return out;
+}
+
+function calcRecOsTotais() {
+    var info = receberOsIdAtual ? obterAtendimentoParaReceber(receberOsIdAtual) : null;
+    var a = info && info.a;
+    var bruto = a ? brutoOrcamentoOs(a) : 0;
+    var descR = nRecOs('recOsDescReais');
+    var descP = nRecOs('recOsDescPerc');
+    var totalFinal = typeof totalAposDescontoOs === 'function'
+        ? totalAposDescontoOs(bruto, descR, descP)
+        : Math.max(0, bruto - descR);
+    var ja = Number(a && a.valorRecebido) || 0;
+    var splits = lerSplitsReceberOs();
+    var agora = splits.reduce(function (s, r) { return s + r.valor; }, 0);
+    var recebido = +(ja + agora).toFixed(2);
+    var aberto = Math.max(0, +(totalFinal - recebido).toFixed(2));
+    var setTxt = function (id, txt) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = txt;
+    };
+    setTxt('recOsTotalBruto', moeda(bruto));
+    setTxt('recOsTotalFinal', moeda(totalFinal));
+    setTxt('recOsRecebido', moeda(agora));
+    setTxt('recOsAberto', moeda(aberto));
+    return {
+        bruto: bruto,
+        descR: descR,
+        descP: descP,
+        totalFinal: totalFinal,
+        jaRecebido: ja,
+        agora: agora,
+        recebido: recebido,
+        aberto: aberto,
+        splits: splits,
+        boleto: nRecOs('recOsBoleto'),
+        boletoDias: nRecOs('recOsBoletoDias')
+    };
 }
 
 function abrirModalReceberOs(atendimentoId) {
-    var main = carregarMain();
-    var a = (main.atendimentos || []).find(function (x) { return x.id === atendimentoId; });
-    if (!a) {
+    var info = obterAtendimentoParaReceber(atendimentoId);
+    if (!info || !info.a) {
         toast('OS não encontrada.');
         return;
     }
+    var a = info.a;
     if (String(a.statusPagamento || '').toUpperCase() === 'PAGO') {
         alert('Esta OS já está marcada como PAGA (' + (a.formaPagamento || '—') +
             (a.canalRecebimento === 'interno' ? ' · Modo Interno' : ' · Caixa oficial') + ').');
         return;
     }
-    var valor = Number(a.total) || 0;
-    if (!(valor > 0)) {
+    var bruto = brutoOrcamentoOs(a);
+    if (!(bruto > 0)) {
         toast('Esta OS está sem valor para receber.');
         return;
     }
     receberOsIdAtual = atendimentoId;
-    receberOsCanalDestino = null;
-    var nome = nomeAtendimento(main, a);
+    var nome = nomeAtendimento(info.db, a);
     document.getElementById('receberOsResumo').innerHTML =
         '<strong>' + esc(nome) + '</strong> — ' + esc(a.carro || '—') +
         ' · Placa <strong>' + esc((a.placa || '—').toUpperCase()) + '</strong>';
-    document.getElementById('receberOsValor').textContent = 'Valor a receber: ' + moeda(valor);
-    document.getElementById('receberOsPasso1').style.display = '';
-    document.getElementById('receberOsPasso2').style.display = 'none';
+    var jaEl = document.getElementById('receberOsJaRec');
+    var ja = Number(a.valorRecebido) || 0;
+    if (jaEl) {
+        if (ja > 0.009) {
+            var txtJa = (a.recebimentos || []).map(function (r) {
+                return (r.forma || '—') + ' ' + moeda(r.valor);
+            }).join(' · ');
+            jaEl.style.display = '';
+            jaEl.textContent = 'Já recebido: ' + moeda(ja) + (txtJa ? ' (' + txtJa + ')' : '') +
+                '. Informe só o valor novo agora.';
+        } else {
+            jaEl.style.display = 'none';
+            jaEl.textContent = '';
+        }
+    }
+    var dest = document.getElementById('recOsDestino');
+    if (dest) dest.value = a.canalRecebimento === 'interno' ? 'interno' : 'normal';
+    document.getElementById('recOsDescReais').value = a.descontoReais != null ? String(a.descontoReais) : '0';
+    document.getElementById('recOsDescPerc').value = a.descontoPerc != null ? String(a.descontoPerc) : '0';
+    ['recOsDinheiro', 'recOsPix', 'recOsDebito', 'recOsCredito', 'recOsBoleto'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    var diasEl = document.getElementById('recOsBoletoDias');
+    if (diasEl) diasEl.value = a.boletoDias != null ? String(a.boletoDias) : '';
+    calcRecOsTotais();
     document.getElementById('modalReceberOs').classList.add('aberto');
 }
 
-function receberOsIrPassoForma(canalDestino) {
-    receberOsCanalDestino = canalDestino;
-    document.getElementById('receberOsDestinoTxt').innerHTML = canalDestino === 'interno'
-        ? 'Destino: <strong style="color:#f1c40f">Modo Interno</strong> — o valor entra no caixa interno.'
-        : 'Destino: <strong style="color:#7ec8ff">Caixa / Relatórios (oficial)</strong> — o valor entra no caixa oficial.';
-    document.getElementById('receberOsPasso1').style.display = 'none';
-    document.getElementById('receberOsPasso2').style.display = '';
-}
-
-function confirmarRecebimentoOs(forma) {
-    if (!receberOsIdAtual || !receberOsCanalDestino) return;
-    var main = carregarMain();
-    var idx = (main.atendimentos || []).findIndex(function (x) { return x.id === receberOsIdAtual; });
-    if (idx < 0) {
+function confirmarRecebimentoOs() {
+    if (!receberOsIdAtual) return;
+    var info = obterAtendimentoParaReceber(receberOsIdAtual);
+    if (!info || !info.a) {
         toast('OS não encontrada.');
         fecharModalReceberOs();
         return;
     }
-    var a = main.atendimentos[idx];
+    var a = info.a;
     if (String(a.statusPagamento || '').toUpperCase() === 'PAGO') {
         alert('Esta OS já foi recebida.');
         fecharModalReceberOs();
         renderHistorico();
         return;
     }
-    var valor = Number(a.total) || 0;
-    if (!(valor > 0)) {
+    var tot = calcRecOsTotais();
+    if (!(tot.bruto > 0)) {
         toast('OS sem valor.');
         return;
     }
-    var nome = nomeAtendimento(main, a);
+    var dest = (document.getElementById('recOsDestino') && document.getElementById('recOsDestino').value) || 'normal';
+    var ehBoleto = tot.boleto > 0.009 || tot.boletoDias > 0;
+    var boletoDias = tot.boletoDias > 0 ? tot.boletoDias : (ehBoleto ? 30 : 0);
+    var nome = nomeAtendimento(info.db, a);
     var placa = (a.placa || '—').toUpperCase();
-    var digital = formaPagamentoEhDigital(forma);
-    var lancId = uid();
-    var agora = new Date().toISOString();
-    var lanc = {
-        id: lancId,
-        tipo: 'entrada',
-        descricao: 'Recebimento OS ' + placa + ' — ' + nome,
-        valor: valor,
-        forma: forma,
-        conta: digital ? 'banco' : 'balcao',
-        atendimentoId: a.id,
-        osResumo: {
-            cliente: nome,
-            placa: placa,
-            carro: a.carro || '',
-            totalOs: valor,
-            entrada: a.entrada || a.criadoEm || ''
-        },
-        criadoEm: agora
-    };
+    var agoraIso = new Date().toISOString();
+    var recs = (a.recebimentos || []).slice();
+    tot.splits.forEach(function (r) {
+        recs.push({ forma: r.forma, valor: r.valor, em: agoraIso });
+    });
+    var formas = recs.map(function (r) { return r.forma; });
+    if (ehBoleto && formas.indexOf('Boleto') < 0) formas.push('Boleto');
+    var status = 'PENDENTE';
+    if (tot.aberto < 0.01) status = 'PAGO';
+    else if (tot.recebido > 0.009) status = 'PARCIAL';
+    var venc = (typeof somarDiasISO === 'function')
+        ? somarDiasISO(hojeISO(), boletoDias || 0)
+        : hojeISO();
+
+    a.totalBruto = tot.bruto;
+    a.descontoReais = tot.descR;
+    a.descontoPerc = tot.descP;
+    a.total = tot.totalFinal;
+    a.valorRecebido = tot.recebido;
+    a.saldoAberto = tot.aberto;
+    a.recebimentos = recs;
+    a.statusPagamento = status;
+    a.formaPagamento = formas.filter(function (v, i, arr) { return arr.indexOf(v) === i; }).join(' + ');
+    a.canalRecebimento = dest === 'interno' ? 'interno' : 'oficial';
+    a.ehBoleto = ehBoleto;
+    a.boletoDias = boletoDias;
+    a.dataVencimento = venc;
+    a.recebidoEm = agoraIso;
+    a.atualizadoEm = agoraIso;
+    if (status === 'PAGO') {
+        if ((a.status || '') !== 'Entregue') a.status = 'Entregue';
+        if (!a.saida) a.saida = hojeISO();
+    } else if ((a.status || '') === 'Em andamento' || (a.status || '') === 'Aguardando peça' || !a.status) {
+        a.status = 'Pronto';
+        a.saida = a.saida || hojeISO();
+    }
+    var ix = (info.db.atendimentos || []).findIndex(function (x) { return x && String(x.id) === String(a.id); });
+    if (ix >= 0) info.db.atendimentos[ix] = a;
+    if (info.viaMain) salvarMain(info.db);
+    else salvar(info.db);
 
     var canalAntes = canalVendas;
-    canalVendas = receberOsCanalDestino === 'interno' ? 'interno' : 'normal';
+    canalVendas = dest === 'interno' ? 'interno' : 'normal';
     var dbCx = carregar();
-    if (digital) {
-        if (!dbCx.caixaBanco) dbCx.caixaBanco = [];
-        dbCx.caixaBanco.push(lanc);
-    } else {
-        if (!dbCx.caixa) dbCx.caixa = [];
-        dbCx.caixa.push(lanc);
+    tot.splits.forEach(function (r) {
+        var lanc = {
+            id: uid(),
+            tipo: 'entrada',
+            descricao: 'Recebimento OS ' + placa + ' — ' + nome + ' (' + r.forma + ')',
+            valor: r.valor,
+            forma: r.forma,
+            conta: formaPagamentoEhDigital(r.forma) ? 'banco' : 'balcao',
+            atendimentoId: a.id,
+            osResumo: {
+                cliente: nome,
+                placa: placa,
+                carro: a.carro || '',
+                totalOs: tot.totalFinal,
+                entrada: a.entrada || a.criadoEm || ''
+            },
+            criadoEm: agoraIso
+        };
+        if (formaPagamentoEhDigital(r.forma)) {
+            if (!dbCx.caixaBanco) dbCx.caixaBanco = [];
+            dbCx.caixaBanco.push(lanc);
+        } else {
+            if (!dbCx.caixa) dbCx.caixa = [];
+            dbCx.caixa.push(lanc);
+        }
+    });
+    if (!dbCx.pendentes) dbCx.pendentes = [];
+    dbCx.pendentes = dbCx.pendentes.filter(function (p) {
+        if (String(p.atendimentoId || '') !== String(a.id)) return true;
+        if (canalVendas !== 'interno' && typeof marcarExcluido === 'function') marcarExcluido(dbCx, 'pendentes', p.id);
+        return false;
+    });
+    if (tot.aberto > 0.009) {
+        dbCx.pendentes.push({
+            id: uid(),
+            cliente: nome,
+            clienteId: a.clienteId || null,
+            descricao: 'OS ' + placa + ' — saldo em aberto',
+            valor: +tot.aberto.toFixed(2),
+            vencimento: venc,
+            status: 'aberto',
+            atendimentoId: a.id,
+            formaPrevista: ehBoleto ? 'Boleto' : (formas.join(' + ') || ''),
+            ehBoleto: ehBoleto,
+            criadoEm: agoraIso
+        });
     }
     salvar(dbCx);
     canalVendas = canalAntes;
     atualizarBadgeCanal();
 
-    a.statusPagamento = 'PAGO';
-    a.formaPagamento = forma;
-    a.canalRecebimento = receberOsCanalDestino === 'interno' ? 'interno' : 'oficial';
-    a.recebidoEm = agora;
-    a.lancamentoRecebimentoId = lancId;
-    a.atualizadoEm = agora;
-    if ((a.status || '') !== 'Entregue') a.status = 'Entregue';
-    if (!a.saida) a.saida = hojeISO();
-    main.atendimentos[idx] = a;
-    salvarMain(main);
-
-    var destinoTxt = receberOsCanalDestino === 'interno' ? 'Modo Interno' : 'Caixa / Relatórios (oficial)';
-    var contaTxt = digital ? 'Caixa do Banco (PIX/cartão)' : 'Caixa / Balcão (dinheiro)';
+    var destinoTxt = dest === 'interno' ? 'Modo Interno' : 'Caixa / Relatórios (oficial)';
     fecharModalReceberOs();
-    sincronizarOficinaNoCaixaEmpresa();
+    if (dest !== 'interno') sincronizarOficinaNoCaixaEmpresa();
     renderHistorico();
     renderCaixa();
     renderCaixaBanco();
+    renderPendentes();
     renderRelatorioCaixa();
     renderRelatorioOficina();
     atualizarKPIs(carregar());
-    toast('Recebido: ' + moeda(valor) + ' · ' + forma + ' · oficina no caixa');
+    var msgStatus = status === 'PAGO'
+        ? 'OS baixada (pago).'
+        : (status === 'PARCIAL'
+            ? 'Parcial: ' + moeda(tot.aberto) + ' em aberto no perfil do cliente.'
+            : 'Valor em aberto no perfil do cliente.');
+    toast(msgStatus);
     alert(
-        '✅ Pagamento registrado!\n\n' +
+        (status === 'PAGO' ? '✅ Pagamento total registrado!\n\n' : '✅ Recebimento registrado!\n\n') +
         'OS: ' + placa + ' — ' + nome + '\n' +
-        'Valor: ' + moeda(valor) + '\n' +
-        'Forma: ' + forma + '\n' +
-        'Destino: ' + destinoTxt + '\n' +
-        'Conta: ' + contaTxt
+        'Total: ' + moeda(tot.totalFinal) + '\n' +
+        'Recebido agora: ' + moeda(tot.agora) + '\n' +
+        (tot.recebido > tot.agora ? 'Total já recebido: ' + moeda(tot.recebido) + '\n' : '') +
+        (tot.aberto > 0.009 ? 'Em aberto: ' + moeda(tot.aberto) + '\n' : '') +
+        'Formas: ' + (a.formaPagamento || '—') + '\n' +
+        'Destino: ' + destinoTxt +
+        (ehBoleto ? '\nBoleto vence em ' + boletoDias + ' dia(s) (' + venc + ')' : '')
     );
 }
 
-document.getElementById('btnRecDestNormal').addEventListener('click', function () {
-    receberOsIrPassoForma('normal');
-});
-document.getElementById('btnRecDestInterno').addEventListener('click', function () {
-    receberOsIrPassoForma('interno');
-});
-document.getElementById('btnReceberOsVoltar').addEventListener('click', function () {
-    receberOsCanalDestino = null;
-    document.getElementById('receberOsPasso1').style.display = '';
-    document.getElementById('receberOsPasso2').style.display = 'none';
-});
+function renderAlertaVencidos30(db) {
+    var el = document.getElementById('alertaVencidos30');
+    if (!el) return;
+    db = db || carregarMain();
+    function atrasoDias(venc) {
+        if (!venc) return 0;
+        var d = new Date(String(venc).slice(0, 10) + 'T12:00:00');
+        if (isNaN(d.getTime())) return 0;
+        var hoje = new Date();
+        hoje.setHours(12, 0, 0, 0);
+        return Math.floor((hoje.getTime() - d.getTime()) / 86400000);
+    }
+    var itens = [];
+    var vistos = {};
+    function add(chave, txt, venc, aberto) {
+        if (!(aberto > 0.009) || atrasoDias(venc) < 30) return;
+        if (chave && vistos[chave]) return;
+        if (chave) vistos[chave] = true;
+        itens.push({ txt: txt, venc: venc, aberto: aberto, dias: atrasoDias(venc) });
+    }
+    (db.atendimentos || []).forEach(function (a) {
+        if (!a) return;
+        var st = String(a.statusPagamento || '').toUpperCase();
+        if (st !== 'PARCIAL' && st !== 'PENDENTE') return;
+        var aberto = a.saldoAberto != null
+            ? Number(a.saldoAberto)
+            : Math.max(0, (Number(a.total) || 0) - (Number(a.valorRecebido) || 0));
+        add('os:' + a.id, 'OS ' + ((a.placa || '').toUpperCase()) + ' · ' + (a.clienteNome || nomeAtendimento(db, a)), a.dataVencimento || a.entrada, aberto);
+    });
+    (db.orcamentos || []).forEach(function (o) {
+        if (!o) return;
+        if (String(o.statusPagamento || '').toUpperCase() === 'PAGO') return;
+        var aberto = o.saldoAberto != null
+            ? Number(o.saldoAberto)
+            : Math.max(0, (Number(o.valor) || 0) - (Number(o.valorRecebido) || 0));
+        add('vd:' + o.id, (o.tipo || 'Doc') + ' Nº ' + (o.numero || ''), o.dataVencimento || o.dataEmissao, aberto);
+    });
+    (db.pendentes || []).forEach(function (p) {
+        if (!p || p.status === 'pago') return;
+        var chave = p.atendimentoId ? 'os:' + p.atendimentoId : (p.vendaId ? 'vd:' + p.vendaId : 'pd:' + p.id);
+        add(chave, (p.cliente || '') + ' · ' + (p.descricao || 'Conta'), p.vencimento, Number(p.valor) || 0);
+    });
+    if (!itens.length) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+    var soma = itens.reduce(function (s, x) { return s + x.aberto; }, 0);
+    el.style.display = '';
+    el.innerHTML = '⚠️ ' + itens.length + ' conta(s) com mais de 30 dias em aberto · ' + moeda(soma) +
+        '<div style="font-size:0.82rem;font-weight:600;margin-top:6px">' +
+        itens.slice(0, 5).map(function (x) {
+            return esc(x.txt) + ' · ' + moeda(x.aberto) + ' · ' + x.dias + ' dias';
+        }).join('<br>') + (itens.length > 5 ? '<br>…' : '') + '</div>' +
+        '<div style="font-size:0.78rem;margin-top:6px;opacity:.9">Clique para abrir Contas a receber</div>';
+    el.onclick = function () {
+        if (typeof irParaPastaInicio === 'function') irParaPastaInicio('pendentes');
+        else if (typeof abrirPainel === 'function') abrirPainel('painelPendentes');
+    };
+    if (!window._alerta30Tocado) {
+        window._alerta30Tocado = true;
+        toast('Atenção: ' + itens.length + ' conta(s) vencida(s) há mais de 30 dias.');
+    }
+}
+
 document.getElementById('btnReceberOsFechar').addEventListener('click', fecharModalReceberOs);
 document.getElementById('modalReceberOs').addEventListener('click', function (e) {
     if (e.target.id === 'modalReceberOs') fecharModalReceberOs();
+});
+var btnRecOsOk = document.getElementById('btnReceberOsConfirmar');
+if (btnRecOsOk) btnRecOsOk.addEventListener('click', confirmarRecebimentoOs);
+['recOsDescReais', 'recOsDescPerc', 'recOsDinheiro', 'recOsPix', 'recOsDebito', 'recOsCredito', 'recOsBoleto', 'recOsBoletoDias'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', calcRecOsTotais);
 });
 (function ligarModalRelatorioServicos() {
     var overlay = document.getElementById('modalRelatorioServicos');
@@ -3019,11 +3259,6 @@ document.getElementById('modalReceberOs').addEventListener('click', function (e)
         if (typeof irParaPastaInicio === 'function') irParaPastaInicio('entradas');
     });
 })();
-document.querySelectorAll('[data-rec-forma]').forEach(function (b) {
-    b.addEventListener('click', function () {
-        confirmarRecebimentoOs(b.getAttribute('data-rec-forma'));
-    });
-});
 
 document.getElementById('buscaAtend').addEventListener('input', renderHistorico);
 
@@ -5003,6 +5238,7 @@ function montarAtendimentoDoFormulario() {
         assinadoEm: base ? base.assinadoEm : null,
         criadoEm: (base && base.criadoEm) || new Date().toISOString()
     };
+    if (typeof preservarFinanceiroOs === 'function') a = preservarFinanceiroOs(a, base);
     var wa = obterTelefoneWhatsAppOs();
     if (wa && a.clienteCadastro) a.clienteCadastro.telefone = wa;
     else if (wa) a.telefoneWa = wa;
@@ -5205,6 +5441,8 @@ function salvarAtendimentoRapidoParaEnvio() {
         total: tots.total,
         atualizadoEm: new Date().toISOString()
     };
+    var existenteRapido = id ? (db.atendimentos || []).find(function (a) { return a && a.id === id; }) : null;
+    if (typeof preservarFinanceiroOs === 'function') payload = preservarFinanceiroOs(payload, existenteRapido);
     var wa = obterTelefoneWhatsAppOs();
     if (wa) {
         if (!payload.clienteCadastro) payload.clienteCadastro = {};

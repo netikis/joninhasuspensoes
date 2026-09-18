@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=37">
-    <link rel="stylesheet" href="css/tema-m3.css?v=37">
+    <link rel="stylesheet" href="css/app.css?v=38">
+    <link rel="stylesheet" href="css/tema-m3.css?v=38">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -186,6 +186,7 @@
                 <img id="logoHero" src="logo-joninha.jpg" alt="Joninha Suspensões">
                 <div class="hero-tag">Timbre oficial · Joninha Suspensões</div>
             </div>
+            <div id="alertaVencidos30" class="alerta-vencidos-30" style="display:none"></div>
             <div class="box box-andamento-destaque" id="boxCarrosAndamentoInicio">
                 <h2>🔧 Carros em andamento</h2>
                 <p class="hint" style="margin:0">Enquanto o serviço roda, o carro fica em aberto. Quando finalizar e receber, o valor entra no caixa.</p>
@@ -1551,32 +1552,50 @@
     </div>
 
     <div class="modal-overlay" id="modalReceberOs">
-        <div class="modal-box" style="width:min(480px,100%)">
-            <h3>💰 Receber pagamento da OS</h3>
+        <div class="modal-box rec-os-box" style="width:min(560px,100%)">
+            <h3>💰 Mandar ao caixa</h3>
             <p class="hint" id="receberOsResumo"></p>
-            <p class="hint" id="receberOsValor" style="color:#f1c40f;font-weight:700"></p>
+            <p class="hint" id="receberOsJaRec" style="display:none;color:#0f7a3f;font-weight:700"></p>
 
-            <div id="receberOsPasso1">
-                <h3 style="font-size:0.95rem;margin-top:8px">1. Onde registrar?</h3>
-                <p class="hint">Escolha o banco de destino do recebimento.</p>
-                <div class="receber-passo-btns">
-                    <button type="button" class="btn btn-primary" id="btnRecDestNormal">💰 Caixa / Relatórios (oficial)</button>
-                    <button type="button" class="btn btn-secondary" id="btnRecDestInterno" style="border-color:#f1c40f;color:#f1c40f">🔒 Modo Interno</button>
-                </div>
+            <label>Destino do caixa</label>
+            <select id="recOsDestino">
+                <option value="normal">Caixa / Relatórios (oficial)</option>
+                <option value="interno">Modo Interno</option>
+            </select>
+
+            <div class="rec-os-bloco">
+                <div class="rec-os-linha"><span>1) Valor total do orçamento</span><strong id="recOsTotalBruto">R$ 0,00</strong></div>
             </div>
 
-            <div id="receberOsPasso2" style="display:none">
-                <h3 style="font-size:0.95rem;margin-top:8px">2. Forma de pagamento</h3>
-                <p class="hint" id="receberOsDestinoTxt"></p>
-                <div class="receber-passo-btns">
-                    <button type="button" class="btn btn-ok" data-rec-forma="Dinheiro">💵 Dinheiro → Caixa / Balcão</button>
-                    <button type="button" class="btn btn-primary" data-rec-forma="PIX">📱 PIX → Caixa do Banco</button>
-                    <button type="button" class="btn btn-primary" data-rec-forma="Cartão">💳 Cartão → Caixa do Banco</button>
-                    <button type="button" class="btn btn-secondary" id="btnReceberOsVoltar">← Voltar</button>
+            <div class="rec-os-bloco">
+                <p class="rec-os-tit">2) Desconto (diminui o total)</p>
+                <div class="row">
+                    <div class="col"><label>Desconto R$</label><input id="recOsDescReais" type="number" step="0.01" min="0" value="0"></div>
+                    <div class="col"><label>Desconto %</label><input id="recOsDescPerc" type="number" step="0.1" min="0" value="0"></div>
                 </div>
+                <div class="rec-os-linha rec-os-final"><span>Total a receber</span><strong id="recOsTotalFinal">R$ 0,00</strong></div>
             </div>
 
-            <div class="modal-acoes">
+            <div class="rec-os-bloco">
+                <p class="rec-os-tit">3 e 4) Como recebeu (pode misturar)</p>
+                <div class="row">
+                    <div class="col"><label>Dinheiro</label><input id="recOsDinheiro" type="number" step="0.01" min="0" placeholder="0,00"></div>
+                    <div class="col"><label>PIX</label><input id="recOsPix" type="number" step="0.01" min="0" placeholder="0,00"></div>
+                </div>
+                <div class="row" style="margin-top:6px">
+                    <div class="col"><label>Cartão débito</label><input id="recOsDebito" type="number" step="0.01" min="0" placeholder="0,00"></div>
+                    <div class="col"><label>Cartão crédito</label><input id="recOsCredito" type="number" step="0.01" min="0" placeholder="0,00"></div>
+                </div>
+                <div class="row" style="margin-top:6px">
+                    <div class="col"><label>Boleto (fica em aberto)</label><input id="recOsBoleto" type="number" step="0.01" min="0" placeholder="0,00"></div>
+                    <div class="col"><label>Boleto — dias para vencer</label><input id="recOsBoletoDias" type="number" step="1" min="0" placeholder="30"></div>
+                </div>
+                <div class="rec-os-linha"><span>Valor recebido agora</span><strong id="recOsRecebido">R$ 0,00</strong></div>
+                <div class="rec-os-linha rec-os-aberto"><span>Em aberto (vai ao perfil do cliente)</span><strong id="recOsAberto">R$ 0,00</strong></div>
+            </div>
+
+            <div class="modal-acoes" style="flex-direction:column;gap:8px;margin-top:12px">
+                <button type="button" class="btn btn-ok" id="btnReceberOsConfirmar" style="width:100%">✅ Confirmar e mandar ao caixa</button>
                 <button type="button" class="btn btn-danger" id="btnReceberOsFechar" style="width:100%">Cancelar</button>
             </div>
         </div>
@@ -1703,17 +1722,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=37"></script>
-    <script src="js/storage.js?v=37"></script>
-    <script src="js/ui.js?v=37"></script>
-    <script src="js/auth.js?v=37"></script>
-    <script src="js/os.js?v=37"></script>
-    <script src="js/nuvem.js?v=37"></script>
-    <script src="js/caixa.js?v=37"></script>
-    <script src="js/comissoes.js?v=37"></script>
-    <script src="js/app.js?v=37"></script>
-    <script src="js/perfil-cliente.js?v=37"></script>
-    <script src="js/navegacao.js?v=37"></script>
+    <script src="js/config.js?v=38"></script>
+    <script src="js/storage.js?v=38"></script>
+    <script src="js/ui.js?v=38"></script>
+    <script src="js/auth.js?v=38"></script>
+    <script src="js/os.js?v=38"></script>
+    <script src="js/nuvem.js?v=38"></script>
+    <script src="js/caixa.js?v=38"></script>
+    <script src="js/comissoes.js?v=38"></script>
+    <script src="js/app.js?v=38"></script>
+    <script src="js/perfil-cliente.js?v=38"></script>
+    <script src="js/navegacao.js?v=38"></script>
 </body>
 </html>
 

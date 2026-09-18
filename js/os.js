@@ -324,6 +324,7 @@ function renderItens() {
         '<div class="os-itens-total-linha"><span>Peças</span><strong>' + moeda(tot.pecas) + '</strong></div>' +
         '<div class="os-itens-total-linha"><span>Mão de obra</span><strong>' + moeda(tot.mao) + '</strong></div>' +
         '<div class="os-itens-total-final"><span>TOTAL</span><strong>' + moeda(tot.total) + '</strong></div>' +
+        htmlResumoPagamentoOsForm() +
         '</div>';
     box.innerHTML = html;
 
@@ -858,6 +859,8 @@ async function salvarAtendimentoAtual() {
         total: tots.total,
         atualizadoEm: new Date().toISOString()
     };
+    var existente = id ? (db.atendimentos || []).find(function (a) { return a && a.id === id; }) : null;
+    payload = preservarFinanceiroOs(payload, existente);
 
     var btn = document.getElementById('btnSalvarAt');
     var txtBtn = btn ? btn.textContent : '';
@@ -1080,4 +1083,91 @@ function alterarStatusAtendimento(id, novoStatus) {
         : 'Status: ' + novoStatus);
     renderHistorico();
 }
+
+function somarDiasISO(iso, dias) {
+    var base = String(iso || (typeof hojeISO === 'function' ? hojeISO() : new Date().toISOString().slice(0, 10))).slice(0, 10);
+    var d = new Date(base + 'T12:00:00');
+    if (isNaN(d.getTime())) d = new Date();
+    d.setDate(d.getDate() + (Number(dias) || 0));
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1);
+    var day = String(d.getDate());
+    if (m.length < 2) m = '0' + m;
+    if (day.length < 2) day = '0' + day;
+    return y + '-' + m + '-' + day;
+}
+
+function totalAposDescontoOs(bruto, descR, descP) {
+    descR = Number(descR) || 0;
+    descP = Number(descP) || 0;
+    if (descR < 0) descR = 0;
+    if (descP < 0) descP = 0;
+    var apos = Math.max(0, (Number(bruto) || 0) - descR);
+    var descPercValor = +(apos * descP / 100).toFixed(2);
+    return Math.max(0, +(apos - descPercValor).toFixed(2));
+}
+
+function preservarFinanceiroOs(payload, existente) {
+    if (!payload) return payload;
+    var bruto = Number(payload.total) || 0;
+    payload.totalBruto = bruto;
+    if (!existente) return payload;
+    var temPg = !!(existente.statusPagamento ||
+        (existente.recebimentos && existente.recebimentos.length) ||
+        Number(existente.valorRecebido) > 0 ||
+        Number(existente.descontoReais) > 0 ||
+        Number(existente.descontoPerc) > 0);
+    if (!temPg) return payload;
+    payload.descontoReais = Number(existente.descontoReais) || 0;
+    payload.descontoPerc = Number(existente.descontoPerc) || 0;
+    payload.total = totalAposDescontoOs(bruto, payload.descontoReais, payload.descontoPerc);
+    payload.valorRecebido = Number(existente.valorRecebido) || 0;
+    payload.recebimentos = existente.recebimentos || [];
+    payload.formaPagamento = existente.formaPagamento || '';
+    payload.canalRecebimento = existente.canalRecebimento;
+    payload.dataVencimento = existente.dataVencimento;
+    payload.ehBoleto = existente.ehBoleto;
+    payload.boletoDias = existente.boletoDias;
+    payload.recebidoEm = existente.recebidoEm;
+    payload.saldoAberto = Math.max(0, +(payload.total - payload.valorRecebido).toFixed(2));
+    if (payload.saldoAberto < 0.01 && payload.valorRecebido > 0.009) payload.statusPagamento = 'PAGO';
+    else if (payload.valorRecebido > 0.009) payload.statusPagamento = 'PARCIAL';
+    else payload.statusPagamento = existente.statusPagamento || 'PENDENTE';
+    return payload;
+}
+
+function htmlResumoPagamentoOsForm() {
+    var idEl = document.getElementById('atId');
+    var id = idEl && idEl.value;
+    if (!id || typeof carregar !== 'function') return '';
+    var db = carregar();
+    var a = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(id); });
+    if (!a) return '';
+    return htmlResumoPagamentoOs(a);
+}
+
+function htmlResumoPagamentoOs(a) {
+    if (!a) return '';
+    var recs = a.recebimentos || [];
+    var descR = Number(a.descontoReais) || 0;
+    var descP = Number(a.descontoPerc) || 0;
+    var recebido = Number(a.valorRecebido) || 0;
+    var aberto = a.saldoAberto != null
+        ? Number(a.saldoAberto)
+        : Math.max(0, (Number(a.total) || 0) - recebido);
+    var st = String(a.statusPagamento || '').toUpperCase();
+    if (!recs.length && !(descR > 0) && !(descP > 0) && !(recebido > 0) && !st) return '';
+    var linhas = [];
+    if (descR > 0) linhas.push('Desconto R$: − ' + moeda(descR));
+    if (descP > 0) linhas.push('Desconto ' + descP + '%');
+    recs.forEach(function (r) {
+        linhas.push((r.forma || '—') + ': ' + moeda(r.valor));
+    });
+    if (recebido > 0) linhas.push('Total recebido: ' + moeda(recebido));
+    if (aberto > 0.009) linhas.push('Em aberto: ' + moeda(aberto));
+    if (st) linhas.push('Status: ' + st + (a.formaPagamento ? ' · ' + a.formaPagamento : ''));
+    if (!linhas.length) return '';
+    return '<div class="os-pgto-resumo">' + linhas.map(function (l) { return '<div>' + esc(l) + '</div>'; }).join('') + '</div>';
+}
+
 
