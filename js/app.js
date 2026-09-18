@@ -2429,19 +2429,22 @@ async function garantirFotosCarregadas(a) {
     return a;
 }
 
-async function abrirLinkAssinatura(id) {
+async function prepararPackLinkAssinatura(id, opts) {
+    opts = opts || {};
     var db = carregar();
     var a = db.atendimentos.find(function (x) { return x.id === id; });
-    if (!a) { toast('Atendimento não encontrado.'); return; }
-    var comFotos = await perguntarEnviarComFotos(a, { forcarPergunta: true });
-    if (comFotos === null) return;
+    if (!a) { toast('Atendimento não encontrado.'); return null; }
+    var comFotos = false;
+    if (opts.perguntarFotos !== false) {
+        comFotos = await perguntarEnviarComFotos(a, { forcarPergunta: true });
+        if (comFotos === null) return null;
+    } else if ((a.fotos || []).length) {
+        comFotos = true;
+    }
     if (comFotos) {
         a = await garantirFotosCarregadas(a);
         var okFoto = (a.fotos || []).some(function (f) { return f && (f.data || f.url); });
-        if (!okFoto) {
-            toast('Não há fotos disponíveis neste atendimento. Enviando só o documento.');
-            comFotos = false;
-        }
+        if (!okFoto) comFotos = false;
     }
     if (!a.tokenAssinatura) a.tokenAssinatura = gerarTokenAssinatura();
 
@@ -2472,7 +2475,6 @@ async function abrirLinkAssinatura(id) {
     var nuvMsg = '';
     var cfgN = carregarConfigNuvem();
     if (cfgN && cfgN.apiKey && cfgN.projectId) {
-        /* Antes de subir o pack, puxa assinatura já feita no celular */
         try {
             var packNuv = await puxarAssinaturaNuvem(a.tokenAssinatura);
             if (packNuv && packNuv.assinaturaCliente) {
@@ -2488,23 +2490,28 @@ async function abrirLinkAssinatura(id) {
             }
         } catch (ePull) { /* ok */ }
         var up = await enviarPackAssinaturaNuvem(pack);
-        if (up.ok && up.pack && up.pack.assinaturaCliente) {
-            pack = up.pack;
-        }
+        if (up.ok && up.pack && up.pack.assinaturaCliente) pack = up.pack;
         nuvMsg = up.ok ? ' · nuvem OK (cliente assina no celular)' : ' · nuvem: ' + (up.motivo || 'falhou');
     } else {
         nuvMsg = ' · configure a nuvem para o cliente assinar pelo WhatsApp no celular';
     }
 
     var link = urlLinkAssinatura(a.tokenAssinatura);
-    document.getElementById('inputLinkAssinatura').value = link;
-    document.getElementById('modalLinkAssinatura').classList.add('aberto');
-    atendimentoNotaAtual = db.atendimentos[i] || a;
-    toast(
-        (pack.assinaturaCliente ? 'Cliente já assinou — link reenviado.' : 'Link pronto — envie ao cliente.') +
-        (comFotos ? ' (com fotos)' : ' (sem fotos)') + nuvMsg
-    );
+    var input = document.getElementById('inputLinkAssinatura');
+    if (input) input.value = link;
+    atendimentoNotaAtual = (i >= 0 ? db.atendimentos[i] : a);
     renderHistorico();
+    return { link: link, a: atendimentoNotaAtual, pack: pack, comFotos: comFotos, nuvMsg: nuvMsg };
+}
+
+async function abrirLinkAssinatura(id) {
+    var r = await prepararPackLinkAssinatura(id, { perguntarFotos: true });
+    if (!r) return;
+    document.getElementById('modalLinkAssinatura').classList.add('aberto');
+    toast(
+        (r.pack.assinaturaCliente ? 'Cliente já assinou — link reenviado.' : 'Link pronto — envie ao cliente.') +
+        (r.comFotos ? ' (com fotos)' : ' (sem fotos)') + r.nuvMsg
+    );
 }
 
 function documentoAssinaturaVenda(db, o) {
@@ -5254,10 +5261,108 @@ async function waEnvioAssinar() {
     await abrirLinkAssinatura(id);
 }
 
-function enviarWhatsAppOs(tipo) {
+async function enviarWhatsAppOsSalvo(id, tipo) {
+    var db = carregar();
+    var a = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(id); });
+    if (!a) { toast('Atendimento não encontrado.'); return; }
+    var tel = telefoneDoAtendimento(db, a);
+    if (!telWa(tel)) {
+        toast('Este cliente está sem WhatsApp. Abra a OS e informe o número.');
+        if (typeof editarAtendimento === 'function') editarAtendimento(id);
+        return;
+    }
+    toast('Gerando link e abrindo o WhatsApp…');
+    var r = await prepararPackLinkAssinatura(id, { perguntarFotos: false });
+    if (!r || !r.link) return;
+    var msg;
+    if (tipo === 'checklist') {
+        var emp = getEmpresa().nome || 'Joninha Suspensões';
+        msg = 'Olá *' + (a.clienteNome || nomeAtendimento(db, a)) + '*, tudo bem?\n\n';
+        msg += 'Segue o *checklist de chegada* do veículo na *' + emp + '*.\n';
+        msg += '*Veículo:* ' + (a.carro || '—') + (a.placa ? ' · Placa ' + a.placa : '') + '\n';
+        if (a.km) msg += '*Km:* ' + a.km + '\n';
+        msg += '\n' + textoChecklist(a.checklist || {}, a.estado || '').replace('*Checklist do veículo — Joninha Suspensões*\n\n', '');
+        msg += '\n\nQualquer dúvida, estamos à disposição.';
+    } else {
+        var tot = totaisItens(a.itens || []);
+        var emp2 = getEmpresa().nome || 'Joninha Suspensões';
+        msg = 'Olá *' + (a.clienteNome || nomeAtendimento(db, a)) + '*, tudo bem?\n\n';
+        msg += 'Segue o *orçamento / diagnóstico* da *' + emp2 + '*.\n';
+        msg += '*Veículo:* ' + (a.carro || '—') + (a.placa ? ' · Placa ' + a.placa : '') + '\n';
+        if (a.diagnostico) msg += '\n*Diagnóstico:*\n' + a.diagnostico + '\n';
+        if (a.servicos) msg += '\n*Serviços:*\n' + a.servicos + '\n';
+        msg += '\n*Peças:* ' + moeda(tot.pecas) + '\n*Mão de obra:* ' + moeda(tot.mao) + '\n*Total:* ' + moeda(a.total != null ? a.total : tot.total);
+        msg += '\n\nAguardamos sua aprovação. Obrigado!';
+    }
+    msg += '\n\n*Abra o link para ver e assinar:*\n' + r.link;
+    abrirWhatsApp(tel, msg);
+    toast('WhatsApp aberto no número do cliente, com o link do documento.');
+}
+
+async function enviarWhatsAppOs(tipo) {
     var tel = obterTelefoneWhatsAppOs();
     if (!garantirTelefoneWaEnvio(tel)) return;
-    abrirModalWaEnvio({ tipo: tipo, deFormulario: true });
+    toast('Gerando link e abrindo o WhatsApp…');
+    var salvo = salvarAtendimentoRapidoParaEnvio();
+    if (!salvo) return;
+    var r = await prepararPackLinkAssinatura(salvo.id, { perguntarFotos: false });
+    if (!r || !r.link) return;
+    var m = tipo === 'checklist' ? montarMsgChecklistAtual() : montarMsgOrcamentoAtual();
+    var msg = (m && m.msg ? m.msg : '') + '\n\n*Abra o link para ver e assinar:*\n' + r.link;
+    abrirWhatsApp(tel, msg);
+    toast('WhatsApp aberto no número informado, com o link do documento.');
+}
+
+async function copiarLinkOsEnvio() {
+    var salvo = salvarAtendimentoRapidoParaEnvio();
+    if (!salvo) return;
+    toast('Gerando link…');
+    var r = await prepararPackLinkAssinatura(salvo.id, { perguntarFotos: false });
+    if (!r || !r.link) return;
+    var ok = false;
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(r.link);
+            ok = true;
+        }
+    } catch (e1) { ok = false; }
+    if (!ok) {
+        var input = document.getElementById('inputLinkAssinatura');
+        if (input) {
+            input.value = r.link;
+            input.select();
+            try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+        }
+    }
+    if (ok) toast('Link copiado. Pode colar no WhatsApp.');
+    else {
+        document.getElementById('modalLinkAssinatura').classList.add('aberto');
+        toast('Não deu para copiar sozinho — use Copiar link na janela.');
+    }
+}
+
+function acaoOsFormImprimir() {
+    var salvo = salvarAtendimentoRapidoParaEnvio();
+    if (!salvo) return;
+    imprimirNotaPdf(salvo.id);
+}
+
+async function acaoOsFormSalvarPdf() {
+    var salvo = salvarAtendimentoRapidoParaEnvio();
+    if (!salvo) return;
+    var db = carregar();
+    var a = (db.atendimentos || []).find(function (x) { return x && x.id === salvo.id; }) || salvo;
+    atendimentoNotaAtual = a;
+    var html = htmlNotaEspelho(db, a, { incluirFotos: false, tituloDoc: 'ORÇAMENTO / DIAGNÓSTICO' });
+    _htmlNotaImpressaoAtual = html;
+    _tituloNotaImpressao = 'OS · ' + (a.placa || '') + ' · ' + (a.clienteNome || '');
+    await salvarNotaPdfArquivo();
+}
+
+function acaoOsFormMandarCaixa() {
+    var salvo = salvarAtendimentoRapidoParaEnvio();
+    if (!salvo) return;
+    finalizarEMandarAoCaixa(salvo.id);
 }
 
 function montarMsgChecklistAtual() {
@@ -5746,6 +5851,14 @@ function imprimirRelatorioOficina() {
     if (bOr) bOr.addEventListener('click', function () {
         enviarWhatsAppOs('orcamento');
     });
+    var bCop = document.getElementById('btnAtCopiarLink');
+    if (bCop) bCop.addEventListener('click', function () { copiarLinkOsEnvio(); });
+    var bImp = document.getElementById('btnAtImprimir');
+    if (bImp) bImp.addEventListener('click', function () { acaoOsFormImprimir(); });
+    var bPdf = document.getElementById('btnAtSalvarPdf');
+    if (bPdf) bPdf.addEventListener('click', function () { acaoOsFormSalvarPdf(); });
+    var bCx = document.getElementById('btnAtMandarCaixa');
+    if (bCx) bCx.addEventListener('click', function () { acaoOsFormMandarCaixa(); });
     var bFechar = document.getElementById('btnFecharCaixaDia');
     if (bFechar) bFechar.addEventListener('click', fecharCaixaDoDia);
     var bRelDia = document.getElementById('btnRelatorioDiaOficina');
@@ -5981,12 +6094,12 @@ function imprimirRelatorioOficina() {
         if (!t || !t.getAttribute) return;
         var waC = t.getAttribute('data-wa-checklist');
         if (waC) {
-            abrirModalWaEnvio({ tipo: 'checklist', atendimentoId: waC, deFormulario: false });
+            enviarWhatsAppOsSalvo(waC, 'checklist');
             return;
         }
         var waO = t.getAttribute('data-wa-orc');
         if (waO) {
-            abrirModalWaEnvio({ tipo: 'orcamento', atendimentoId: waO, deFormulario: false });
+            enviarWhatsAppOsSalvo(waO, 'orcamento');
             return;
         }
     });
