@@ -1453,8 +1453,27 @@ function inferirTipoMaoDesc(desc) {
 }
 
 function listarProdutosParaCatalogo(db) {
-    db = db || (typeof carregar === 'function' ? carregar() : { produtos: [] });
-    return (db.produtos || []).filter(function (p) { return p && String(p.nome || '').trim(); });
+    db = db || (typeof carregarMain === 'function'
+        ? carregarMain()
+        : (typeof carregar === 'function' ? carregar() : { produtos: [] }));
+    return (db.produtos || []).filter(function (p) {
+        return p && p.id && String(p.nome || '').trim();
+    });
+}
+
+function produtoQueryEhExata(query, p) {
+    if (!p) return false;
+    var q = textoBuscaNormCat(query);
+    if (!q) return false;
+    var nome = textoBuscaNormCat(p.nome);
+    var cod = textoBuscaNormCat(p.codigo);
+    var semCol = q.replace(/\s*\[.*$/, '').trim();
+    if (nome && (q === nome || semCol === nome)) return true;
+    if (cod && (q === cod || semCol === cod)) return true;
+    var soDigQ = String(query || '').replace(/\D/g, '');
+    var soDigC = String(p.codigo || '').replace(/\D/g, '');
+    if (soDigQ.length >= 4 && soDigC && soDigQ === soDigC) return true;
+    return false;
 }
 
 function buscarProdutosCatalogo(query, limite) {
@@ -1462,9 +1481,12 @@ function buscarProdutosCatalogo(query, limite) {
     if (q.length < 1) return [];
     var lista = listarProdutosParaCatalogo();
     return lista.filter(function (p) {
-        var blob = [p.nome, p.codigo, p.categoria].join(' ');
+        var blob = [p.nome, p.codigo].join(' ');
         return combinaBuscaCatalogo(blob, q);
     }).sort(function (a, b) {
+        var ea = produtoQueryEhExata(q, a) ? 0 : 1;
+        var eb = produtoQueryEhExata(q, b) ? 0 : 1;
+        if (ea !== eb) return ea - eb;
         var sa = scoreBuscaCatalogo(a.nome, q);
         var sb = scoreBuscaCatalogo(b.nome, q);
         if (sa !== sb) return sa - sb;
@@ -1610,7 +1632,6 @@ window._mapaBoxCatalogo = {
     itemDesc: 'sugestoesItemDesc',
     maoDesc: 'sugestoesMaoDesc',
     vdProdBusca: 'sugestoesVdProd',
-    vdAvNome: 'sugestoesVdAv',
     vdMaoDesc: 'sugestoesVdMao'
 };
 
@@ -1619,7 +1640,10 @@ function selecionarPrimeiraSugestaoCatalogo(inputId) {
     if (!boxId) return false;
     var box = document.getElementById(boxId);
     if (!box || box.hidden) return false;
-    var btn = box.querySelector('button.ativo, button[data-cat-idx]');
+    var somenteExato = inputId === 'vdProdBusca' || inputId === 'itemDesc';
+    var btn = somenteExato
+        ? box.querySelector('button[data-cat-exato="1"]')
+        : box.querySelector('button.ativo, button[data-cat-idx]');
     if (!btn) return false;
     btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     return true;
@@ -1640,9 +1664,19 @@ function ligarAutocompleteCampoCatalogo(opts) {
     }
 
     function mostrar(itens) {
-        if (!itens.length) { esconder(); return; }
+        if (!itens.length) {
+            if (opts.vazioTxt) {
+                box.innerHTML = '<div class="sugestoes-catalogo-vazio">' + esc(opts.vazioTxt) + '</div>';
+                box.hidden = false;
+                return;
+            }
+            esconder();
+            return;
+        }
         box.innerHTML = itens.map(function (it, i) {
-            return '<button type="button" data-cat-idx="' + i + '"' + (i === 0 ? ' class="ativo"' : '') + '>' +
+            return '<button type="button" data-cat-idx="' + i + '"' +
+                (it.exato ? ' data-cat-exato="1"' : '') +
+                (i === 0 ? ' class="ativo"' : '') + '>' +
                 '<strong>' + esc(it.titulo) + '</strong>' +
                 (it.sub ? '<span>' + esc(it.sub) + '</span>' : '') +
                 '</button>';
@@ -1695,16 +1729,28 @@ function rotuloPrecoCatalogo(custo, venda) {
 }
 
 (function ligarAutocompleteOrcamento() {
+    function itensProdutoCadastro(q) {
+        return buscarProdutosCatalogo(q).map(function (p) {
+            var qtd = (p.qtd != null && Number(p.qtd) === Number(p.qtd)) ? Number(p.qtd) : null;
+            var extra = [
+                p.codigo ? 'cód. ' + p.codigo : '',
+                qtd != null ? 'estoque ' + qtd : '',
+                rotuloPrecoCatalogo(p.custo, p.venda)
+            ].filter(Boolean).join(' · ');
+            return {
+                titulo: p.nome,
+                sub: extra || 'Cadastro de Produtos',
+                raw: p,
+                exato: produtoQueryEhExata(q, p)
+            };
+        });
+    }
+    var vazioProd = 'Nenhum produto cadastrado com esse nome. Use Cadastro de Produtos.';
     ligarAutocompleteCampoCatalogo({
         inputId: 'itemDesc',
         boxId: 'sugestoesItemDesc',
-        buscar: function (q) {
-            return buscarProdutosCatalogo(q).map(function (p) {
-                var extra = [p.codigo ? 'cód. ' + p.codigo : '', rotuloPrecoCatalogo(p.custo, p.venda)]
-                    .filter(Boolean).join(' · ');
-                return { titulo: p.nome, sub: extra, raw: p };
-            });
-        },
+        vazioTxt: vazioProd,
+        buscar: itensProdutoCadastro,
         onSelect: aplicarProdutoNoOrcamentoOs
     });
     ligarAutocompleteCampoCatalogo({
@@ -1725,26 +1771,9 @@ function rotuloPrecoCatalogo(custo, venda) {
     ligarAutocompleteCampoCatalogo({
         inputId: 'vdProdBusca',
         boxId: 'sugestoesVdProd',
-        buscar: function (q) {
-            return buscarProdutosCatalogo(q).map(function (p) {
-                var extra = [p.codigo ? 'cód. ' + p.codigo : '', rotuloPrecoCatalogo(p.custo, p.venda)]
-                    .filter(Boolean).join(' · ');
-                return { titulo: p.nome, sub: extra, raw: p };
-            });
-        },
+        vazioTxt: vazioProd,
+        buscar: itensProdutoCadastro,
         onSelect: function (p) { aplicarProdutoNoOrcamentoVenda(p, 'estoque'); }
-    });
-    ligarAutocompleteCampoCatalogo({
-        inputId: 'vdAvNome',
-        boxId: 'sugestoesVdAv',
-        buscar: function (q) {
-            return buscarProdutosCatalogo(q).map(function (p) {
-                var extra = [p.codigo ? 'cód. ' + p.codigo : '', rotuloPrecoCatalogo(p.custo, p.venda)]
-                    .filter(Boolean).join(' · ');
-                return { titulo: p.nome, sub: extra, raw: p };
-            });
-        },
-        onSelect: function (p) { aplicarProdutoNoOrcamentoVenda(p, 'avulso'); }
     });
     ligarAutocompleteCampoCatalogo({
         inputId: 'vdMaoDesc',

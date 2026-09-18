@@ -1191,16 +1191,64 @@ function listarCarrosEmAberto(db) {
     });
 }
 
+var PAINEL_RECOLHE_KEY = 'joninha_painel_recolhe_v1';
+
+function painelRecolheEstado() {
+    try {
+        return JSON.parse(localStorage.getItem(PAINEL_RECOLHE_KEY) || '{}') || {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function painelRecolheSalvar(chave, min) {
+    var st = painelRecolheEstado();
+    st[chave] = !!min;
+    try { localStorage.setItem(PAINEL_RECOLHE_KEY, JSON.stringify(st)); } catch (eS) { /* ok */ }
+}
+
+function aplicarPainelRecolhe(wrap, chave) {
+    if (!wrap) return;
+    var min = !!painelRecolheEstado()[chave];
+    wrap.classList.toggle('recolhido', min);
+    var btn = wrap.querySelector('[data-recolher="' + chave + '"]') || wrap.querySelector('.btn-recolher');
+    if (btn) {
+        btn.textContent = min ? 'Maximizar' : 'Minimizar';
+        btn.setAttribute('aria-expanded', min ? 'false' : 'true');
+        btn.setAttribute('title', min ? 'Mostrar a lista' : 'Esconder a lista');
+    }
+}
+
+function ligarPainelRecolhe(wrap, chave) {
+    if (!wrap) return;
+    aplicarPainelRecolhe(wrap, chave);
+    var btn = wrap.querySelector('[data-recolher="' + chave + '"]') || wrap.querySelector('.btn-recolher');
+    if (!btn || btn.getAttribute('data-recolher-ligado')) return;
+    btn.setAttribute('data-recolher-ligado', '1');
+    btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var min = !wrap.classList.contains('recolhido');
+        painelRecolheSalvar(chave, min);
+        aplicarPainelRecolhe(wrap, chave);
+    });
+}
+
 function renderCarrosEmAberto(db) {
     db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
     var lista = listarCarrosEmAberto(db);
-    function preencher(elId, boxId) {
+    function preencher(elId, boxId, qtdId, chave) {
         var host = document.getElementById(elId);
         var box = document.getElementById(boxId);
+        var qtdEl = document.getElementById(qtdId);
+        if (qtdEl) qtdEl.textContent = lista.length ? '(' + lista.length + ')' : '';
+        if (box) {
+            box.style.display = lista.length ? '' : 'none';
+            if (chave) ligarPainelRecolhe(box, chave);
+        }
         if (!host) return;
         if (!lista.length) {
             host.innerHTML = '<div class="muted" style="padding:6px 0">Nenhum carro em andamento agora.</div>';
-            if (box && boxId === 'boxCarrosAndamentoInicio') box.style.display = lista.length ? '' : '';
             return;
         }
         host.innerHTML = lista.map(function (a) {
@@ -1224,8 +1272,8 @@ function renderCarrosEmAberto(db) {
             });
         });
     }
-    preencher('listaCarrosAndamentoInicio', 'boxCarrosAndamentoInicio');
-    preencher('listaCarrosAndamentoHist', 'boxCarrosAndamentoHist');
+    preencher('listaCarrosAndamentoInicio', 'boxCarrosAndamentoInicio', 'qtdCarrosAndamentoInicio', 'andamentoInicio');
+    preencher('listaCarrosAndamentoHist', 'boxCarrosAndamentoHist', 'qtdCarrosAndamentoHist', 'andamentoHist');
 }
 
 function finalizarEMandarAoCaixa(id) {
@@ -1340,6 +1388,8 @@ function abrirRelatorioServicos(tipo) {
     tipo = tipo || 'entradas';
     if (tipo === 'andamento') {
         abrirPainel('painelHistorico');
+        painelRecolheSalvar('andamentoHist', false);
+        aplicarPainelRecolhe(document.getElementById('boxCarrosAndamentoHist'), 'andamentoHist');
         setTimeout(function () {
             var box = document.getElementById('boxCarrosAndamentoHist');
             if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -3312,9 +3362,9 @@ function renderAlertaVencidos30(db) {
     if (!el) return;
     db = db || carregarMain();
     function atrasoDias(venc) {
-        if (!venc) return 0;
+        if (!venc) return null;
         var d = new Date(String(venc).slice(0, 10) + 'T12:00:00');
-        if (isNaN(d.getTime())) return 0;
+        if (isNaN(d.getTime())) return null;
         var hoje = new Date();
         hoje.setHours(12, 0, 0, 0);
         return Math.floor((hoje.getTime() - d.getTime()) / 86400000);
@@ -3322,10 +3372,12 @@ function renderAlertaVencidos30(db) {
     var itens = [];
     var vistos = {};
     function add(chave, txt, venc, aberto) {
-        if (!(aberto > 0.009) || atrasoDias(venc) < 30) return;
+        if (!(aberto > 0.009)) return;
+        var dias = atrasoDias(venc);
+        if (dias == null || dias < 0) return;
         if (chave && vistos[chave]) return;
         if (chave) vistos[chave] = true;
-        itens.push({ txt: txt, venc: venc, aberto: aberto, dias: atrasoDias(venc) });
+        itens.push({ txt: txt, venc: venc, aberto: aberto, dias: dias });
     }
     (db.atendimentos || []).forEach(function (a) {
         if (!a) return;
@@ -3334,7 +3386,7 @@ function renderAlertaVencidos30(db) {
         var aberto = a.saldoAberto != null
             ? Number(a.saldoAberto)
             : Math.max(0, (Number(a.total) || 0) - (Number(a.valorRecebido) || 0));
-        add('os:' + a.id, 'OS ' + ((a.placa || '').toUpperCase()) + ' · ' + (a.clienteNome || nomeAtendimento(db, a)), a.dataVencimento || a.entrada, aberto);
+        add('os:' + a.id, 'OS ' + ((a.placa || '').toUpperCase()) + ' · ' + (a.clienteNome || nomeAtendimento(db, a)), a.dataVencimento, aberto);
     });
     (db.orcamentos || []).forEach(function (o) {
         if (!o) return;
@@ -3342,7 +3394,7 @@ function renderAlertaVencidos30(db) {
         var aberto = o.saldoAberto != null
             ? Number(o.saldoAberto)
             : Math.max(0, (Number(o.valor) || 0) - (Number(o.valorRecebido) || 0));
-        add('vd:' + o.id, (o.tipo || 'Doc') + ' Nº ' + (o.numero || ''), o.dataVencimento || o.dataEmissao, aberto);
+        add('vd:' + o.id, (o.tipo || 'Doc') + ' Nº ' + (o.numero || ''), o.dataVencimento, aberto);
     });
     (db.pendentes || []).forEach(function (p) {
         if (!p || p.status === 'pago') return;
@@ -3352,23 +3404,53 @@ function renderAlertaVencidos30(db) {
     if (!itens.length) {
         el.style.display = 'none';
         el.innerHTML = '';
+        el.classList.remove('alerta-vence-hoje');
         return;
     }
+    itens.sort(function (a, b) { return b.dias - a.dias; });
     var soma = itens.reduce(function (s, x) { return s + x.aberto; }, 0);
+    var nHoje = itens.filter(function (x) { return x.dias === 0; }).length;
+    var nAtraso = itens.filter(function (x) { return x.dias > 0; }).length;
+    var n30 = itens.filter(function (x) { return x.dias >= 30; }).length;
+    var partes = [];
+    if (nHoje) partes.push(nHoje + ' vence(m) hoje');
+    if (nAtraso) partes.push(nAtraso + ' vencida(s)');
+    if (n30) partes.push(n30 + ' com mais de 30 dias');
+    el.classList.toggle('alerta-vence-hoje', !nAtraso && !!nHoje);
     el.style.display = '';
-    el.innerHTML = '⚠️ ' + itens.length + ' conta(s) com mais de 30 dias em aberto · ' + moeda(soma) +
-        '<div style="font-size:0.82rem;font-weight:600;margin-top:6px">' +
+    var min = !!painelRecolheEstado().vencidas;
+    el.classList.toggle('recolhido', min);
+    el.innerHTML =
+        '<div class="bloco-recolhe-cab">' +
+        '<button type="button" class="bloco-recolhe-titulo" id="btnAlertaVencidasAbrir">' +
+        '⚠️ ' + partes.join(' · ') + ' · ' + moeda(soma) +
+        '</button>' +
+        '<button type="button" class="btn btn-recolher" id="btnRecolheVencidas" data-recolher="vencidas">' +
+        (min ? 'Maximizar' : 'Minimizar') +
+        '</button>' +
+        '</div>' +
+        '<div class="bloco-recolhe-corpo">' +
+        '<div style="font-size:0.82rem;font-weight:600">' +
         itens.slice(0, 5).map(function (x) {
-            return esc(x.txt) + ' · ' + moeda(x.aberto) + ' · ' + x.dias + ' dias';
+            var quando = x.dias === 0 ? 'hoje' : (x.dias + ' dia(s)');
+            return esc(x.txt) + ' · ' + moeda(x.aberto) + ' · ' + quando;
         }).join('<br>') + (itens.length > 5 ? '<br>…' : '') + '</div>' +
-        '<div style="font-size:0.78rem;margin-top:6px;opacity:.9">Clique para abrir Contas a receber</div>';
-    el.onclick = function () {
-        if (typeof irParaPastaInicio === 'function') irParaPastaInicio('pendentes');
-        else if (typeof abrirPainel === 'function') abrirPainel('painelPendentes');
-    };
-    if (!window._alerta30Tocado) {
-        window._alerta30Tocado = true;
-        toast('Atenção: ' + itens.length + ' conta(s) vencida(s) há mais de 30 dias.');
+        '<div class="alerta-vencidos-acao">Clique no título para abrir Contas a receber</div>' +
+        '</div>';
+    el.onclick = null;
+    var btnAbrir = document.getElementById('btnAlertaVencidasAbrir');
+    if (btnAbrir) {
+        btnAbrir.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof irParaPastaInicio === 'function') irParaPastaInicio('pendentes');
+            else if (typeof abrirPainel === 'function') abrirPainel('painelPendentes');
+        });
+    }
+    ligarPainelRecolhe(el, 'vencidas');
+    if (!window._alertaVencTocado) {
+        window._alertaVencTocado = true;
+        toast('Atenção: ' + partes.join(', ') + '.');
     }
 }
 
@@ -4194,28 +4276,39 @@ function preencherSelectFuncionariosVenda() {
 }
 
 function encontrarProdutoPorBusca(texto) {
-    var db = carregar();
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
     var t = String(texto || '').trim();
     if (!t) return null;
+    var lista = (db.produtos || []).filter(function (p) { return p && p.id && String(p.nome || '').trim(); });
     var tLow = t.toLowerCase();
-    var cod = tLow.replace(/^.*\[/, '').replace(/\].*$/, '').trim();
-    var porCod = db.produtos.find(function (p) {
-        return p.codigo && String(p.codigo).toLowerCase() === cod;
+    var entreColchetes = '';
+    var mCol = t.match(/\[([^\]]+)\]/);
+    if (mCol) entreColchetes = String(mCol[1] || '').trim();
+    function normCod(c) {
+        return String(c || '').replace(/\s+/g, '').toLowerCase();
+    }
+    function soDig(c) {
+        return String(c || '').replace(/\D/g, '');
+    }
+    if (entreColchetes) {
+        var porCol = lista.find(function (p) {
+            return p.codigo && normCod(p.codigo) === normCod(entreColchetes);
+        });
+        if (porCol) return porCol;
+    }
+    var porCod = lista.find(function (p) {
+        if (!p.codigo) return false;
+        return normCod(p.codigo) === normCod(t) || (soDig(t).length >= 4 && soDig(p.codigo) === soDig(t));
     });
     if (porCod) return porCod;
     var nome = tLow.replace(/\s*\[.*$/, '').trim();
-    var exato = db.produtos.find(function (p) {
-        return String(p.nome || '').toLowerCase() === nome ||
-            (p.codigo && String(p.codigo).toLowerCase() === tLow);
+    var exato = lista.find(function (p) {
+        return textoBuscaNormCat
+            ? textoBuscaNormCat(p.nome) === textoBuscaNormCat(nome)
+            : String(p.nome || '').toLowerCase() === nome;
     });
     if (exato) return exato;
-    if (typeof buscarProdutosCatalogo === 'function') {
-        var hits = buscarProdutosCatalogo(nome, 1);
-        if (hits.length) return hits[0];
-    }
-    return db.produtos.find(function (p) {
-        return String(p.nome || '').toLowerCase().indexOf(nome) === 0;
-    }) || null;
+    return null;
 }
 
 function atualizarTotalLinhaEstoque() {
@@ -4314,7 +4407,14 @@ function preencherCamposProdutoEstoque() {
     var p = encontrarProdutoPorBusca(document.getElementById('vdProdBusca').value);
     produtoVendaSelecionado = p;
     if (!p) {
+        document.getElementById('vdProdCusto').value = '';
+        document.getElementById('vdProdVenda').value = '';
+        document.getElementById('vdProdMargem').value = '';
+        document.getElementById('vdProdUn').value = '';
+        document.getElementById('vdProdTotal').value = '';
         atualizarResumoEstoqueVenda();
+        var q = String(document.getElementById('vdProdBusca').value || '').trim();
+        if (q) toast('Esse item não está no Cadastro de Produtos. Clique numa sugestão cadastrada ou cadastre o produto.');
         return;
     }
     document.getElementById('vdProdCusto').value = p.custo || 0;
@@ -4629,6 +4729,18 @@ function addItemCarrinho(item) {
 }
 
 document.getElementById('vdProdBusca').addEventListener('change', preencherCamposProdutoEstoque);
+document.getElementById('vdProdBusca').addEventListener('input', function () {
+    if (!produtoVendaSelecionado) return;
+    var t = String(this.value || '').trim();
+    var p = produtoVendaSelecionado;
+    var aindaOMesmo = typeof produtoQueryEhExata === 'function'
+        ? produtoQueryEhExata(t, p)
+        : (t && p && (t === p.nome || (p.codigo && t.indexOf(p.codigo) >= 0)));
+    if (!aindaOMesmo) {
+        produtoVendaSelecionado = null;
+        atualizarResumoEstoqueVenda();
+    }
+});
 document.getElementById('vdProdBusca').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') {
         if (typeof window.selecionarPrimeiraSugestaoCatalogo === 'function' &&
@@ -4667,7 +4779,17 @@ document.getElementById('vdProdVenda').addEventListener('input', function () {
 document.getElementById('btnVdAddEstoque').addEventListener('click', function () {
     if (!produtoVendaSelecionado) preencherCamposProdutoEstoque();
     var p = produtoVendaSelecionado;
-    if (!p) { toast('Selecione um produto do estoque (nome ou código).'); return; }
+    if (!p || !p.id) {
+        if (!String(document.getElementById('vdProdBusca').value || '').trim()) {
+            toast('Selecione um produto cadastrado no estoque (clique na lista).');
+        }
+        return;
+    }
+    var listaCad = ((typeof carregarMain === 'function' ? carregarMain() : carregar()).produtos || []);
+    var cadastro = listaCad.find(function (x) { return x && String(x.id) === String(p.id); });
+    if (!cadastro) { toast('Esse item não está no Cadastro de Produtos.'); return; }
+    p = cadastro;
+    produtoVendaSelecionado = p;
     var qtd = parseMoeda(document.getElementById('vdProdQtd').value);
     var venda = Number(document.getElementById('vdProdVenda').value) || 0;
     if (qtd <= 0) { toast('Informe a quantidade.'); return; }

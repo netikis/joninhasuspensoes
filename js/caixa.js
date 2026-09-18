@@ -1198,8 +1198,10 @@ function renderPendentes() {
             hj.setHours(12, 0, 0, 0);
             if (!isNaN(dv.getTime())) atraso = Math.floor((hj.getTime() - dv.getTime()) / 86400000);
         }
-        var vencHtml = esc(fmtData(p.vencimento));
-        if (atraso >= 30) vencHtml += ' <span style="color:#b91c1c;font-weight:800">30+ dias vencido</span>';
+        var vencIso = typeof dataISODia === 'function' ? dataISODia(p.vencimento) : String(p.vencimento || '').slice(0, 10);
+        var vencHtml = esc(fmtData(p.vencimento) || '—');
+        if (vencIso && atraso === 0) vencHtml += ' <span style="color:#b45309;font-weight:800">Vence hoje</span>';
+        else if (atraso >= 30) vencHtml += ' <span style="color:#b91c1c;font-weight:800">30+ dias vencido</span>';
         else if (atraso > 0) vencHtml += ' <span style="color:#b45309;font-weight:800">Vencido</span>';
         var recAvulso = p.atendimentoId
             ? ''
@@ -1208,7 +1210,14 @@ function renderPendentes() {
         tr.innerHTML =
             '<td>' + esc(p.cliente) + '</td>' +
             '<td>' + esc(descExibir) + '</td>' +
-            '<td>' + vencHtml + '</td>' +
+            '<td class="pd-venc-td">' +
+            '<div class="pd-venc-linha"><span>' + vencHtml + '</span>' +
+            '<button type="button" class="btn btn-secondary" data-pd-edit-venc="' + esc(p.id) + '">Editar</button></div>' +
+            '<div class="pd-venc-edit" hidden>' +
+            '<span class="muted">Dia combinado de pagamento</span>' +
+            '<input type="date" data-pd-venc-input="' + esc(p.id) + '" value="' + esc(vencIso) + '">' +
+            '<button type="button" class="btn btn-ok" data-pd-venc-salvar="' + esc(p.id) + '">Salvar data</button>' +
+            '</div></td>' +
             '<td>' + moeda(p.valor) + '</td>' +
             '<td class="actions"><div class="cx-acoes-fh">' + acoesDoc + recAvulso +
             '<button type="button" class="btn btn-danger" data-ex="' + p.id + '">Excluir</button>' +
@@ -1238,7 +1247,62 @@ function renderPendentes() {
             renderPendentes();
         });
     });
+    tb.querySelectorAll('[data-pd-edit-venc]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var cell = b.closest('td');
+            var box = cell ? cell.querySelector('.pd-venc-edit') : null;
+            if (!box) return;
+            box.hidden = !box.hidden;
+            if (!box.hidden) {
+                var inp = cell.querySelector('input[type="date"]');
+                if (inp) inp.focus();
+            }
+        });
+    });
+    tb.querySelectorAll('[data-pd-venc-salvar]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var id = b.getAttribute('data-pd-venc-salvar');
+            var cell = b.closest('td');
+            var inp = cell ? cell.querySelector('[data-pd-venc-input]') : null;
+            salvarVencimentoPendente(id, inp ? inp.value : '');
+        });
+    });
 }
+
+function salvarVencimentoPendente(id, ymd) {
+    ymd = typeof dataISODia === 'function' ? dataISODia(ymd) : String(ymd || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+        toast('Informe o dia que o cliente combinou pagar.');
+        return;
+    }
+    var db = carregar();
+    var p = (db.pendentes || []).find(function (x) { return x && String(x.id) === String(id); });
+    if (!p) {
+        toast('Pendente não encontrada.');
+        return;
+    }
+    p.vencimento = ymd;
+    if (p.atendimentoId) {
+        var a = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(p.atendimentoId); });
+        if (a) {
+            a.dataVencimento = ymd;
+            a.atualizadoEm = new Date().toISOString();
+        }
+    }
+    if (p.vendaId) {
+        var o = (db.orcamentos || []).find(function (x) { return x && String(x.id) === String(p.vendaId); });
+        if (o) {
+            o.dataVencimento = ymd;
+            o.atualizadoEm = new Date().toISOString();
+        }
+    }
+    salvar(db);
+    toast('Vencimento salvo. No Início o alerta usa essa data.');
+    renderPendentes();
+    if (typeof renderAlertaVencidos30 === 'function') renderAlertaVencidos30(typeof carregarMain === 'function' ? carregarMain() : db);
+    if (typeof atualizarKPIs === 'function') atualizarKPIs(typeof carregarMain === 'function' ? carregarMain() : db);
+}
+window.salvarVencimentoPendente = salvarVencimentoPendente;
 
 /* ---------- Relatório mensal + pastas (modelo FH Control) ---------- */
 var MES_NOMES_CX = {

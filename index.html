@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=48">
-    <link rel="stylesheet" href="css/tema-m3.css?v=48">
+    <link rel="stylesheet" href="css/app.css?v=51">
+    <link rel="stylesheet" href="css/tema-m3.css?v=51">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -188,9 +188,14 @@
             </div>
             <div id="alertaVencidos30" class="alerta-vencidos-30" style="display:none"></div>
             <div class="box box-andamento-destaque" id="boxCarrosAndamentoInicio">
-                <h2>🔧 Carros em andamento</h2>
-                <p class="hint" style="margin:0">Enquanto o serviço roda, o carro fica aqui. <strong>Mandar ao caixa</strong> tira da lista e abre o recebimento.</p>
-                <div class="lista-agendados-chips" id="listaCarrosAndamentoInicio"></div>
+                <div class="bloco-recolhe-cab">
+                    <h2>🔧 Carros em andamento <span class="bloco-recolhe-qtd" id="qtdCarrosAndamentoInicio"></span></h2>
+                    <button type="button" class="btn btn-secondary btn-recolher" data-recolher="andamentoInicio">Minimizar</button>
+                </div>
+                <div class="bloco-recolhe-corpo">
+                    <p class="hint" style="margin:0">Enquanto o serviço roda, o carro fica aqui. <strong>Mandar ao caixa</strong> tira da lista e abre o recebimento.</p>
+                    <div class="lista-agendados-chips" id="listaCarrosAndamentoInicio"></div>
+                </div>
             </div>
             <div class="cards">
                 <button type="button" class="card card-atalho card-ent" data-relatorio-servicos="entradas" title="Ver relatório dos serviços e vendas">
@@ -513,9 +518,14 @@
 
         <section id="painelHistorico" class="panel">
             <div class="box box-andamento-destaque" id="boxCarrosAndamentoHist">
-                <h2>🔧 Carros em andamento (em aberto)</h2>
-                <p class="hint" style="margin:0">Toque no carro para editar. <strong>Mandar ao caixa</strong> tira o carro desta lista e abre o recebimento.</p>
-                <div class="lista-agendados-chips" id="listaCarrosAndamentoHist"></div>
+                <div class="bloco-recolhe-cab">
+                    <h2>🔧 Carros em andamento (em aberto) <span class="bloco-recolhe-qtd" id="qtdCarrosAndamentoHist"></span></h2>
+                    <button type="button" class="btn btn-secondary btn-recolher" data-recolher="andamentoHist">Minimizar</button>
+                </div>
+                <div class="bloco-recolhe-corpo">
+                    <p class="hint" style="margin:0">Toque no carro para editar. <strong>Mandar ao caixa</strong> tira o carro desta lista e abre o recebimento.</p>
+                    <div class="lista-agendados-chips" id="listaCarrosAndamentoHist"></div>
+                </div>
             </div>
             <div class="box box-agendados-destaque" id="boxAgendadosDestaque" style="display:none">
                 <h2>📅 Serviços agendados</h2>
@@ -675,12 +685,12 @@
 
                     <div class="box">
                         <h3>2. Buscar do estoque (nome ou bipe)</h3>
+                        <p class="hint">Só entra o que está em <strong>Cadastro de Produtos</strong>. Digite e clique na sugestão — item que não estiver cadastrado não adiciona.</p>
                         <div class="row">
                             <div class="col autocomplete-wrap" style="flex:2">
-                                <label>Produto</label>
-                                <input id="vdProdBusca" placeholder="Bipe o código ou digite o nome (ex.: amortecedor gol)..." autocomplete="off">
+                                <label>Produto cadastrado</label>
+                                <input id="vdProdBusca" placeholder="Digite o nome ou bipe o código do cadastro..." autocomplete="off">
                                 <div id="sugestoesVdProd" class="sugestoes-catalogo" hidden></div>
-                                <datalist id="listaProdutosVenda"></datalist>
                             </div>
                         </div>
                         <div id="vdEstoqueInfo" class="estoque-resumo" aria-live="polite"></div>
@@ -706,7 +716,7 @@
                     <div class="box box-item-avulso" style="border:2px solid #e61e25;background:#ffe5e8;box-shadow:0 0 0 1px rgba(230,30,37,0.25)">
                         <h3 style="color:#111;font-weight:800">3. Adicionar item avulso</h3>
                         <div class="row">
-                            <div class="col autocomplete-wrap" style="flex:2"><label style="color:#111;font-weight:800">Descrição</label><input id="vdAvNome" placeholder="Ex: Amortecedor gol, instalação..." autocomplete="off"><div id="sugestoesVdAv" class="sugestoes-catalogo" hidden></div></div>
+                            <div class="col" style="flex:2"><label style="color:#111;font-weight:800">Descrição</label><input id="vdAvNome" placeholder="Item avulso (não precisa estar no cadastro)..." autocomplete="off"></div>
                         </div>
                         <div class="row" style="margin-top:8px;align-items:flex-end">
                             <div class="col" style="flex:0.7"><label style="color:#111;font-weight:800">Unid.</label>
@@ -1017,13 +1027,13 @@
         <section id="painelPendentes" class="panel">
             <div class="box">
                 <h2>Contas a Receber (Pendentes)</h2>
-                <p class="hint">OS em aberto: use <strong>Receber OS</strong>. Conta avulsa: Balcão ou Banco. Ao receber, o valor some daqui e entra no caixa.</p>
+                <p class="hint">OS em aberto: use <strong>Receber OS</strong>. Conta avulsa: Balcão ou Banco. No vencimento, clique em <strong>Editar</strong> e coloque o dia que o cliente combinou pagar — no Início o sistema alerta nessa data. Ao receber, o valor some daqui e entra no caixa.</p>
                 <form id="formPendente">
                     <div class="row">
                         <div class="col" style="flex:2"><label>Cliente</label><input id="pdCliente" required placeholder="Nome do cliente"></div>
                         <div class="col" style="flex:2"><label>Descrição</label><input id="pdDesc" required placeholder="Serviço / OS / nota"></div>
                         <div class="col"><label>Valor (R$)</label><input id="pdValor" inputmode="decimal" required placeholder="0,00"></div>
-                        <div class="col"><label>Vencimento</label><input id="pdVenc" type="date"></div>
+                        <div class="col"><label>Vencimento (dia combinado)</label><input id="pdVenc" type="date"></div>
                     </div>
                     <div class="row" style="margin-top:14px">
                         <button type="submit" class="btn btn-primary">Adicionar pendente</button>
@@ -1732,17 +1742,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=48"></script>
-    <script src="js/storage.js?v=48"></script>
-    <script src="js/ui.js?v=48"></script>
-    <script src="js/auth.js?v=48"></script>
-    <script src="js/os.js?v=48"></script>
-    <script src="js/nuvem.js?v=48"></script>
-    <script src="js/caixa.js?v=48"></script>
-    <script src="js/comissoes.js?v=48"></script>
-    <script src="js/app.js?v=48"></script>
-    <script src="js/perfil-cliente.js?v=48"></script>
-    <script src="js/navegacao.js?v=48"></script>
+    <script src="js/config.js?v=51"></script>
+    <script src="js/storage.js?v=51"></script>
+    <script src="js/ui.js?v=51"></script>
+    <script src="js/auth.js?v=51"></script>
+    <script src="js/os.js?v=51"></script>
+    <script src="js/nuvem.js?v=51"></script>
+    <script src="js/caixa.js?v=51"></script>
+    <script src="js/comissoes.js?v=51"></script>
+    <script src="js/app.js?v=51"></script>
+    <script src="js/perfil-cliente.js?v=51"></script>
+    <script src="js/navegacao.js?v=51"></script>
 </body>
 </html>
 

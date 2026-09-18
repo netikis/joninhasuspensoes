@@ -1507,6 +1507,12 @@
         .sugestoes-catalogo button:last-child { border-bottom: 0; }
         .sugestoes-catalogo button:hover,
         .sugestoes-catalogo button.ativo { background: #f8fafc; }
+        .sugestoes-catalogo-vazio {
+            padding: 10px 12px;
+            color: #b45309;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
         .sugestoes-catalogo strong {
             display: block;
             color: #152642;
@@ -2124,16 +2130,87 @@
         }
         .alerta-vencidos-30 {
             margin: 10px 0 14px;
-            padding: 12px 14px;
+            padding: 10px 12px;
             border-radius: 10px;
             background: #7f1d1d;
             border: 2px solid #f87171;
             color: #fff;
             font-weight: 800;
-            cursor: pointer;
             line-height: 1.4;
         }
-        .alerta-vencidos-30:hover { filter: brightness(1.08); }
+        .alerta-vencidos-30.alerta-vence-hoje {
+            background: #9a3412;
+            border-color: #fb923c;
+        }
+        .bloco-recolhe-cab {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .bloco-recolhe-cab h2 {
+            margin: 0;
+            flex: 1;
+            min-width: 0;
+        }
+        .bloco-recolhe-qtd {
+            font-size: 0.82em;
+            font-weight: 800;
+            opacity: 0.85;
+        }
+        .bloco-recolhe-titulo {
+            flex: 1;
+            min-width: 0;
+            text-align: left;
+            background: none;
+            border: 0;
+            color: inherit;
+            font: inherit;
+            font-weight: 800;
+            cursor: pointer;
+            padding: 0;
+        }
+        .btn-recolher {
+            flex-shrink: 0;
+            padding: 5px 10px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+        .alerta-vencidos-30 .btn-recolher {
+            background: rgba(255,255,255,0.16);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.45);
+        }
+        .alerta-vencidos-30 .btn-recolher:hover {
+            background: rgba(255,255,255,0.28);
+        }
+        .bloco-recolhe-corpo { margin-top: 8px; }
+        .recolhido > .bloco-recolhe-corpo { display: none; }
+        .alerta-vencidos-acao {
+            font-size: 0.78rem;
+            margin-top: 6px;
+            opacity: 0.9;
+            font-weight: 600;
+        }
+        .pd-venc-td { min-width: 168px; }
+        .pd-venc-linha {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .pd-venc-edit {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .pd-venc-edit[hidden] { display: none !important; }
+        .pd-venc-edit input[type="date"] {
+            max-width: 170px;
+        }
         .btn-pdf { background: #c0392b; color: #fff; }
         .btn-assinar { background: #6f42c1; color: #fff; }
         .badge-assinado {
