@@ -495,6 +495,7 @@ function renderCaixa() {
 
         var tr = document.createElement('tr');
         var idsRow = resolverDocCaixa(x);
+        if (x.id) tr.setAttribute('data-cx-lanc', String(x.id));
         if (idsRow.idVd) {
             tr.setAttribute('data-cx-abrir-vd', idsRow.idVd);
             tr.style.cursor = 'pointer';
@@ -546,8 +547,10 @@ function renderCaixa() {
             }
             if (tratarCliqueAcoesDocumentoCaixa(e)) return;
             if (!e.target.closest('button') && !e.target.closest('a')) {
-                var trAbrir = e.target.closest('tr[data-cx-abrir-vd], tr[data-cx-abrir-os]');
+                var trAbrir = e.target.closest('tr[data-cx-abrir-vd], tr[data-cx-abrir-os], tr[data-cx-lanc]');
                 if (trAbrir) {
+                    var lanc = lancamentoCaixaPorId(trAbrir.getAttribute('data-cx-lanc'));
+                    if (lanc && abrirDocumentoDoLancamentoCaixa(lanc)) return;
                     var idVd = trAbrir.getAttribute('data-cx-abrir-vd');
                     var idOs = trAbrir.getAttribute('data-cx-abrir-os');
                     if (idVd && typeof editarDocumentoVenda === 'function') {
@@ -578,9 +581,74 @@ function renderCaixa() {
     }
 }
 
+function valorTotalAtendimentoOs(at) {
+    if (!at) return 0;
+    var doc = Number(at.total) || 0;
+    var itens = 0;
+    try {
+        if (typeof totaisItens === 'function') itens = Number(totaisItens(at.itens || []).total) || 0;
+    } catch (eTot) { itens = 0; }
+    return Math.max(doc, itens);
+}
+
+function totalNotaLancamentoCaixa(x) {
+    if (!x) return 0;
+    var nota = Number(x.osResumo && x.osResumo.totalOs);
+    if (nota > 0.009) return nota;
+    return Number(x.valor) || 0;
+}
+
+function acharAtendimentoPorLancamentoCaixa(x, db) {
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : (typeof carregar === 'function' ? carregar() : null));
+    var lista = (db && db.atendimentos) || [];
+    if (!x || !lista.length) return null;
+    var idOs = x.atendimentoId ? String(x.atendimentoId) : '';
+    var totalAlvo = totalNotaLancamentoCaixa(x);
+    var valorLanc = Number(x.valor) || 0;
+    var placa = String((x.osResumo && x.osResumo.placa) || '').toUpperCase().trim();
+    if (placa === '—' || placa === '-') placa = '';
+    var nome = String((x.osResumo && x.osResumo.cliente) || x.clienteNome || '').toLowerCase().trim();
+
+    function score(at) {
+        if (!at) return -999;
+        var s = 0;
+        var tot = valorTotalAtendimentoOs(at);
+        if (totalAlvo > 0.009 && Math.abs(tot - totalAlvo) < 0.05) s += 120;
+        else if (valorLanc > 0.009 && Math.abs(tot - valorLanc) < 0.05) s += 90;
+        else if (totalAlvo > 0.009 && tot > 0 && Math.abs(tot - totalAlvo) / Math.max(totalAlvo, tot) > 0.35) s -= 80;
+        if (idOs && String(at.id) === idOs) s += 35;
+        if (placa && String(at.placa || '').toUpperCase() === placa) s += 18;
+        if (nome && String(at.clienteNome || '').toLowerCase() === nome) s += 12;
+        return s;
+    }
+
+    var byId = idOs ? (lista.find(function (at) { return at && String(at.id) === idOs; }) || null) : null;
+    var totId = valorTotalAtendimentoOs(byId);
+    var notaResumo = Number(x.osResumo && x.osResumo.totalOs) || 0;
+    if (byId) {
+        if (notaResumo > 0.009 && Math.abs(totId - notaResumo) < 0.05) return byId;
+        if (!(notaResumo > 0.009) && valorLanc > 0.009 && valorLanc <= totId + 0.05) return byId;
+        if (Math.abs(totId - totalAlvo) < 0.05) return byId;
+    }
+
+    var melhor = null;
+    var melhorS = -999;
+    lista.forEach(function (at) {
+        var s = score(at);
+        if (s > melhorS) {
+            melhorS = s;
+            melhor = at;
+        }
+    });
+    if (melhor && melhorS >= 90) return melhor;
+    if (byId) return byId;
+    return melhorS > 0 ? melhor : null;
+}
+
 function resolverDocCaixa(x) {
     var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
-    var idOs = x && (x.atendimentoId || '') ? String(x.atendimentoId) : '';
+    var at = acharAtendimentoPorLancamentoCaixa(x, db);
+    var idOs = at && at.id ? String(at.id) : (x && x.atendimentoId ? String(x.atendimentoId) : '');
     var idVd = x && (x.vendaId || x.orcamentoId) ? String(x.vendaId || x.orcamentoId) : '';
     if (!idVd && x) {
         var blob = [x.descricao, x.clienteNome].join(' ');
@@ -593,14 +661,32 @@ function resolverDocCaixa(x) {
             if (o && o.id) idVd = String(o.id);
         }
     }
-    if (!idOs && x && x.osResumo && x.osResumo.placa) {
-        var placa = String(x.osResumo.placa).toUpperCase();
-        var a = (db.atendimentos || []).find(function (at) {
-            return at && String(at.placa || '').toUpperCase() === placa;
-        });
-        if (a && a.id) idOs = String(a.id);
-    }
     return { idOs: idOs, idVd: idVd };
+}
+
+function lancamentoCaixaPorId(id) {
+    if (!id) return null;
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+    var listas = [(db && db.caixa) || [], (db && db.caixaBanco) || []];
+    for (var i = 0; i < listas.length; i++) {
+        var hit = listas[i].find(function (l) { return l && String(l.id) === String(id); });
+        if (hit) return hit;
+    }
+    return null;
+}
+
+function abrirDocumentoDoLancamentoCaixa(x) {
+    if (!x) return false;
+    var ids = resolverDocCaixa(x);
+    if (ids.idVd && typeof editarDocumentoVenda === 'function') {
+        editarDocumentoVenda(ids.idVd);
+        return true;
+    }
+    if (ids.idOs && typeof editarAtendimento === 'function') {
+        editarAtendimento(ids.idOs, (x.osResumo && x.osResumo.placa) || x.descricao || '');
+        return true;
+    }
+    return false;
 }
 
 function htmlAssinaturaCaixa(db, x) {
@@ -871,6 +957,7 @@ function renderCaixaBanco() {
         var assHtml = htmlAssinaturaCaixa(mainBk, x);
         var tr = document.createElement('tr');
         var idsBk = resolverDocCaixa(x);
+        if (x.id) tr.setAttribute('data-cx-lanc', String(x.id));
         if (idsBk.idVd) {
             tr.setAttribute('data-cx-abrir-vd', idsBk.idVd);
             tr.style.cursor = 'pointer';
@@ -921,8 +1008,10 @@ function renderCaixaBanco() {
             }
             if (tratarCliqueAcoesDocumentoCaixa(e)) return;
             if (!e.target.closest('button') && !e.target.closest('a')) {
-                var trAbrirBk = e.target.closest('tr[data-cx-abrir-vd], tr[data-cx-abrir-os]');
+                var trAbrirBk = e.target.closest('tr[data-cx-abrir-vd], tr[data-cx-abrir-os], tr[data-cx-lanc]');
                 if (trAbrirBk) {
+                    var lancBk = lancamentoCaixaPorId(trAbrirBk.getAttribute('data-cx-lanc'));
+                    if (lancBk && abrirDocumentoDoLancamentoCaixa(lancBk)) return;
                     var idVdBk = trAbrirBk.getAttribute('data-cx-abrir-vd');
                     var idOsBk = trAbrirBk.getAttribute('data-cx-abrir-os');
                     if (idVdBk && typeof editarDocumentoVenda === 'function') {

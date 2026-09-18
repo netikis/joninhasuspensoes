@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=45">
-    <link rel="stylesheet" href="css/tema-m3.css?v=45">
+    <link rel="stylesheet" href="css/app.css?v=48">
+    <link rel="stylesheet" href="css/tema-m3.css?v=48">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -433,16 +433,24 @@
 
                 <div class="box">
                     <h2>Valores — Peças e Mão de Obra</h2>
-                    <p class="hint">Peça: <strong>custo</strong> e <strong>venda unitários</strong> + <strong>qtd</strong> (total = venda × qtd). Na lista dá para <strong>editar os valores</strong> e a quantidade. Mão de obra: a <strong>% e o R$ da comissão</strong> do funcionário aparecem na linha (só no painel interno — não vai na nota do cliente).</p>
+                    <p class="hint">Peça: digite o nome (ex.: <strong>amortecedor gol</strong>) e escolha o produto cadastrado — custo e venda entram sozinhos. Mão de obra: digite <strong>alinhamento</strong>, amortecedor etc. para selecionar o serviço. Na lista dá para <strong>editar os valores</strong> e a quantidade.</p>
                     <div class="row">
-                        <div class="col" style="flex:2"><label>Descrição peça</label><input id="itemDesc" placeholder="Ex: Amortecedor dianteiro"></div>
+                        <div class="col autocomplete-wrap" style="flex:2">
+                            <label>Descrição peça</label>
+                            <input id="itemDesc" placeholder="Ex: Amortecedor gol..." autocomplete="off">
+                            <div id="sugestoesItemDesc" class="sugestoes-catalogo" hidden></div>
+                        </div>
                         <div class="col"><label>Custo unit. (R$)</label><input id="itemCusto" inputmode="decimal" placeholder="55,00"></div>
                         <div class="col"><label>Venda unit. (R$)</label><input id="itemValor" inputmode="decimal" placeholder="60,00"></div>
                         <div class="col" style="flex:0.55"><label>Qtd</label><input id="itemQtd" inputmode="numeric" value="1" min="1" step="1" placeholder="1"></div>
                         <div class="col" style="flex:0.7;align-self:end"><button type="button" class="btn btn-secondary" id="btnAddItem" style="width:100%">+ Peça</button></div>
                     </div>
                     <div class="row" style="margin-top:10px">
-                        <div class="col" style="flex:1.4"><label>Descrição mão de obra</label><input id="maoDesc" placeholder="Ex: Troca amortecedor, alinhamento..."></div>
+                        <div class="col autocomplete-wrap" style="flex:1.4">
+                            <label>Descrição mão de obra</label>
+                            <input id="maoDesc" placeholder="Ex: Alinhamento, troca amortecedor..." autocomplete="off">
+                            <div id="sugestoesMaoDesc" class="sugestoes-catalogo" hidden></div>
+                        </div>
                         <div class="col"><label>Funcionário</label>
                             <select id="maoFuncId"><option value="">— sem funcionário —</option></select>
                         </div>
@@ -668,9 +676,10 @@
                     <div class="box">
                         <h3>2. Buscar do estoque (nome ou bipe)</h3>
                         <div class="row">
-                            <div class="col" style="flex:2">
+                            <div class="col autocomplete-wrap" style="flex:2">
                                 <label>Produto</label>
-                                <input id="vdProdBusca" list="listaProdutosVenda" placeholder="Bipe o código ou digite o nome..." autocomplete="off">
+                                <input id="vdProdBusca" placeholder="Bipe o código ou digite o nome (ex.: amortecedor gol)..." autocomplete="off">
+                                <div id="sugestoesVdProd" class="sugestoes-catalogo" hidden></div>
                                 <datalist id="listaProdutosVenda"></datalist>
                             </div>
                         </div>
@@ -697,7 +706,7 @@
                     <div class="box box-item-avulso" style="border:2px solid #e61e25;background:#ffe5e8;box-shadow:0 0 0 1px rgba(230,30,37,0.25)">
                         <h3 style="color:#111;font-weight:800">3. Adicionar item avulso</h3>
                         <div class="row">
-                            <div class="col" style="flex:2"><label style="color:#111;font-weight:800">Descrição</label><input id="vdAvNome" placeholder="Ex: Instalação padrão, taxa de visita..."></div>
+                            <div class="col autocomplete-wrap" style="flex:2"><label style="color:#111;font-weight:800">Descrição</label><input id="vdAvNome" placeholder="Ex: Amortecedor gol, instalação..." autocomplete="off"><div id="sugestoesVdAv" class="sugestoes-catalogo" hidden></div></div>
                         </div>
                         <div class="row" style="margin-top:8px;align-items:flex-end">
                             <div class="col" style="flex:0.7"><label style="color:#111;font-weight:800">Unid.</label>
@@ -720,7 +729,7 @@
                     <div class="box">
                         <h3>4. Mão de obra / serviço</h3>
                         <div class="row" style="align-items:flex-end">
-                            <div class="col" style="flex:1.6"><label>Descrição</label><input id="vdMaoDesc" placeholder="Ex: Funilaria, pintura, polimento..."></div>
+                            <div class="col autocomplete-wrap" style="flex:1.6"><label>Descrição</label><input id="vdMaoDesc" placeholder="Ex: Alinhamento, funilaria..." autocomplete="off"><div id="sugestoesVdMao" class="sugestoes-catalogo" hidden></div></div>
                             <div class="col">
                                 <label>Funcionário desta linha</label>
                                 <select id="vdMaoFuncId">
@@ -1723,17 +1732,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=45"></script>
-    <script src="js/storage.js?v=45"></script>
-    <script src="js/ui.js?v=45"></script>
-    <script src="js/auth.js?v=45"></script>
-    <script src="js/os.js?v=45"></script>
-    <script src="js/nuvem.js?v=45"></script>
-    <script src="js/caixa.js?v=45"></script>
-    <script src="js/comissoes.js?v=45"></script>
-    <script src="js/app.js?v=45"></script>
-    <script src="js/perfil-cliente.js?v=45"></script>
-    <script src="js/navegacao.js?v=45"></script>
+    <script src="js/config.js?v=48"></script>
+    <script src="js/storage.js?v=48"></script>
+    <script src="js/ui.js?v=48"></script>
+    <script src="js/auth.js?v=48"></script>
+    <script src="js/os.js?v=48"></script>
+    <script src="js/nuvem.js?v=48"></script>
+    <script src="js/caixa.js?v=48"></script>
+    <script src="js/comissoes.js?v=48"></script>
+    <script src="js/app.js?v=48"></script>
+    <script src="js/perfil-cliente.js?v=48"></script>
+    <script src="js/navegacao.js?v=48"></script>
 </body>
 </html>
 

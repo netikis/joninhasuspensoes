@@ -26,6 +26,18 @@ function acharAtendimentoComDb(id, placaHint) {
                 });
                 if (hits.length) {
                     hits.sort(function (x, y) {
+                        var tx = 0;
+                        var ty = 0;
+                        try {
+                            if (typeof valorTotalAtendimentoOs === 'function') {
+                                tx = valorTotalAtendimentoOs(x);
+                                ty = valorTotalAtendimentoOs(y);
+                            } else {
+                                tx = Number(x.total) || 0;
+                                ty = Number(y.total) || 0;
+                            }
+                        } catch (eT) { /* ok */ }
+                        if (ty !== tx) return ty - tx;
                         return String(y.atualizadoEm || y.criadoEm || '').localeCompare(String(x.atualizadoEm || x.criadoEm || ''));
                     });
                     a = hits[0];
@@ -34,10 +46,24 @@ function acharAtendimentoComDb(id, placaHint) {
         }
         return a ? { a: a, db: db } : null;
     }
-    var r = buscar(typeof carregar === 'function' ? carregar() : null);
-    if (r) return r;
-    if (typeof carregarMain === 'function') return buscar(carregarMain());
-    return null;
+    function maisCompleto(r1, r2) {
+        if (!r1) return r2;
+        if (!r2) return r1;
+        var t1 = Number(r1.a && r1.a.total) || 0;
+        var t2 = Number(r2.a && r2.a.total) || 0;
+        var n1 = ((r1.a && r1.a.itens) || []).length;
+        var n2 = ((r2.a && r2.a.itens) || []).length;
+        if (n2 > n1) return r2;
+        if (n1 > n2) return r1;
+        if (t2 > t1 + 0.05) return r2;
+        return r1;
+    }
+    var rLocal = buscar(typeof carregar === 'function' ? carregar() : null);
+    var rMain = null;
+    try {
+        if (typeof carregarMain === 'function') rMain = buscar(carregarMain());
+    } catch (eMain) { rMain = null; }
+    return maisCompleto(rLocal, rMain);
 }
 
 /* ---------- Atendimento / veículo ---------- */
@@ -810,6 +836,12 @@ window._osSalvando = false;
         if (!tecla(e)) return;
         var t = e.target;
         if (!t || t.tagName === 'TEXTAREA') return;
+        if (typeof window.selecionarPrimeiraSugestaoCatalogo === 'function' &&
+            window.selecionarPrimeiraSugestaoCatalogo(t.id)) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
         var botaoId = window._mapaEnterOs[t.id];
         if (!botaoId) return;
         e.preventDefault();
@@ -1213,6 +1245,20 @@ function editarAtendimento(id, placaHint) {
     if (!temMaoNaLista && Number(a.maoObra) > 0) {
         itensTemp.push({ tipo: 'mao', desc: 'Mão de obra', valor: Number(a.maoObra) || 0 });
     }
+    var totItens = typeof totaisItens === 'function' ? totaisItens(itensTemp).total : 0;
+    var totDoc = Math.max(Number(a.total) || 0, Number(a.totalBruto) || 0);
+    if (totDoc > totItens + 0.05) {
+        var falta = +(totDoc - totItens).toFixed(2);
+        itensTemp.push({
+            tipo: 'peca',
+            desc: 'Demais itens da nota',
+            qtd: 1,
+            valorUnit: falta,
+            valor: falta,
+            custoUnit: 0,
+            custo: 0
+        });
+    }
     renderItens();
     carregarFotosNoForm(a.fotos);
     atualizarPlaca();
@@ -1370,4 +1416,350 @@ function htmlResumoPagamentoOs(a) {
     return '<div class="os-pgto-resumo">' + linhas.map(function (l) { return '<div>' + esc(l) + '</div>'; }).join('') + '</div>';
 }
 
+function textoBuscaNormCat(s) {
+    return String(s || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function combinaBuscaCatalogo(haystack, query) {
+    var h = textoBuscaNormCat(haystack);
+    var tokens = textoBuscaNormCat(query).split(' ').filter(function (t) { return t.length >= 1; });
+    if (!tokens.length || !h) return false;
+    return tokens.every(function (t) { return h.indexOf(t) >= 0; });
+}
+
+function scoreBuscaCatalogo(haystack, query) {
+    var h = textoBuscaNormCat(haystack);
+    var q = textoBuscaNormCat(query);
+    if (!h || !q) return 99;
+    if (h === q) return 0;
+    if (h.indexOf(q) === 0) return 1;
+    var i = h.indexOf(q);
+    if (i > 0) return 2 + Math.min(i, 20);
+    return 40;
+}
+
+function inferirTipoMaoDesc(desc) {
+    var t = textoBuscaNormCat(desc);
+    if (t.indexOf('rebaix') >= 0) return 'amortecedor-original-2';
+    if (t.indexOf('original') >= 0) return 'amortecedor-original';
+    if (t.indexOf('alinh') >= 0 || t.indexOf('balance') >= 0) return 'alinhamento';
+    if (t.indexOf('amort') >= 0) return 'amortecedor';
+    return 'servico';
+}
+
+function listarProdutosParaCatalogo(db) {
+    db = db || (typeof carregar === 'function' ? carregar() : { produtos: [] });
+    return (db.produtos || []).filter(function (p) { return p && String(p.nome || '').trim(); });
+}
+
+function buscarProdutosCatalogo(query, limite) {
+    var q = String(query || '').trim();
+    if (q.length < 1) return [];
+    var lista = listarProdutosParaCatalogo();
+    return lista.filter(function (p) {
+        var blob = [p.nome, p.codigo, p.categoria].join(' ');
+        return combinaBuscaCatalogo(blob, q);
+    }).sort(function (a, b) {
+        var sa = scoreBuscaCatalogo(a.nome, q);
+        var sb = scoreBuscaCatalogo(b.nome, q);
+        if (sa !== sb) return sa - sb;
+        return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR');
+    }).slice(0, limite || 12);
+}
+
+function catalogoServicosMaoObra(db) {
+    db = db || (typeof carregar === 'function' ? carregar() : {});
+    var mapa = {};
+    function add(desc, tipo, valor) {
+        desc = String(desc || '').trim();
+        if (!desc) return;
+        var k = textoBuscaNormCat(desc);
+        if (!k) return;
+        var cur = mapa[k];
+        var tipoMao = tipo || inferirTipoMaoDesc(desc);
+        var v = Number(valor) || 0;
+        if (!cur) {
+            mapa[k] = { desc: desc, tipoMao: tipoMao, valor: v };
+            return;
+        }
+        if (v > 0) cur.valor = v;
+        if (tipoMao && tipoMao !== 'servico') cur.tipoMao = tipoMao;
+    }
+    [
+        { desc: 'Alinhamento', tipoMao: 'alinhamento' },
+        { desc: 'Alinhamento e balanceamento', tipoMao: 'alinhamento' },
+        { desc: 'Mão de obra — Amortecedor', tipoMao: 'amortecedor' },
+        { desc: 'Troca de amortecedor', tipoMao: 'amortecedor' },
+        { desc: 'Mão de obra — Amortecedor original 1', tipoMao: 'amortecedor-original' },
+        { desc: 'Mão de obra — Rebaixados', tipoMao: 'amortecedor-original-2' },
+        { desc: 'Mão de obra — Serviço', tipoMao: 'servico' }
+    ].forEach(function (s) { add(s.desc, s.tipoMao, 0); });
+    (db.atendimentos || []).forEach(function (a) {
+        (a.itens || []).forEach(function (it) {
+            if (!it || (it.tipo || '') !== 'mao') return;
+            add(it.desc, it.tipoMao, it.valor);
+        });
+    });
+    (db.orcamentos || []).forEach(function (o) {
+        (o.itens || []).forEach(function (it) {
+            if (!it) return;
+            if (it.origem !== 'mao' && it.tipo !== 'mao') return;
+            add(it.desc, it.tipoMao, it.venda || it.valor);
+        });
+    });
+    return Object.keys(mapa).map(function (k) { return mapa[k]; });
+}
+
+function buscarServicosMaoCatalogo(query, limite) {
+    var q = String(query || '').trim();
+    if (q.length < 1) return [];
+    return catalogoServicosMaoObra().filter(function (s) {
+        return combinaBuscaCatalogo(s.desc, q);
+    }).sort(function (a, b) {
+        var sa = scoreBuscaCatalogo(a.desc, q);
+        var sb = scoreBuscaCatalogo(b.desc, q);
+        if (sa !== sb) return sa - sb;
+        return String(a.desc || '').localeCompare(String(b.desc || ''), 'pt-BR');
+    }).slice(0, limite || 12);
+}
+
+function aplicarProdutoNoOrcamentoOs(p) {
+    if (!p) return;
+    var desc = document.getElementById('itemDesc');
+    var custo = document.getElementById('itemCusto');
+    var venda = document.getElementById('itemValor');
+    if (desc) desc.value = p.nome || '';
+    if (custo) custo.value = typeof fmtNumOs === 'function' ? fmtNumOs(p.custo) : String(p.custo || '');
+    if (venda) venda.value = typeof fmtNumOs === 'function' ? fmtNumOs(p.venda) : String(p.venda || '');
+    if (venda) {
+        try { venda.focus(); venda.select(); } catch (eF) { /* ok */ }
+    }
+    toast('Produto selecionado: ' + (p.nome || ''));
+}
+
+function aplicarServicoMaoNoOs(s) {
+    if (!s) return;
+    var desc = document.getElementById('maoDesc');
+    var tipo = document.getElementById('maoTipoComissao');
+    var valor = document.getElementById('maoValor');
+    if (desc) desc.value = s.desc || '';
+    if (tipo) tipo.value = s.tipoMao || inferirTipoMaoDesc(s.desc);
+    if (valor && Number(s.valor) > 0) {
+        valor.value = typeof fmtNumOs === 'function' ? fmtNumOs(s.valor) : String(s.valor);
+    }
+    if (typeof atualizarPreviewComissaoMao === 'function') atualizarPreviewComissaoMao();
+    if (valor) {
+        try { valor.focus(); valor.select(); } catch (eF) { /* ok */ }
+    }
+    toast('Serviço selecionado: ' + (s.desc || ''));
+}
+
+function aplicarProdutoNoOrcamentoVenda(p, destino) {
+    if (!p) return;
+    if (destino === 'avulso') {
+        var nome = document.getElementById('vdAvNome');
+        var custo = document.getElementById('vdAvCusto');
+        var venda = document.getElementById('vdAvVenda');
+        if (nome) nome.value = p.nome || '';
+        if (custo) custo.value = p.custo || 0;
+        if (venda) venda.value = p.venda || 0;
+        if (typeof atualizarTotalLinhaAvulso === 'function') atualizarTotalLinhaAvulso();
+        if (typeof recalcMargemDeVenda === 'function') {
+            recalcMargemDeVenda('vdAvCusto', 'vdAvMargem', 'vdAvVenda', atualizarTotalLinhaAvulso);
+        }
+        toast('Produto selecionado: ' + (p.nome || ''));
+        return;
+    }
+    produtoVendaSelecionado = p;
+    var busca = document.getElementById('vdProdBusca');
+    if (busca) busca.value = (p.nome || '') + (p.codigo ? ' [' + p.codigo + ']' : '');
+    var elC = document.getElementById('vdProdCusto');
+    var elV = document.getElementById('vdProdVenda');
+    var elM = document.getElementById('vdProdMargem');
+    var elU = document.getElementById('vdProdUn');
+    if (elC) elC.value = p.custo || 0;
+    if (elV) elV.value = p.venda || 0;
+    var margem = (Number(p.custo) > 0) ? (((Number(p.venda) / Number(p.custo)) - 1) * 100) : 0;
+    if (elM) elM.value = margem.toFixed(1);
+    if (elU) elU.value = p.unidade || '';
+    if (typeof atualizarTotalLinhaEstoque === 'function') atualizarTotalLinhaEstoque();
+    if (typeof atualizarResumoEstoqueVenda === 'function') atualizarResumoEstoqueVenda();
+    toast('Produto selecionado: ' + (p.nome || ''));
+}
+
+function aplicarServicoMaoNaVenda(s) {
+    if (!s) return;
+    var desc = document.getElementById('vdMaoDesc');
+    var tipo = document.getElementById('vdMaoTipoComissao');
+    var valor = document.getElementById('vdMaoValor');
+    if (desc) desc.value = s.desc || '';
+    if (tipo) tipo.value = s.tipoMao || inferirTipoMaoDesc(s.desc);
+    if (valor && Number(s.valor) > 0) {
+        valor.value = typeof fmtNumOs === 'function' ? fmtNumOs(s.valor) : String(s.valor);
+    }
+    if (typeof atualizarPreviewComissaoVd === 'function') atualizarPreviewComissaoVd();
+    toast('Serviço selecionado: ' + (s.desc || ''));
+}
+
+window._mapaBoxCatalogo = {
+    itemDesc: 'sugestoesItemDesc',
+    maoDesc: 'sugestoesMaoDesc',
+    vdProdBusca: 'sugestoesVdProd',
+    vdAvNome: 'sugestoesVdAv',
+    vdMaoDesc: 'sugestoesVdMao'
+};
+
+function selecionarPrimeiraSugestaoCatalogo(inputId) {
+    var boxId = window._mapaBoxCatalogo[inputId];
+    if (!boxId) return false;
+    var box = document.getElementById(boxId);
+    if (!box || box.hidden) return false;
+    var btn = box.querySelector('button.ativo, button[data-cat-idx]');
+    if (!btn) return false;
+    btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    return true;
+}
+window.selecionarPrimeiraSugestaoCatalogo = selecionarPrimeiraSugestaoCatalogo;
+
+function ligarAutocompleteCampoCatalogo(opts) {
+    var input = document.getElementById(opts.inputId);
+    var box = document.getElementById(opts.boxId);
+    if (!input || !box || input.getAttribute('data-auto-cat')) return;
+    input.setAttribute('data-auto-cat', '1');
+    input.setAttribute('autocomplete', 'off');
+    input.removeAttribute('list');
+
+    function esconder() {
+        box.innerHTML = '';
+        box.hidden = true;
+    }
+
+    function mostrar(itens) {
+        if (!itens.length) { esconder(); return; }
+        box.innerHTML = itens.map(function (it, i) {
+            return '<button type="button" data-cat-idx="' + i + '"' + (i === 0 ? ' class="ativo"' : '') + '>' +
+                '<strong>' + esc(it.titulo) + '</strong>' +
+                (it.sub ? '<span>' + esc(it.sub) + '</span>' : '') +
+                '</button>';
+        }).join('');
+        box.hidden = false;
+        box.querySelectorAll('[data-cat-idx]').forEach(function (b) {
+            b.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                var it = itens[Number(b.getAttribute('data-cat-idx'))];
+                if (it && opts.onSelect) opts.onSelect(it.raw);
+                esconder();
+            });
+        });
+    }
+
+    function atualizar() {
+        var q = input.value.trim();
+        if (q.length < 1) { esconder(); return; }
+        mostrar(opts.buscar(q) || []);
+    }
+
+    input.addEventListener('input', atualizar);
+    input.addEventListener('focus', atualizar);
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            esconder();
+            return;
+        }
+        if ((e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) && !box.hidden) {
+            var btn = box.querySelector('button.ativo, button[data-cat-idx]');
+            if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+            }
+        }
+    }, true);
+    document.addEventListener('mousedown', function (e) {
+        if (box.hidden) return;
+        if (e.target === input || box.contains(e.target)) return;
+        esconder();
+    });
+}
+
+function rotuloPrecoCatalogo(custo, venda) {
+    var partes = [];
+    if (Number(venda) > 0 && typeof moeda === 'function') partes.push('venda ' + moeda(venda));
+    if (Number(custo) > 0 && typeof moeda === 'function') partes.push('custo ' + moeda(custo));
+    return partes.join(' · ');
+}
+
+(function ligarAutocompleteOrcamento() {
+    ligarAutocompleteCampoCatalogo({
+        inputId: 'itemDesc',
+        boxId: 'sugestoesItemDesc',
+        buscar: function (q) {
+            return buscarProdutosCatalogo(q).map(function (p) {
+                var extra = [p.codigo ? 'cód. ' + p.codigo : '', rotuloPrecoCatalogo(p.custo, p.venda)]
+                    .filter(Boolean).join(' · ');
+                return { titulo: p.nome, sub: extra, raw: p };
+            });
+        },
+        onSelect: aplicarProdutoNoOrcamentoOs
+    });
+    ligarAutocompleteCampoCatalogo({
+        inputId: 'maoDesc',
+        boxId: 'sugestoesMaoDesc',
+        buscar: function (q) {
+            return buscarServicosMaoCatalogo(q).map(function (s) {
+                var tipo = (typeof rotuloTipoMaoComissao === 'function')
+                    ? rotuloTipoMaoComissao(s.tipoMao)
+                    : (s.tipoMao || '');
+                var sub = [tipo, Number(s.valor) > 0 && typeof moeda === 'function' ? 'último valor ' + moeda(s.valor) : '']
+                    .filter(Boolean).join(' · ');
+                return { titulo: s.desc, sub: sub, raw: s };
+            });
+        },
+        onSelect: aplicarServicoMaoNoOs
+    });
+    ligarAutocompleteCampoCatalogo({
+        inputId: 'vdProdBusca',
+        boxId: 'sugestoesVdProd',
+        buscar: function (q) {
+            return buscarProdutosCatalogo(q).map(function (p) {
+                var extra = [p.codigo ? 'cód. ' + p.codigo : '', rotuloPrecoCatalogo(p.custo, p.venda)]
+                    .filter(Boolean).join(' · ');
+                return { titulo: p.nome, sub: extra, raw: p };
+            });
+        },
+        onSelect: function (p) { aplicarProdutoNoOrcamentoVenda(p, 'estoque'); }
+    });
+    ligarAutocompleteCampoCatalogo({
+        inputId: 'vdAvNome',
+        boxId: 'sugestoesVdAv',
+        buscar: function (q) {
+            return buscarProdutosCatalogo(q).map(function (p) {
+                var extra = [p.codigo ? 'cód. ' + p.codigo : '', rotuloPrecoCatalogo(p.custo, p.venda)]
+                    .filter(Boolean).join(' · ');
+                return { titulo: p.nome, sub: extra, raw: p };
+            });
+        },
+        onSelect: function (p) { aplicarProdutoNoOrcamentoVenda(p, 'avulso'); }
+    });
+    ligarAutocompleteCampoCatalogo({
+        inputId: 'vdMaoDesc',
+        boxId: 'sugestoesVdMao',
+        buscar: function (q) {
+            return buscarServicosMaoCatalogo(q).map(function (s) {
+                var tipo = (typeof rotuloTipoMaoComissao === 'function')
+                    ? rotuloTipoMaoComissao(s.tipoMao)
+                    : (s.tipoMao || '');
+                var sub = [tipo, Number(s.valor) > 0 && typeof moeda === 'function' ? 'último valor ' + moeda(s.valor) : '']
+                    .filter(Boolean).join(' · ');
+                return { titulo: s.desc, sub: sub, raw: s };
+            });
+        },
+        onSelect: aplicarServicoMaoNaVenda
+    });
+})();
 

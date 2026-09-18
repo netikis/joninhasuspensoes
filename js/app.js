@@ -3285,8 +3285,8 @@ function confirmarRecebimentoOs() {
     var msgStatus = status === 'PAGO'
         ? 'OS baixada (pago).'
         : (status === 'PARCIAL'
-            ? 'Parcial: ' + moeda(tot.aberto) + ' em aberto no perfil do cliente.'
-            : 'Valor em aberto no perfil do cliente.');
+            ? 'Parcial: ' + moeda(tot.aberto) + ' foi para Contas a receber.'
+            : 'Valor em aberto foi para Contas a receber.');
     toast(msgStatus);
     alert(
         (status === 'PAGO' ? '✅ Pagamento total registrado!\n\n' : '✅ Recebimento registrado!\n\n') +
@@ -3294,11 +3294,17 @@ function confirmarRecebimentoOs() {
         'Total: ' + moeda(tot.totalFinal) + '\n' +
         'Recebido agora: ' + moeda(tot.agora) + '\n' +
         (tot.recebido > tot.agora ? 'Total já recebido: ' + moeda(tot.recebido) + '\n' : '') +
-        (tot.aberto > 0.009 ? 'Em aberto: ' + moeda(tot.aberto) + '\n' : '') +
+        (tot.aberto > 0.009 ? 'Em aberto (Contas a receber): ' + moeda(tot.aberto) + '\n' : '') +
         'Formas: ' + (a.formaPagamento || '—') + '\n' +
         'Destino: ' + destinoTxt +
         (ehBoleto ? '\nBoleto vence em ' + boletoDias + ' dia(s) (' + venc + ')' : '')
     );
+    if (tot.aberto > 0.009 && dest !== 'interno') irParaContasReceber();
+}
+
+function irParaContasReceber() {
+    if (typeof irParaPastaInicio === 'function') irParaPastaInicio('pendentes');
+    else if (typeof abrirPainel === 'function') abrirPainel('painelPendentes');
 }
 
 function renderAlertaVencidos30(db) {
@@ -4189,18 +4195,26 @@ function preencherSelectFuncionariosVenda() {
 
 function encontrarProdutoPorBusca(texto) {
     var db = carregar();
-    var t = String(texto || '').trim().toLowerCase();
+    var t = String(texto || '').trim();
     if (!t) return null;
-    var cod = t.replace(/^.*\[/, '').replace(/\].*$/, '').trim();
+    var tLow = t.toLowerCase();
+    var cod = tLow.replace(/^.*\[/, '').replace(/\].*$/, '').trim();
     var porCod = db.produtos.find(function (p) {
         return p.codigo && String(p.codigo).toLowerCase() === cod;
     });
     if (porCod) return porCod;
-    var nome = t.replace(/\s*\[.*$/, '').trim();
-    return db.produtos.find(function (p) {
+    var nome = tLow.replace(/\s*\[.*$/, '').trim();
+    var exato = db.produtos.find(function (p) {
         return String(p.nome || '').toLowerCase() === nome ||
-            String(p.nome || '').toLowerCase().indexOf(nome) === 0 ||
-            (p.codigo && String(p.codigo).toLowerCase() === t);
+            (p.codigo && String(p.codigo).toLowerCase() === tLow);
+    });
+    if (exato) return exato;
+    if (typeof buscarProdutosCatalogo === 'function') {
+        var hits = buscarProdutosCatalogo(nome, 1);
+        if (hits.length) return hits[0];
+    }
+    return db.produtos.find(function (p) {
+        return String(p.nome || '').toLowerCase().indexOf(nome) === 0;
     }) || null;
 }
 
@@ -4617,6 +4631,12 @@ function addItemCarrinho(item) {
 document.getElementById('vdProdBusca').addEventListener('change', preencherCamposProdutoEstoque);
 document.getElementById('vdProdBusca').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') {
+        if (typeof window.selecionarPrimeiraSugestaoCatalogo === 'function' &&
+            window.selecionarPrimeiraSugestaoCatalogo('vdProdBusca')) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
         e.preventDefault();
         e.stopPropagation();
         preencherCamposProdutoEstoque();
@@ -5112,6 +5132,7 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
     }
 
     /* Destino financeiro — splits, parcial e orçamento também lançam */
+    var valorPend = 0;
     if (tipo === 'VENDA' || tipo === 'ORCAMENTO') {
         if (editando) removerLancamentosVenda(doc.id);
         var rotuloDoc = (tipo === 'ORCAMENTO' ? 'Orçamento' : 'Venda') + ' Nº ' + numero;
@@ -5152,7 +5173,6 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
                 db.caixa.push(lanc);
             }
         });
-        var valorPend = 0;
         if (status === 'PENDENTE') valorPend = Number(totais.total) || 0;
         else if (status === 'PARCIAL') valorPend = Number(totais.saldoAberto) || 0;
         if (valorPend > 0.009) {
@@ -5178,13 +5198,13 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
     if (editando) {
         msg = (tipo === 'ORCAMENTO' ? 'Orçamento' : 'Venda') + ' Nº ' + numero + ' atualizado(a). Estoque não foi alterado na edição.';
     } else if (tipo === 'ORCAMENTO') {
-        if (status === 'PARCIAL') msg = 'Orçamento Nº ' + numero + ' salvo. Recebido parcial; saldo em aberto no perfil.';
-        else if (status === 'PENDENTE') msg = 'Orçamento Nº ' + numero + ' salvo. Valor em contas a receber.';
+        if (status === 'PARCIAL') msg = 'Orçamento Nº ' + numero + ' salvo. Recebido parcial; saldo em Contas a receber.';
+        else if (status === 'PENDENTE') msg = 'Orçamento Nº ' + numero + ' salvo. Valor em Contas a receber.';
         else msg = 'Orçamento Nº ' + numero + ' salvo (sem baixa de estoque).';
     } else if (status === 'PAGO') {
         msg = 'Venda Nº ' + numero + ' salva. Estoque baixado. Recebimento lançado no caixa.';
     } else if (status === 'PARCIAL') {
-        msg = 'Venda Nº ' + numero + ' salva. Estoque baixado. Saldo em aberto no perfil do cliente.';
+        msg = 'Venda Nº ' + numero + ' salva. Estoque baixado. Saldo em Contas a receber.';
     } else {
         msg = 'Venda Nº ' + numero + ' salva. Estoque baixado. Valor em Contas a Receber.';
     }
@@ -5198,6 +5218,9 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
     renderCaixaBanco();
     renderPendentes();
     atualizarKPIs(db);
+    if (!interno && (status === 'PARCIAL' || status === 'PENDENTE') && valorPend > 0.009) {
+        irParaContasReceber();
+    }
 });
 
 function renderOrcamentos() {

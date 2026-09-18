@@ -1477,10 +1477,46 @@
             color: #152642;
             font-size: 0.92rem;
         }
-        .sugestoes-cliente-at span {
+        .autocomplete-wrap { position: relative; }
+        .sugestoes-catalogo {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 100%;
+            z-index: 80;
+            margin-top: 4px;
+            background: #fff;
+            border: 1px solid #c9a227;
+            border-radius: 8px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+            max-height: 260px;
+            overflow: auto;
+        }
+        .sugestoes-catalogo[hidden] { display: none !important; }
+        .sugestoes-catalogo button {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: 0;
+            border-bottom: 1px solid #e2e8f0;
+            background: #fff;
+            padding: 9px 12px;
+            cursor: pointer;
+            color: #1e293b;
+        }
+        .sugestoes-catalogo button:last-child { border-bottom: 0; }
+        .sugestoes-catalogo button:hover,
+        .sugestoes-catalogo button.ativo { background: #f8fafc; }
+        .sugestoes-catalogo strong {
+            display: block;
+            color: #152642;
+            font-size: 0.9rem;
+            font-weight: 800;
+        }
+        .sugestoes-catalogo span {
             display: block;
             margin-top: 2px;
-            font-size: 0.78rem;
+            font-size: 0.76rem;
             color: #64748b;
             font-weight: 600;
         }
