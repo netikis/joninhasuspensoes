@@ -239,8 +239,8 @@ function htmlLinhaItemOs(it, idx) {
             ' · venda ' + moeda(it.valorUnit) +
             ' · Total custo ' + moeda(it.custo) +
             ' · Ganho <span class="ganho-linha">' + moeda(ganhoItem(it)) + '</span></div>';
-        return '<div class="row" style="margin-bottom:8px;align-items:center;gap:6px">' +
-            '<div class="col" style="flex:2"><span style="display:inline-block;margin-right:8px;padding:2px 8px;border-radius:999px;font-size:0.7rem;font-weight:700;background:rgba(61,160,232,0.15);color:#9fd3ff;border:1px solid rgba(61,160,232,0.4)">PEÇA</span>' +
+        return '<div class="row os-item-linha" style="margin-bottom:8px;align-items:center;gap:6px">' +
+            '<div class="col" style="flex:2"><span class="os-tag os-tag-peca">PEÇA</span>' +
             esc(it.desc) + extraP + '</div>' +
             '<div class="col" style="flex:1.1;display:flex;align-items:center;gap:4px">' +
             '<button type="button" class="btn btn-secondary" data-qtd-menos="' + idx + '" style="padding:4px 10px;min-width:36px">−</button>' +
@@ -248,7 +248,7 @@ function htmlLinhaItemOs(it, idx) {
             'style="width:64px;text-align:center;padding:6px;font-weight:700" title="Quantidade">' +
             '<button type="button" class="btn btn-secondary" data-qtd-mais="' + idx + '" style="padding:4px 10px;min-width:36px">+</button>' +
             '</div>' +
-            '<div class="col" style="flex:0.9;font-weight:800">' + moeda(it.valor) + '</div>' +
+            '<div class="col os-item-valor" style="flex:0.9">' + moeda(it.valor) + '</div>' +
             '<div class="col" style="flex:0.4"><button type="button" class="btn btn-danger" data-rm="' + idx + '">×</button></div>' +
             '</div>';
     }
@@ -276,17 +276,17 @@ function htmlLinhaItemOs(it, idx) {
                 extraM += ' · <span style="color:#ffb4b4">sem R$ cadastrado neste tipo</span>';
             }
         } else if (pctLinha > 0) {
-            extraM += ' · Comissão <strong style="color:#8fe0b8">' + esc(String(pctLinha)) + '%</strong>' +
+            extraM += ' · Comissão <strong class="os-item-comissao">' + esc(String(pctLinha)) + '%</strong>' +
                 ' = <span class="ganho-linha" style="font-weight:800">' + moeda(comVal) + '</span>';
         } else {
             extraM += ' · <span style="color:#ffb4b4">sem % cadastrada neste tipo</span>';
         }
     }
     extraM += '</div>';
-    return '<div class="row" style="margin-bottom:8px;align-items:center">' +
-        '<div class="col" style="flex:2"><span style="display:inline-block;margin-right:8px;padding:2px 8px;border-radius:999px;font-size:0.7rem;font-weight:700;background:rgba(47,158,107,0.2);color:#8fe0b8;border:1px solid rgba(47,158,107,0.45)">MÃO DE OBRA</span>' +
+    return '<div class="row os-item-linha" style="margin-bottom:8px;align-items:center">' +
+        '<div class="col" style="flex:2"><span class="os-tag os-tag-mao">MÃO DE OBRA</span>' +
         esc(it.desc) + extraM + '</div>' +
-        '<div class="col" style="font-weight:800">' + moeda(it.valor) + '</div>' +
+        '<div class="col os-item-valor">' + moeda(it.valor) + '</div>' +
         '<div class="col" style="flex:0.5"><button type="button" class="btn btn-danger" data-rm="' + idx + '">×</button></div>' +
         '</div>';
 }
@@ -307,13 +307,13 @@ function renderItens() {
     });
 
     var html = '';
-    html += '<div style="margin:10px 0 6px;padding:6px 0;border-bottom:1px solid rgba(61,160,232,0.45);color:#9fd3ff;font-weight:800;letter-spacing:.04em;font-size:0.82rem">PEÇAS</div>';
+    html += '<div class="os-sec-tit os-sec-pecas">PEÇAS</div>';
     if (!idxsPeca.length) {
         html += '<p class="muted" style="margin:0 0 10px;font-size:0.85rem">Nenhuma peça nesta OS.</p>';
     } else {
         html += idxsPeca.map(function (idx) { return htmlLinhaItemOs(itensTemp[idx], idx); }).join('');
     }
-    html += '<div style="margin:16px 0 6px;padding:6px 0;border-bottom:1px solid rgba(47,158,107,0.45);color:#8fe0b8;font-weight:800;letter-spacing:.04em;font-size:0.82rem">MÃO DE OBRA</div>';
+    html += '<div class="os-sec-tit os-sec-mao">MÃO DE OBRA</div>';
     if (!idxsMao.length) {
         html += '<p class="muted" style="margin:0;font-size:0.85rem">Nenhuma mão de obra nesta OS.</p>';
     } else {

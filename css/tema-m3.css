@@ -520,8 +520,8 @@ tbody td {
     font-weight: 500;
 }
 
-tbody tr:nth-child(even) { background: #fafbfd; }
-tbody tr:hover { background: #f3f6fb; }
+tbody tr:nth-child(even) { background: #f8fafc; }
+tbody tr:hover { background: #f1f5f9; }
 
 .table-wrap,
 .tbl-wrap {
@@ -704,8 +704,9 @@ tbody tr:hover { background: #f3f6fb; }
 .chip-andamento .chip-cli { color: var(--m3-text); }
 .btn-mandar-caixa { width: 100%; }
 .tbl-click tbody tr { cursor: pointer; }
-.tbl-click tbody tr:hover { background: #eef3fb; }
+.tbl-click tbody tr:hover { background: #e2e8f0; }
 tr.row-click { cursor: pointer; }
+tr.row-click:hover { background: #e2e8f0; }
 
 .box .os-itens-total-linha span,
 .box .os-itens-total-linha strong {

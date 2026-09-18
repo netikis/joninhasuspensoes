@@ -668,8 +668,59 @@
         }
 
         .box .ganho-linha {
-            color: #8fe0b8 !important;
+            color: #15803d !important;
             font-weight: 800;
+        }
+        #listaItens,
+        #listaItens .os-item-linha,
+        #listaItens .os-item-linha .col {
+            color: #111827;
+            font-weight: 700;
+        }
+        #listaItens .muted {
+            color: #334155 !important;
+        }
+        #listaItens .os-item-valor {
+            color: #111827 !important;
+            font-weight: 800;
+            font-size: 1.02rem;
+        }
+        #listaItens .os-item-comissao {
+            color: #166534 !important;
+        }
+        .os-sec-tit {
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            font-size: 0.88rem;
+            margin: 10px 0 6px;
+            padding: 6px 0;
+        }
+        .os-sec-pecas {
+            color: #1e3a8a !important;
+            border-bottom: 2px solid #1e3a8a;
+        }
+        .os-sec-mao {
+            margin-top: 16px;
+            color: #14532d !important;
+            border-bottom: 2px solid #14532d;
+        }
+        .os-tag {
+            display: inline-block;
+            margin-right: 8px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 800;
+        }
+        .os-tag-peca {
+            background: #dbeafe;
+            color: #1e3a8a !important;
+            border: 1px solid #93c5fd;
+        }
+        .os-tag-mao {
+            background: #dcfce7;
+            color: #14532d !important;
+            border: 1px solid #86efac;
         }
 
         .lista-relatorios-mes {
@@ -1009,7 +1060,7 @@
         th.th-ordena.ativa { color: #3da0e8; }
         th.th-ordena .seta-ord { font-size: 0.65rem; margin-left: 4px; opacity: 0.85; }
 
-        tr:hover td { background: rgba(61, 160, 232, 0.05); }
+        tr:hover td { background: #f1f5f9; }
 
         /* Lista de clientes: texto legível no fundo escuro do box */
         #painelListaClientes table td {
@@ -1856,16 +1907,59 @@
             max-height: 92vh;
             overflow: auto;
         }
+        #modalReceberOs .modal-box,
+        #modalRelatorioServicos .modal-box {
+            background: #fff !important;
+            color: #111827 !important;
+            border: 3px solid #c9a227;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+        }
+        #modalReceberOs .modal-box h3,
+        #modalRelatorioServicos .modal-box h3 {
+            color: #152642;
+            font-weight: 800;
+        }
+        #modalReceberOs .hint,
+        #modalReceberOs label,
+        #modalRelatorioServicos .hint {
+            color: #334155 !important;
+        }
+        #modalReceberOs input,
+        #modalReceberOs select {
+            background: #fff !important;
+            color: #111827 !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+        #modalReceberOs input::placeholder {
+            color: #64748b;
+        }
+        #modalRelatorioServicos table td {
+            color: #111827 !important;
+            background: transparent;
+        }
+        #modalRelatorioServicos tbody tr:nth-child(even) {
+            background: #f8fafc;
+        }
+        #modalRelatorioServicos tbody tr:hover,
+        #modalRelatorioServicos tbody tr:hover td,
+        #modalRelatorioServicos .tbl-click tbody tr:hover {
+            background: #e2e8f0 !important;
+        }
+        #modalRelatorioServicos .empty {
+            color: #64748b;
+            background: #f8fafc;
+            border-color: #cbd5e1;
+        }
         .rec-os-bloco {
             margin-top: 12px;
             padding: 10px 12px;
             border-radius: 10px;
-            background: #1a252f;
-            border: 1px solid rgba(201, 162, 39, 0.4);
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
         }
         .rec-os-tit {
             font-weight: 800;
-            color: #f1c40f;
+            color: #9a7b12;
             margin: 0 0 8px;
             font-size: 0.88rem;
         }
@@ -1874,19 +1968,19 @@
             justify-content: space-between;
             gap: 10px;
             font-weight: 700;
-            color: #e2e8f0;
+            color: #1e293b;
             margin-top: 8px;
             font-size: 0.92rem;
         }
-        .rec-os-final strong { color: #86efac; font-size: 1.12rem; }
-        .rec-os-aberto strong { color: #fbbf24; }
+        .rec-os-final strong { color: #15803d; font-size: 1.12rem; }
+        .rec-os-aberto strong { color: #b45309; }
         .os-pgto-resumo {
             margin-top: 10px;
             padding-top: 8px;
             border-top: 1px solid rgba(201, 162, 39, 0.45);
             font-size: 0.82rem;
             font-weight: 700;
-            color: #e2e8f0;
+            color: #1e293b;
             line-height: 1.5;
         }
         .alerta-vencidos-30 {
@@ -2879,4 +2973,4 @@
             color: var(--muted); padding: 8px; border-radius: 8px; cursor: pointer; font-weight: 600;
         }
         .login-tabs button.active { background: var(--blue); color: #fff; border-color: var(--blue-soft); }
-        .ganho-linha { color: #8fe0b8; font-weight: 700; }
+        .ganho-linha { color: #15803d; font-weight: 700; }
