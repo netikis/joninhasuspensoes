@@ -4026,6 +4026,7 @@ function editarDocumentoVenda(id) {
     carrinhoVenda = (o.itens || []).map(function (it) {
         return Object.assign({}, it);
     });
+    cancelarEdicaoItemVd();
     atualizarUIVendaPorCanal();
     renderCarrinhoVenda();
     calcTotaisVenda();
@@ -4157,7 +4158,8 @@ function calcularDisponivelEstoqueVenda(p) {
 }
 
 function qtdReservadaCarrinho(produtoId) {
-    return carrinhoVenda.reduce(function (s, it) {
+    return carrinhoVenda.reduce(function (s, it, idx) {
+        if (vdItemEditIdx != null && idx === vdItemEditIdx) return s;
         return s + (it.produtoId === produtoId ? (Number(it.qtd) || 0) : 0);
     }, 0);
 }
@@ -4359,25 +4361,166 @@ function renderCarrinhoVenda() {
                     esc(it.funcionarioNome || 'sem funcionário') +
                     (tipoLbl ? ' · ' + esc(tipoLbl) : '') + '</span>';
             }
-            return '<div class="vd-cart-linha">' +
+            var cls = 'vd-cart-linha' + (vdItemEditIdx === idx ? ' vd-cart-editando' : '');
+            var btnEd = vdItemEditIdx === idx ? 'Cancelar' : 'Editar';
+            var vendaVal = (typeof fmtNumOs === 'function') ? fmtNumOs(it.venda) : String(it.venda || '');
+            return '<div class="' + cls + '">' +
                 '<span class="vd-cart-tag" style="color:' + cor + '">' + tag + '</span>' +
                 '<span class="vd-cart-info" title="' + esc(it.desc) + '">' + esc(it.desc) + extra +
-                ' <span class="vd-cart-qtd">(' + esc(String(it.qtd)) + ' ' + esc(it.unidade || 'un') +
-                ' × ' + moeda(it.venda) + ')</span></span>' +
+                ' <span class="vd-cart-qtd">(' + esc(String(it.qtd)) + ' ' + esc(it.unidade || 'un') + ')</span></span>' +
+                '<input class="vd-cart-edit" inputmode="decimal" data-vd-valor="' + idx + '" value="' +
+                esc(vendaVal) + '" title="Valor de venda / mão de obra">' +
                 '<span class="vd-cart-total">' + moeda(it.total) + '</span>' +
+                '<button type="button" class="btn btn-secondary vd-cart-editar" data-vd-edit="' + idx + '">' + btnEd + '</button>' +
                 '<button type="button" class="btn btn-danger vd-cart-rm" data-vd-rm="' + idx + '" title="Excluir item">×</button>' +
                 '</div>';
         }).join('');
         box.querySelectorAll('[data-vd-rm]').forEach(function (b) {
             b.addEventListener('click', function () {
-                carrinhoVenda.splice(Number(b.getAttribute('data-vd-rm')), 1);
+                var i = Number(b.getAttribute('data-vd-rm'));
+                if (vdItemEditIdx === i) cancelarEdicaoItemVd();
+                else if (vdItemEditIdx != null && vdItemEditIdx > i) vdItemEditIdx -= 1;
+                carrinhoVenda.splice(i, 1);
                 renderCarrinhoVenda();
                 atualizarResumoEstoqueVenda();
+            });
+        });
+        box.querySelectorAll('[data-vd-edit]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                iniciarEdicaoItemVd(Number(b.getAttribute('data-vd-edit')));
+            });
+        });
+        box.querySelectorAll('[data-vd-valor]').forEach(function (inp) {
+            inp.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); inp.blur(); }
+            });
+            inp.addEventListener('change', function () {
+                aplicarValorCarrinhoVd(Number(inp.getAttribute('data-vd-valor')), inp.value);
             });
         });
     }
     calcTotaisVenda();
     atualizarResumoEstoqueVenda();
+}
+
+var vdItemEditIdx = null;
+
+function rotulosBotoesAddVd() {
+    var bE = document.getElementById('btnVdAddEstoque');
+    var bA = document.getElementById('btnVdAddAvulso');
+    var bM = document.getElementById('btnVdAddMao');
+    if (bE) bE.textContent = '➕ ADD';
+    if (bA) bA.textContent = '➕ ADD';
+    if (bM) bM.textContent = '➕ Serv';
+}
+
+function cancelarEdicaoItemVd() {
+    vdItemEditIdx = null;
+    rotulosBotoesAddVd();
+}
+
+function iniciarEdicaoItemVd(idx) {
+    var it = carrinhoVenda[idx];
+    if (!it) return;
+    if (vdItemEditIdx === idx) {
+        cancelarEdicaoItemVd();
+        renderCarrinhoVenda();
+        return;
+    }
+    vdItemEditIdx = idx;
+    rotulosBotoesAddVd();
+    if (it.origem === 'estoque') {
+        var db = carregar();
+        var p = (db.produtos || []).find(function (x) { return String(x.id) === String(it.produtoId); }) || null;
+        produtoVendaSelecionado = p || {
+            id: it.produtoId,
+            nome: it.desc,
+            codigo: it.codigo || '',
+            unidade: it.unidade || 'un',
+            custo: it.custo,
+            venda: it.venda,
+            qtd: 0
+        };
+        document.getElementById('vdProdBusca').value = it.codigo || it.desc || '';
+        document.getElementById('vdProdCusto').value = it.custo || 0;
+        document.getElementById('vdProdVenda').value = it.venda || 0;
+        var margem = (Number(it.custo) > 0) ? (((Number(it.venda) / Number(it.custo)) - 1) * 100) : 0;
+        document.getElementById('vdProdMargem').value = margem.toFixed(1);
+        document.getElementById('vdProdUn').value = it.unidade || '';
+        document.getElementById('vdProdQtd').value = String(it.qtd || 1);
+        atualizarTotalLinhaEstoque();
+        atualizarResumoEstoqueVenda();
+        document.getElementById('btnVdAddEstoque').textContent = 'Salvar';
+        try {
+            document.getElementById('vdProdVenda').focus();
+            document.getElementById('vdProdVenda').select();
+        } catch (eF) { /* ok */ }
+    } else if (it.origem === 'mao') {
+        document.getElementById('vdMaoDesc').value = it.desc || '';
+        document.getElementById('vdMaoValor').value = (typeof fmtNumOs === 'function')
+            ? fmtNumOs(it.venda || it.total)
+            : String(it.venda || '');
+        var selF = document.getElementById('vdMaoFuncId');
+        if (selF) selF.value = it.funcionarioId || '';
+        var selT = document.getElementById('vdMaoTipoComissao');
+        if (selT) selT.value = it.tipoMao || 'servico';
+        document.getElementById('btnVdAddMao').textContent = 'Salvar';
+        if (typeof atualizarPreviewComissaoVd === 'function') atualizarPreviewComissaoVd();
+        try {
+            document.getElementById('vdMaoValor').focus();
+            document.getElementById('vdMaoValor').select();
+        } catch (eF2) { /* ok */ }
+    } else {
+        document.getElementById('vdAvNome').value = it.desc || '';
+        document.getElementById('vdAvQtd').value = String(it.qtd || 1);
+        document.getElementById('vdAvUn').value = it.unidade || 'un';
+        document.getElementById('vdAvCusto').value = it.custo || 0;
+        document.getElementById('vdAvMargem').value = it.margem || 0;
+        document.getElementById('vdAvVenda').value = it.venda || 0;
+        document.getElementById('btnVdAddAvulso').textContent = 'Salvar';
+        atualizarTotalLinhaAvulso();
+        try {
+            document.getElementById('vdAvVenda').focus();
+            document.getElementById('vdAvVenda').select();
+        } catch (eF3) { /* ok */ }
+    }
+    toast('Altere o valor e clique em Salvar.');
+    renderCarrinhoVenda();
+}
+
+function aplicarValorCarrinhoVd(idx, raw) {
+    var it = carrinhoVenda[idx];
+    if (!it) return;
+    var n = parseMoeda(raw);
+    if (n < 0) n = 0;
+    it.venda = n;
+    var q = Number(it.qtd) || 1;
+    it.total = +(q * n).toFixed(2);
+    if (it.origem === 'mao') {
+        it.valor = n;
+        var dadosMo = { pct: Number(it.comissaoPct) || 0, valorFixo: 0, nome: it.funcionarioNome || '' };
+        if (it.funcionarioId && typeof obterDadosComissaoFuncionario === 'function') {
+            dadosMo = obterDadosComissaoFuncionario(it.funcionarioId, it.tipoMao || 'servico');
+        }
+        if (typeof ehTipoMaoAmortOriginal === 'function' && ehTipoMaoAmortOriginal(it.tipoMao)) {
+            it.comissaoValor = Number(dadosMo.valorFixo) || 0;
+        } else if (typeof calcularValorComissaoMao === 'function') {
+            it.comissaoValor = calcularValorComissaoMao(n, dadosMo.pct || 0);
+        }
+    }
+    renderCarrinhoVenda();
+}
+
+function substituirItemCarrinhoSeEditando(origem, item) {
+    if (vdItemEditIdx == null || !carrinhoVenda[vdItemEditIdx] || carrinhoVenda[vdItemEditIdx].origem !== origem) {
+        return false;
+    }
+    carrinhoVenda[vdItemEditIdx] = item;
+    cancelarEdicaoItemVd();
+    renderCarrinhoVenda();
+    atualizarResumoEstoqueVenda();
+    toast('Item atualizado.');
+    return true;
 }
 
 function addItemCarrinho(item) {
@@ -4443,7 +4586,7 @@ document.getElementById('btnVdAddEstoque').addEventListener('click', function ()
         }
     }
 
-    addItemCarrinho({
+    var itemEstoque = {
         origem: 'estoque',
         produtoId: p.id,
         codigo: p.codigo || '',
@@ -4455,7 +4598,15 @@ document.getElementById('btnVdAddEstoque').addEventListener('click', function ()
         venda: venda,
         total: qtd * venda,
         baixaEstoque: tipoDoc === 'VENDA'
-    });
+    };
+    if (substituirItemCarrinhoSeEditando('estoque', itemEstoque)) {
+        document.getElementById('vdProdBusca').value = '';
+        produtoVendaSelecionado = null;
+        atualizarResumoEstoqueVenda();
+        document.getElementById('vdProdQtd').value = '1';
+        return;
+    }
+    addItemCarrinho(itemEstoque);
     document.getElementById('vdProdBusca').value = '';
     produtoVendaSelecionado = null;
     atualizarResumoEstoqueVenda();
@@ -4494,7 +4645,7 @@ document.getElementById('btnVdAddAvulso').addEventListener('click', function () 
     var venda = Number(document.getElementById('vdAvVenda').value) || 0;
     if (!desc) { toast('Informe a descrição do item avulso.'); return; }
     if (qtd <= 0 || venda < 0) { toast('Qtd e valor de venda inválidos.'); return; }
-    addItemCarrinho({
+    var itemAvulso = {
         origem: 'avulso',
         produtoId: null,
         desc: desc,
@@ -4504,7 +4655,15 @@ document.getElementById('btnVdAddAvulso').addEventListener('click', function () 
         margem: Number(document.getElementById('vdAvMargem').value) || 0,
         venda: venda,
         total: qtd * venda
-    });
+    };
+    if (substituirItemCarrinhoSeEditando('avulso', itemAvulso)) {
+        document.getElementById('vdAvNome').value = '';
+        document.getElementById('vdAvQtd').value = '1';
+        document.getElementById('vdAvVenda').value = '';
+        document.getElementById('vdAvTotal').value = '';
+        return;
+    }
+    addItemCarrinho(itemAvulso);
     document.getElementById('vdAvNome').value = '';
     document.getElementById('vdAvQtd').value = '1';
     document.getElementById('vdAvVenda').value = '';
@@ -4543,7 +4702,7 @@ document.getElementById('btnVdAddMao').addEventListener('click', function () {
     } else {
         comissaoValor = +((valor * (dadosMo.pct || 0)) / 100).toFixed(2);
     }
-    addItemCarrinho({
+    var itemMao = {
         origem: 'mao',
         tipo: 'mao',
         tipoMao: tipoMao,
@@ -4559,7 +4718,14 @@ document.getElementById('btnVdAddMao').addEventListener('click', function () {
         funcionarioNome: mecNome || dadosMo.nome || '',
         comissaoPct: dadosMo.pct || 0,
         comissaoValor: comissaoValor
-    });
+    };
+    if (substituirItemCarrinhoSeEditando('mao', itemMao)) {
+        document.getElementById('vdMaoDesc').value = '';
+        document.getElementById('vdMaoValor').value = '';
+        if (typeof atualizarPreviewComissaoVd === 'function') atualizarPreviewComissaoVd();
+        return;
+    }
+    addItemCarrinho(itemMao);
     document.getElementById('vdMaoDesc').value = '';
     document.getElementById('vdMaoValor').value = '';
     document.getElementById('vdMaoDesc').focus();
@@ -4618,6 +4784,7 @@ if (vdMaoValorEl) vdMaoValorEl.addEventListener('input', atualizarPreviewComissa
 
 function limparVendaForm() {
     vendaEmEdicaoId = null;
+    cancelarEdicaoItemVd();
     carrinhoVenda = [];
     produtoVendaSelecionado = null;
     document.getElementById('vdCliente').value = '';

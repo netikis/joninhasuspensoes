@@ -270,15 +270,95 @@ function aplicarQtdPeca(idx, novaQtd) {
     renderItens();
 }
 
+var osItemEditIdx = null;
+
+function cancelarEdicaoItemOs() {
+    osItemEditIdx = null;
+    var bP = document.getElementById('btnAddItem');
+    var bM = document.getElementById('btnAddMao');
+    if (bP) bP.textContent = '+ Peça';
+    if (bM) bM.textContent = '+ Mão de obra';
+}
+
+function iniciarEdicaoItemOs(idx) {
+    var it = itensTemp[idx];
+    if (!it) return;
+    if (osItemEditIdx === idx) {
+        cancelarEdicaoItemOs();
+        renderItens();
+        return;
+    }
+    osItemEditIdx = idx;
+    if ((it.tipo || 'peca') === 'mao') {
+        document.getElementById('maoDesc').value = it.desc || '';
+        document.getElementById('maoValor').value = fmtNumOs(it.valor);
+        var selF = document.getElementById('maoFuncId');
+        if (selF) selF.value = it.funcionarioId || '';
+        var selT = document.getElementById('maoTipoComissao');
+        if (selT) selT.value = it.tipoMao || 'servico';
+        document.getElementById('btnAddMao').textContent = 'Salvar mão de obra';
+        document.getElementById('btnAddItem').textContent = '+ Peça';
+        if (typeof atualizarPreviewComissaoMao === 'function') atualizarPreviewComissaoMao();
+        try {
+            document.getElementById('maoValor').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            document.getElementById('maoValor').focus();
+            document.getElementById('maoValor').select();
+        } catch (eF) { /* ok */ }
+    } else {
+        normalizarPecaItem(it);
+        document.getElementById('itemDesc').value = it.desc || '';
+        document.getElementById('itemCusto').value = fmtNumOs(it.custoUnit);
+        document.getElementById('itemValor').value = fmtNumOs(it.valorUnit);
+        if (document.getElementById('itemQtd')) document.getElementById('itemQtd').value = String(it.qtd || 1);
+        document.getElementById('btnAddItem').textContent = 'Salvar peça';
+        document.getElementById('btnAddMao').textContent = '+ Mão de obra';
+        try {
+            document.getElementById('itemValor').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            document.getElementById('itemValor').focus();
+            document.getElementById('itemValor').select();
+        } catch (eF2) { /* ok */ }
+    }
+    toast('Altere o valor e clique em Salvar na linha de cima.');
+    renderItens();
+}
+
+function aplicarValorLinhaPeca(idx, campo, raw) {
+    var it = itensTemp[idx];
+    if (!it || (it.tipo || 'peca') === 'mao') return;
+    normalizarPecaItem(it);
+    var n = parseMoeda(raw);
+    if (n < 0) n = 0;
+    if (campo === 'custo') it.custoUnit = n;
+    else it.valorUnit = n;
+    normalizarPecaItem(it);
+    renderItens();
+}
+
+function aplicarValorLinhaMao(idx, raw) {
+    var it = itensTemp[idx];
+    if (!it || it.tipo !== 'mao') return;
+    it.valor = parseMoeda(raw);
+    if (it.valor < 0) it.valor = 0;
+    var dados = it.funcionarioId ? obterDadosComissaoFuncionario(it.funcionarioId, it.tipoMao || 'servico') : { pct: 0, valorFixo: 0 };
+    it.comissaoValor = valorComissaoDoItemMao(it, dados);
+    renderItens();
+}
+
 function htmlLinhaItemOs(it, idx) {
     var tipo = it.tipo || 'peca';
+    var editando = osItemEditIdx === idx;
+    var clsEdit = editando ? ' os-item-editando' : '';
+    var btnEditTxt = editando ? 'Cancelar' : 'Editar';
     if (tipo === 'peca') {
         normalizarPecaItem(it);
-        var extraP = '<div class="muted" style="font-size:0.78rem">Unit. custo ' + moeda(it.custoUnit) +
-            ' · venda ' + moeda(it.valorUnit) +
-            ' · Total custo ' + moeda(it.custo) +
-            ' · Ganho <span class="ganho-linha">' + moeda(ganhoItem(it)) + '</span></div>';
-        return '<div class="row os-item-linha" style="margin-bottom:8px;align-items:center;gap:6px">' +
+        var extraP = '<div class="os-item-edit-row">' +
+            '<label>Custo un. <input class="os-edit-val" inputmode="decimal" data-edit-custo="' + idx + '" value="' +
+            esc(fmtNumOs(it.custoUnit)) + '" title="Custo unitário"></label>' +
+            '<label>Venda un. <input class="os-edit-val" inputmode="decimal" data-edit-venda="' + idx + '" value="' +
+            esc(fmtNumOs(it.valorUnit)) + '" title="Venda unitária"></label>' +
+            '<span>Total custo ' + moeda(it.custo) +
+            ' · Ganho <span class="ganho-linha">' + moeda(ganhoItem(it)) + '</span></span></div>';
+        return '<div class="row os-item-linha' + clsEdit + '" style="margin-bottom:8px;align-items:center;gap:6px">' +
             '<div class="col" style="flex:2"><span class="os-tag os-tag-peca">PEÇA</span>' +
             esc(it.desc) + extraP + '</div>' +
             '<div class="col" style="flex:1.1;display:flex;align-items:center;gap:4px">' +
@@ -288,7 +368,9 @@ function htmlLinhaItemOs(it, idx) {
             '<button type="button" class="btn btn-secondary" data-qtd-mais="' + idx + '" style="padding:4px 10px;min-width:36px">+</button>' +
             '</div>' +
             '<div class="col os-item-valor" style="flex:0.9">' + moeda(it.valor) + '</div>' +
-            '<div class="col" style="flex:0.4"><button type="button" class="btn btn-danger" data-rm="' + idx + '">×</button></div>' +
+            '<div class="col os-item-acoes">' +
+            '<button type="button" class="btn btn-secondary btn-os-editar" data-edit-item="' + idx + '">' + btnEditTxt + '</button>' +
+            '<button type="button" class="btn btn-danger" data-rm="' + idx + '">×</button></div>' +
             '</div>';
     }
 
@@ -322,11 +404,15 @@ function htmlLinhaItemOs(it, idx) {
         }
     }
     extraM += '</div>';
-    return '<div class="row os-item-linha" style="margin-bottom:8px;align-items:center">' +
+    return '<div class="row os-item-linha' + clsEdit + '" style="margin-bottom:8px;align-items:center">' +
         '<div class="col" style="flex:2"><span class="os-tag os-tag-mao">MÃO DE OBRA</span>' +
         esc(it.desc) + extraM + '</div>' +
-        '<div class="col os-item-valor">' + moeda(it.valor) + '</div>' +
-        '<div class="col" style="flex:0.5"><button type="button" class="btn btn-danger" data-rm="' + idx + '">×</button></div>' +
+        '<div class="col os-item-valor" style="flex:1.1">' +
+        '<label class="os-item-edit-row">Valor <input class="os-edit-val" inputmode="decimal" data-edit-mao="' + idx +
+        '" value="' + esc(fmtNumOs(it.valor)) + '" title="Valor da mão de obra"></label></div>' +
+        '<div class="col os-item-acoes">' +
+        '<button type="button" class="btn btn-secondary btn-os-editar" data-edit-item="' + idx + '">' + btnEditTxt + '</button>' +
+        '<button type="button" class="btn btn-danger" data-rm="' + idx + '">×</button></div>' +
         '</div>';
 }
 
@@ -369,8 +455,40 @@ function renderItens() {
 
     box.querySelectorAll('[data-rm]').forEach(function (b) {
         b.addEventListener('click', function () {
-            itensTemp.splice(Number(b.getAttribute('data-rm')), 1);
+            var i = Number(b.getAttribute('data-rm'));
+            if (osItemEditIdx === i) cancelarEdicaoItemOs();
+            else if (osItemEditIdx != null && osItemEditIdx > i) osItemEditIdx -= 1;
+            itensTemp.splice(i, 1);
             renderItens();
+        });
+    });
+    box.querySelectorAll('[data-edit-item]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            iniciarEdicaoItemOs(Number(b.getAttribute('data-edit-item')));
+        });
+    });
+    box.querySelectorAll('[data-edit-venda]').forEach(function (inp) {
+        inp.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); inp.blur(); }
+        });
+        inp.addEventListener('change', function () {
+            aplicarValorLinhaPeca(Number(inp.getAttribute('data-edit-venda')), 'venda', inp.value);
+        });
+    });
+    box.querySelectorAll('[data-edit-custo]').forEach(function (inp) {
+        inp.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); inp.blur(); }
+        });
+        inp.addEventListener('change', function () {
+            aplicarValorLinhaPeca(Number(inp.getAttribute('data-edit-custo')), 'custo', inp.value);
+        });
+    });
+    box.querySelectorAll('[data-edit-mao]').forEach(function (inp) {
+        inp.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); inp.blur(); }
+        });
+        inp.addEventListener('change', function () {
+            aplicarValorLinhaMao(Number(inp.getAttribute('data-edit-mao')), inp.value);
         });
     });
     box.querySelectorAll('[data-qtd-mais]').forEach(function (b) {
@@ -425,6 +543,26 @@ document.getElementById('btnAddItem').addEventListener('click', function () {
     if (!desc) { toast('Informe a descrição da peça/item.'); return; }
     if (!(valorUnit > 0) && !(custoUnit > 0)) { toast('Informe o valor de venda da peça.'); return; }
     if (!(valorUnit > 0)) valorUnit = custoUnit;
+
+    var editandoPeca = osItemEditIdx != null && itensTemp[osItemEditIdx] &&
+        (itensTemp[osItemEditIdx].tipo || 'peca') !== 'mao';
+    if (editandoPeca) {
+        var itemEd = itensTemp[osItemEditIdx];
+        itemEd.desc = desc;
+        itemEd.qtd = qtd;
+        itemEd.custoUnit = custoUnit;
+        itemEd.valorUnit = valorUnit;
+        itemEd.custo = +(custoUnit * qtd).toFixed(2);
+        itemEd.valor = +(valorUnit * qtd).toFixed(2);
+        cancelarEdicaoItemOs();
+        document.getElementById('itemDesc').value = '';
+        document.getElementById('itemCusto').value = '';
+        document.getElementById('itemValor').value = '';
+        if (document.getElementById('itemQtd')) document.getElementById('itemQtd').value = '1';
+        renderItens();
+        toast('Peça atualizada.');
+        return;
+    }
 
     /* Se já existe a mesma peça (mesmo nome + unitários), só soma a quantidade */
     var iExist = itensTemp.findIndex(function (x) {
@@ -615,7 +753,7 @@ document.getElementById('btnAddMao').addEventListener('click', function () {
     var dados = obterDadosComissaoFuncionario(fid, tipoMao);
     var comissaoPct = ehTipoMaoAmortOriginal(tipoMao) ? 0 : dados.pct;
     var comissaoValor = valorComissaoDoItemMao({ tipoMao: tipoMao, valor: valor, comissaoPct: comissaoPct }, dados);
-    itensTemp.push({
+    var itemMao = {
         tipo: 'mao',
         tipoMao: tipoMao,
         desc: desc,
@@ -624,7 +762,15 @@ document.getElementById('btnAddMao').addEventListener('click', function () {
         funcionarioNome: dados.nome || '',
         comissaoPct: comissaoPct,
         comissaoValor: comissaoValor
-    });
+    };
+    var editandoMao = osItemEditIdx != null && itensTemp[osItemEditIdx] && itensTemp[osItemEditIdx].tipo === 'mao';
+    if (editandoMao) {
+        itensTemp[osItemEditIdx] = itemMao;
+        cancelarEdicaoItemOs();
+        toast('Mão de obra atualizada.');
+    } else {
+        itensTemp.push(itemMao);
+    }
     document.getElementById('maoDesc').value = '';
     document.getElementById('maoValor').value = '';
     document.getElementById('maoFuncId').value = '';
@@ -705,6 +851,7 @@ window._osSalvando = false;
 })();
 
 function limparAtendimento() {
+    cancelarEdicaoItemOs();
     document.getElementById('formAtendimento').reset();
     document.getElementById('atId').value = '';
     document.getElementById('atClienteId').value = '';
@@ -1024,6 +1171,7 @@ function editarAtendimento(id, placaHint) {
     if (diagEl) diagEl.value = a.diagnostico || '';
     document.getElementById('atServicos').value = a.servicos || '';
     preencherSelectMaoFunc();
+    cancelarEdicaoItemOs();
     itensTemp = (a.itens || []).map(function (it) {
         var fid = it.funcionarioId || '';
         var tipoMao = it.tipoMao || 'servico';

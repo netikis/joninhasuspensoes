@@ -90,6 +90,7 @@ function abrirPainel(id, btn, opcoes) {
     if (!opcoes.skipNav && canalAntes !== canalVendas) {
         carrinhoVenda = [];
         produtoVendaSelecionado = null;
+        if (typeof cancelarEdicaoItemVd === 'function') cancelarEdicaoItemVd();
     }
     atualizarBadgeCanal();
 
