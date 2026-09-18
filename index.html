@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=51">
-    <link rel="stylesheet" href="css/tema-m3.css?v=51">
+    <link rel="stylesheet" href="css/app.css?v=52">
+    <link rel="stylesheet" href="css/tema-m3.css?v=52">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -711,6 +711,24 @@
                             <div class="col" style="flex:0.8"><label style="color:#f1c40f">Total (R$)</label><input id="vdProdTotal" readonly style="font-weight:700;color:#8fe0b8"></div>
                             <div class="col" style="flex:0.55"><button type="button" class="btn btn-ok" id="btnVdAddEstoque" style="width:100%">➕ ADD</button></div>
                         </div>
+                        <div class="row" style="margin-top:8px">
+                            <div class="col">
+                                <label>Funcionário (comissão)</label>
+                                <select id="vdProdFuncId"><option value="">— sem comissão —</option></select>
+                            </div>
+                            <div class="col">
+                                <label>Tipo da comissão</label>
+                                <select id="vdProdTipoComissao">
+                                    <option value="">— sem comissão —</option>
+                                    <option value="servico">Serviço (%)</option>
+                                    <option value="alinhamento">Alinhamento (%)</option>
+                                    <option value="amortecedor">Amortecedor (%)</option>
+                                    <option value="amortecedor-original">Amortecedor original 1 (R$)</option>
+                                    <option value="amortecedor-original-2">Rebaixados (R$)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="hint" id="vdProdComissaoPreview" style="margin-top:6px;margin-bottom:0;color:#8fe0b8;font-weight:700"></p>
                     </div>
 
                     <div class="box box-item-avulso" style="border:2px solid #e61e25;background:#ffe5e8;box-shadow:0 0 0 1px rgba(230,30,37,0.25)">
@@ -734,10 +752,29 @@
                             <div class="col" style="flex:0.8"><label style="color:#111;font-weight:800">Total (R$)</label><input id="vdAvTotal" readonly style="font-weight:800;color:#111;background:#fff"></div>
                             <div class="col" style="flex:0.55"><button type="button" class="btn btn-ok" id="btnVdAddAvulso" style="width:100%">➕ ADD</button></div>
                         </div>
+                        <div class="row" style="margin-top:8px">
+                            <div class="col">
+                                <label style="color:#111;font-weight:800">Funcionário (comissão)</label>
+                                <select id="vdAvFuncId"><option value="">— sem comissão —</option></select>
+                            </div>
+                            <div class="col">
+                                <label style="color:#111;font-weight:800">Tipo da comissão</label>
+                                <select id="vdAvTipoComissao">
+                                    <option value="">— sem comissão —</option>
+                                    <option value="servico">Serviço (%)</option>
+                                    <option value="alinhamento">Alinhamento (%)</option>
+                                    <option value="amortecedor">Amortecedor (%)</option>
+                                    <option value="amortecedor-original">Amortecedor original 1 (R$)</option>
+                                    <option value="amortecedor-original-2">Rebaixados (R$)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="hint" id="vdAvComissaoPreview" style="margin-top:6px;margin-bottom:0;color:#14532d;font-weight:700"></p>
                     </div>
 
                     <div class="box">
                         <h3>4. Mão de obra / serviço</h3>
+                        <p class="hint">Amortecedor feito na venda: pode lançar a peça no estoque com comissão, ou a mão de obra aqui. Escolha o funcionário e o tipo (Amortecedor % ou original R$).</p>
                         <div class="row" style="align-items:flex-end">
                             <div class="col autocomplete-wrap" style="flex:1.6"><label>Descrição</label><input id="vdMaoDesc" placeholder="Ex: Alinhamento, funilaria..." autocomplete="off"><div id="sugestoesVdMao" class="sugestoes-catalogo" hidden></div></div>
                             <div class="col">
@@ -1742,17 +1779,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=51"></script>
-    <script src="js/storage.js?v=51"></script>
-    <script src="js/ui.js?v=51"></script>
-    <script src="js/auth.js?v=51"></script>
-    <script src="js/os.js?v=51"></script>
-    <script src="js/nuvem.js?v=51"></script>
-    <script src="js/caixa.js?v=51"></script>
-    <script src="js/comissoes.js?v=51"></script>
-    <script src="js/app.js?v=51"></script>
-    <script src="js/perfil-cliente.js?v=51"></script>
-    <script src="js/navegacao.js?v=51"></script>
+    <script src="js/config.js?v=52"></script>
+    <script src="js/storage.js?v=52"></script>
+    <script src="js/ui.js?v=52"></script>
+    <script src="js/auth.js?v=52"></script>
+    <script src="js/os.js?v=52"></script>
+    <script src="js/nuvem.js?v=52"></script>
+    <script src="js/caixa.js?v=52"></script>
+    <script src="js/comissoes.js?v=52"></script>
+    <script src="js/app.js?v=52"></script>
+    <script src="js/perfil-cliente.js?v=52"></script>
+    <script src="js/navegacao.js?v=52"></script>
 </body>
 </html>
 

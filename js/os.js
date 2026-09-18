@@ -733,6 +733,16 @@ function atualizarRotulosTipoMaoOriginal() {
     var selVd = document.getElementById('vdMaoTipoComissao');
     setOpt(selVd, 'amortecedor-original', 'Amortecedor original 1 (R$)', d1.valorFixo);
     setOpt(selVd, 'amortecedor-original-2', 'Rebaixados (R$)', d2.valorFixo);
+    function rotulosPorSelect(funcId, tipoId) {
+        var fidL = document.getElementById(funcId) && document.getElementById(funcId).value;
+        var dL1 = fidL ? obterDadosComissaoFuncionario(fidL, 'amortecedor-original') : { valorFixo: 0 };
+        var dL2 = fidL ? obterDadosComissaoFuncionario(fidL, 'amortecedor-original-2') : { valorFixo: 0 };
+        var selL = document.getElementById(tipoId);
+        setOpt(selL, 'amortecedor-original', 'Amortecedor original 1 (R$)', dL1.valorFixo);
+        setOpt(selL, 'amortecedor-original-2', 'Rebaixados (R$)', dL2.valorFixo);
+    }
+    rotulosPorSelect('vdProdFuncId', 'vdProdTipoComissao');
+    rotulosPorSelect('vdAvFuncId', 'vdAvTipoComissao');
 }
 
 function atualizarPreviewComissaoMao() {

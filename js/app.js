@@ -4015,9 +4015,9 @@ function htmlDocumentoVenda(db, o) {
     var tipo = o.tipo || 'VENDA';
     var rows = (o.itens || []).map(function (it) {
         var extraMo = '';
-        if ((it.origem || it.tipo) === 'mao') {
-            var tipoLbl = (typeof rotuloTipoMaoComissao === 'function')
-                ? rotuloTipoMaoComissao(it.tipoMao || 'servico')
+        if ((it.origem || it.tipo) === 'mao' || (it.funcionarioId && it.tipoMao) || it.funcionarioNome) {
+            var tipoLbl = it.tipoMao
+                ? ((typeof rotuloTipoMaoComissao === 'function') ? rotuloTipoMaoComissao(it.tipoMao) : it.tipoMao)
                 : '';
             extraMo = '<div style="font-size:0.78rem;color:#475569">' +
                 esc(it.funcionarioNome || '') +
@@ -4315,12 +4315,14 @@ function atualizarTotalLinhaEstoque() {
     var qtd = parseMoeda(document.getElementById('vdProdQtd').value) || 0;
     var venda = Number(document.getElementById('vdProdVenda').value) || 0;
     document.getElementById('vdProdTotal').value = (qtd * venda).toFixed(2);
+    if (typeof atualizarPreviewComissaoEstoqueVd === 'function') atualizarPreviewComissaoEstoqueVd();
 }
 
 function atualizarTotalLinhaAvulso() {
     var qtd = parseMoeda(document.getElementById('vdAvQtd').value) || 0;
     var venda = Number(document.getElementById('vdAvVenda').value) || 0;
     document.getElementById('vdAvTotal').value = (qtd * venda).toFixed(2);
+    if (typeof atualizarPreviewComissaoAvulsoVd === 'function') atualizarPreviewComissaoAvulsoVd();
 }
 
 function recalcVendaDeCusto(custoId, margemId, vendaId, totalFn) {
@@ -4553,13 +4555,16 @@ function renderCarrinhoVenda() {
             var tag = it.origem === 'estoque' ? 'ESTOQUE' : (it.origem === 'mao' ? 'MÃO DE OBRA' : 'AVULSO');
             var cor = it.origem === 'mao' ? '#1e9e5a' : (it.origem === 'estoque' ? '#2563a8' : '#d23b3b');
             var extra = '';
-            if (it.origem === 'mao') {
-                var tipoLbl = (typeof rotuloTipoMaoComissao === 'function')
-                    ? rotuloTipoMaoComissao(it.tipoMao || 'servico')
-                    : (it.tipoMao || '');
+            var temComLinha = it.origem === 'mao' || (it.funcionarioId && it.tipoMao) || Number(it.comissaoValor) > 0.009;
+            if (temComLinha) {
+                var tipoLbl = it.tipoMao
+                    ? ((typeof rotuloTipoMaoComissao === 'function') ? rotuloTipoMaoComissao(it.tipoMao) : it.tipoMao)
+                    : (it.origem === 'mao' ? 'Serviço' : '');
                 extra = '<span class="vd-cart-func">' +
-                    esc(it.funcionarioNome || 'sem funcionário') +
-                    (tipoLbl ? ' · ' + esc(tipoLbl) : '') + '</span>';
+                    esc(it.funcionarioNome || (it.origem === 'mao' ? 'sem funcionário' : '')) +
+                    (tipoLbl ? ' · ' + esc(tipoLbl) : '') +
+                    (Number(it.comissaoValor) > 0.009 ? ' · ' + moeda(it.comissaoValor) : '') +
+                    '</span>';
             }
             var cls = 'vd-cart-linha' + (vdItemEditIdx === idx ? ' vd-cart-editando' : '');
             var btnEd = vdItemEditIdx === idx ? 'Cancelar' : 'Editar';
@@ -4648,8 +4653,13 @@ function iniciarEdicaoItemVd(idx) {
         document.getElementById('vdProdMargem').value = margem.toFixed(1);
         document.getElementById('vdProdUn').value = it.unidade || '';
         document.getElementById('vdProdQtd').value = String(it.qtd || 1);
+        var selPF = document.getElementById('vdProdFuncId');
+        if (selPF) selPF.value = it.funcionarioId || '';
+        var selPT = document.getElementById('vdProdTipoComissao');
+        if (selPT) selPT.value = it.tipoMao || '';
         atualizarTotalLinhaEstoque();
         atualizarResumoEstoqueVenda();
+        if (typeof atualizarPreviewComissaoEstoqueVd === 'function') atualizarPreviewComissaoEstoqueVd();
         document.getElementById('btnVdAddEstoque').textContent = 'Salvar';
         try {
             document.getElementById('vdProdVenda').focus();
@@ -4677,8 +4687,13 @@ function iniciarEdicaoItemVd(idx) {
         document.getElementById('vdAvCusto').value = it.custo || 0;
         document.getElementById('vdAvMargem').value = it.margem || 0;
         document.getElementById('vdAvVenda').value = it.venda || 0;
+        var selAF = document.getElementById('vdAvFuncId');
+        if (selAF) selAF.value = it.funcionarioId || '';
+        var selAT = document.getElementById('vdAvTipoComissao');
+        if (selAT) selAT.value = it.tipoMao || '';
         document.getElementById('btnVdAddAvulso').textContent = 'Salvar';
         atualizarTotalLinhaAvulso();
+        if (typeof atualizarPreviewComissaoAvulsoVd === 'function') atualizarPreviewComissaoAvulsoVd();
         try {
             document.getElementById('vdAvVenda').focus();
             document.getElementById('vdAvVenda').select();
@@ -4696,18 +4711,8 @@ function aplicarValorCarrinhoVd(idx, raw) {
     it.venda = n;
     var q = Number(it.qtd) || 1;
     it.total = +(q * n).toFixed(2);
-    if (it.origem === 'mao') {
-        it.valor = n;
-        var dadosMo = { pct: Number(it.comissaoPct) || 0, valorFixo: 0, nome: it.funcionarioNome || '' };
-        if (it.funcionarioId && typeof obterDadosComissaoFuncionario === 'function') {
-            dadosMo = obterDadosComissaoFuncionario(it.funcionarioId, it.tipoMao || 'servico');
-        }
-        if (typeof ehTipoMaoAmortOriginal === 'function' && ehTipoMaoAmortOriginal(it.tipoMao)) {
-            it.comissaoValor = Number(dadosMo.valorFixo) || 0;
-        } else if (typeof calcularValorComissaoMao === 'function') {
-            it.comissaoValor = calcularValorComissaoMao(n, dadosMo.pct || 0);
-        }
-    }
+    if (it.origem === 'mao') it.valor = n;
+    recalcularComissaoItemVenda(it);
     renderCarrinhoVenda();
 }
 
@@ -4827,11 +4832,13 @@ document.getElementById('btnVdAddEstoque').addEventListener('click', function ()
         total: qtd * venda,
         baixaEstoque: tipoDoc === 'VENDA'
     };
+    aplicarComissaoCamposNoItemVenda(itemEstoque, 'vdProdFuncId', 'vdProdTipoComissao', qtd);
     if (substituirItemCarrinhoSeEditando('estoque', itemEstoque)) {
         document.getElementById('vdProdBusca').value = '';
         produtoVendaSelecionado = null;
         atualizarResumoEstoqueVenda();
         document.getElementById('vdProdQtd').value = '1';
+        if (typeof atualizarPreviewComissaoEstoqueVd === 'function') atualizarPreviewComissaoEstoqueVd();
         return;
     }
     addItemCarrinho(itemEstoque);
@@ -4840,7 +4847,11 @@ document.getElementById('btnVdAddEstoque').addEventListener('click', function ()
     atualizarResumoEstoqueVenda();
     document.getElementById('vdProdQtd').value = '1';
     document.getElementById('vdProdBusca').focus();
-    if (tipoDoc === 'VENDA') {
+    if (typeof atualizarPreviewComissaoEstoqueVd === 'function') atualizarPreviewComissaoEstoqueVd();
+    if (Number(itemEstoque.comissaoValor) > 0.009) {
+        toast('Peça adicionada. Comissão ' + moeda(itemEstoque.comissaoValor) +
+            ' para ' + (itemEstoque.funcionarioNome || 'funcionário') + '.');
+    } else if (tipoDoc === 'VENDA') {
         toast('Item adicionado. Estoque será baixado ao finalizar a venda.');
     } else {
         toast('Item no orçamento (sem baixa de estoque).');
@@ -4884,11 +4895,13 @@ document.getElementById('btnVdAddAvulso').addEventListener('click', function () 
         venda: venda,
         total: qtd * venda
     };
+    aplicarComissaoCamposNoItemVenda(itemAvulso, 'vdAvFuncId', 'vdAvTipoComissao', qtd);
     if (substituirItemCarrinhoSeEditando('avulso', itemAvulso)) {
         document.getElementById('vdAvNome').value = '';
         document.getElementById('vdAvQtd').value = '1';
         document.getElementById('vdAvVenda').value = '';
         document.getElementById('vdAvTotal').value = '';
+        if (typeof atualizarPreviewComissaoAvulsoVd === 'function') atualizarPreviewComissaoAvulsoVd();
         return;
     }
     addItemCarrinho(itemAvulso);
@@ -4897,6 +4910,11 @@ document.getElementById('btnVdAddAvulso').addEventListener('click', function () 
     document.getElementById('vdAvVenda').value = '';
     document.getElementById('vdAvTotal').value = '';
     document.getElementById('vdAvNome').focus();
+    if (typeof atualizarPreviewComissaoAvulsoVd === 'function') atualizarPreviewComissaoAvulsoVd();
+    if (Number(itemAvulso.comissaoValor) > 0.009) {
+        toast('Item avulso adicionado. Comissão ' + moeda(itemAvulso.comissaoValor) +
+            ' para ' + (itemAvulso.funcionarioNome || 'funcionário') + '.');
+    }
 });
 
 document.getElementById('btnVdAddMao').addEventListener('click', function () {
@@ -4960,6 +4978,124 @@ document.getElementById('btnVdAddMao').addEventListener('click', function () {
     if (typeof atualizarPreviewComissaoVd === 'function') atualizarPreviewComissaoVd();
 });
 
+function aplicarComissaoCamposNoItemVenda(item, funcId, tipoId, qtd) {
+    var selF = document.getElementById(funcId);
+    var selT = document.getElementById(tipoId);
+    var fid = selF && selF.value ? selF.value : '';
+    var tipoMao = selT && selT.value ? selT.value : '';
+    item.funcionarioId = '';
+    item.tipoMao = '';
+    item.funcionarioNome = '';
+    item.comissaoPct = 0;
+    item.comissaoValor = 0;
+    if (!fid || !tipoMao) return item;
+    item.funcionarioId = fid;
+    item.tipoMao = tipoMao;
+    var nomeSel = '';
+    if (selF && selF.selectedIndex >= 0 && selF.options[selF.selectedIndex]) {
+        nomeSel = selF.options[selF.selectedIndex].text || '';
+        if (nomeSel.indexOf('sem comissão') >= 0 || nomeSel.indexOf('usar funcionário') >= 0) nomeSel = '';
+    }
+    var dados = { pct: 0, valorFixo: 0, nome: nomeSel };
+    if (typeof obterDadosComissaoFuncionario === 'function') {
+        dados = obterDadosComissaoFuncionario(fid, tipoMao);
+        if (!dados.nome) dados.nome = nomeSel;
+    }
+    item.funcionarioNome = dados.nome || nomeSel || '';
+    var q = Math.max(1, Number(qtd) || 1);
+    if (typeof ehTipoMaoAmortOriginal === 'function' && ehTipoMaoAmortOriginal(tipoMao)) {
+        item.comissaoPct = 0;
+        item.comissaoValor = +((Number(dados.valorFixo) || 0) * q).toFixed(2);
+    } else if (typeof calcularValorComissaoMao === 'function') {
+        item.comissaoPct = dados.pct || 0;
+        var base = Number(item.total != null ? item.total : item.venda) || 0;
+        item.comissaoValor = calcularValorComissaoMao(base, item.comissaoPct);
+    } else {
+        item.comissaoPct = dados.pct || 0;
+        var base2 = Number(item.total != null ? item.total : item.venda) || 0;
+        item.comissaoValor = +((base2 * (item.comissaoPct || 0)) / 100).toFixed(2);
+    }
+    return item;
+}
+
+function atualizarPreviewComissaoCamposVenda(funcId, tipoId, qtdId, vendaId, previewId) {
+    var el = document.getElementById(previewId);
+    if (!el) return;
+    var fid = document.getElementById(funcId) && document.getElementById(funcId).value;
+    var tipo = document.getElementById(tipoId) && document.getElementById(tipoId).value;
+    if (!fid || !tipo) {
+        el.textContent = 'Sem comissão nesta peça — escolha funcionário e tipo (ex.: Amortecedor) se ele fez o serviço.';
+        el.style.color = '#94a3b8';
+        return;
+    }
+    if (typeof obterDadosComissaoFuncionario !== 'function') {
+        el.textContent = '';
+        return;
+    }
+    var dados = obterDadosComissaoFuncionario(fid, tipo);
+    var tipoLbl = (typeof rotuloTipoMaoComissao === 'function') ? rotuloTipoMaoComissao(tipo) : tipo;
+    var qtd = Math.max(1, parseMoeda(document.getElementById(qtdId) && document.getElementById(qtdId).value) || 1);
+    if (typeof ehTipoMaoAmortOriginal === 'function' && ehTipoMaoAmortOriginal(tipo)) {
+        var fixo = Number(dados.valorFixo) || 0;
+        if (!(fixo > 0)) {
+            el.textContent = (dados.nome || 'Funcionário') + ' — sem R$ de ' + tipoLbl.toLowerCase() + ' no cadastro.';
+            el.style.color = '#ffb4b4';
+            return;
+        }
+        el.textContent = (dados.nome || 'Funcionário') + ' · ' + tipoLbl + ': ' + moeda(fixo) +
+            (qtd > 1 ? ' × ' + qtd + ' = ' + moeda(fixo * qtd) : ' (fixo)');
+        el.style.color = '#8fe0b8';
+        return;
+    }
+    var venda = Number(document.getElementById(vendaId) && document.getElementById(vendaId).value) || 0;
+    var base = qtd * venda;
+    var com = (typeof calcularValorComissaoMao === 'function')
+        ? calcularValorComissaoMao(base, dados.pct || 0)
+        : +((base * (dados.pct || 0)) / 100).toFixed(2);
+    el.textContent = (dados.nome || 'Funcionário') + ' · ' + tipoLbl + ': ' + (dados.pct || 0) + '%' +
+        (base > 0 ? ' → ' + moeda(com) : '');
+    el.style.color = '#8fe0b8';
+}
+
+function atualizarPreviewComissaoEstoqueVd() {
+    if (typeof atualizarRotulosTipoMaoOriginal === 'function') atualizarRotulosTipoMaoOriginal();
+    atualizarPreviewComissaoCamposVenda('vdProdFuncId', 'vdProdTipoComissao', 'vdProdQtd', 'vdProdVenda', 'vdProdComissaoPreview');
+}
+function atualizarPreviewComissaoAvulsoVd() {
+    if (typeof atualizarRotulosTipoMaoOriginal === 'function') atualizarRotulosTipoMaoOriginal();
+    atualizarPreviewComissaoCamposVenda('vdAvFuncId', 'vdAvTipoComissao', 'vdAvQtd', 'vdAvVenda', 'vdAvComissaoPreview');
+}
+
+function recalcularComissaoItemVenda(it) {
+    if (!it) return;
+    var ehMao = (it.origem || it.tipo || '') === 'mao';
+    var tipoMao = it.tipoMao || (ehMao ? 'servico' : '');
+    if (!it.funcionarioId || !tipoMao) {
+        if (!ehMao) {
+            it.comissaoPct = 0;
+            it.comissaoValor = 0;
+        }
+        return;
+    }
+    var dadosMo = { pct: Number(it.comissaoPct) || 0, valorFixo: 0, nome: it.funcionarioNome || '' };
+    if (typeof obterDadosComissaoFuncionario === 'function') {
+        dadosMo = obterDadosComissaoFuncionario(it.funcionarioId, tipoMao);
+        if (!it.funcionarioNome) it.funcionarioNome = dadosMo.nome;
+    }
+    var q = Math.max(1, Number(it.qtd) || 1);
+    var base = Number(it.total != null ? it.total : ((Number(it.venda) || 0) * q)) || 0;
+    if (typeof ehTipoMaoAmortOriginal === 'function' && ehTipoMaoAmortOriginal(tipoMao)) {
+        it.comissaoPct = 0;
+        it.comissaoValor = +((Number(dadosMo.valorFixo) || 0) * q).toFixed(2);
+    } else if (typeof calcularValorComissaoMao === 'function') {
+        it.comissaoPct = dadosMo.pct || 0;
+        it.comissaoValor = calcularValorComissaoMao(base, it.comissaoPct);
+    } else {
+        it.comissaoPct = dadosMo.pct || 0;
+        it.comissaoValor = +((base * (it.comissaoPct || 0)) / 100).toFixed(2);
+    }
+}
+
 function atualizarPreviewComissaoVd() {
     if (typeof atualizarRotulosTipoMaoOriginal === 'function') atualizarRotulosTipoMaoOriginal();
     var el = document.getElementById('vdMaoComissaoPreview');
@@ -5009,6 +5145,14 @@ function atualizarPreviewComissaoVd() {
 });
 var vdMaoValorEl = document.getElementById('vdMaoValor');
 if (vdMaoValorEl) vdMaoValorEl.addEventListener('input', atualizarPreviewComissaoVd);
+['vdProdFuncId', 'vdProdTipoComissao'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', atualizarPreviewComissaoEstoqueVd);
+});
+['vdAvFuncId', 'vdAvTipoComissao'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', atualizarPreviewComissaoAvulsoVd);
+});
 
 function limparVendaForm() {
     vendaEmEdicaoId = null;
@@ -5027,6 +5171,14 @@ function limparVendaForm() {
     if (selMec2) selMec2.value = '';
     var selMaoF = document.getElementById('vdMaoFuncId');
     if (selMaoF) selMaoF.value = '';
+    var selPF = document.getElementById('vdProdFuncId');
+    if (selPF) selPF.value = '';
+    var selPT = document.getElementById('vdProdTipoComissao');
+    if (selPT) selPT.value = '';
+    var selAF = document.getElementById('vdAvFuncId');
+    if (selAF) selAF.value = '';
+    var selAT = document.getElementById('vdAvTipoComissao');
+    if (selAT) selAT.value = '';
     document.getElementById('vdProdBusca').value = '';
     document.getElementById('vdObs').value = '';
     document.getElementById('vdDescReais').value = '0';
@@ -5040,6 +5192,8 @@ function limparVendaForm() {
     renderCarrinhoVenda();
     atualizarResumoEstoqueVenda();
     if (typeof atualizarPreviewComissaoVd === 'function') atualizarPreviewComissaoVd();
+    if (typeof atualizarPreviewComissaoEstoqueVd === 'function') atualizarPreviewComissaoEstoqueVd();
+    if (typeof atualizarPreviewComissaoAvulsoVd === 'function') atualizarPreviewComissaoAvulsoVd();
 }
 
 document.getElementById('btnVdLimpar').addEventListener('click', function () {
@@ -5091,8 +5245,7 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
     carrinhoVenda.forEach(function (it) {
         if (!it) return;
         var ehMao = (it.origem || it.tipo || '') === 'mao';
-        if (!ehMao) return;
-        if (!it.funcionarioId) {
+        if (ehMao && !it.funcionarioId) {
             if (mecanicoId) {
                 it.funcionarioId = mecanicoId;
                 it.funcionarioNome = mecanicoNome;
@@ -5101,17 +5254,7 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
                 it.funcionarioNome = mecanicoNome2;
             }
         }
-        if (it.funcionarioId && typeof obterDadosComissaoFuncionario === 'function') {
-            var dM = obterDadosComissaoFuncionario(it.funcionarioId, it.tipoMao || 'servico');
-            it.comissaoPct = dM.pct || 0;
-            if (!it.funcionarioNome) it.funcionarioNome = dM.nome;
-            var baseMo = Number(it.total != null ? it.total : it.venda) || 0;
-            if (typeof ehTipoMaoAmortOriginal === 'function' && ehTipoMaoAmortOriginal(it.tipoMao)) {
-                it.comissaoValor = Number(dM.valorFixo) || 0;
-            } else if (typeof calcularValorComissaoMao === 'function') {
-                it.comissaoValor = calcularValorComissaoMao(baseMo, it.comissaoPct || 0);
-            }
-        }
+        recalcularComissaoItemVenda(it);
     });
     var tipo = document.getElementById('vdTipo').value;
     /* Orçamento (oficina/balcão): placa, itens e até cliente não bloqueiam */
@@ -6302,17 +6445,33 @@ function calcularRelatorioOficina(periodo) {
         if (!d || d < periodo.inicio || d > periodo.fim) return;
         var t = totaisLucroVendaDoc(o);
         var comV = 0;
+        var comVMao = 0;
         (o.itens || []).forEach(function (it) {
-            if (!it || (it.origem || it.tipo || '') !== 'mao') return;
-            var fid = it.funcionarioId || o.mecanicoId || o.funcionarioId;
+            if (!it) return;
+            var ehMao = (it.origem || it.tipo || '') === 'mao';
+            var temCom = ehMao || (it.funcionarioId && it.tipoMao) || (Number(it.comissaoValor) > 0.009);
+            if (!temCom) return;
+            var fid = it.funcionarioId || (ehMao ? (o.mecanicoId || o.funcionarioId) : '');
             if (!fid) return;
-            var pct = Number(it.comissaoPct);
-            if (!(pct > 0) && typeof obterDadosComissaoFuncionario === 'function') {
-                var dCom = obterDadosComissaoFuncionario(fid, it.tipoMao || 'servico');
-                if (dCom && dCom.pct > 0) pct = dCom.pct;
+            var tipoMao = it.tipoMao || (ehMao ? 'servico' : '');
+            var qtd = Math.max(1, Number(it.qtd) || 1);
+            var valorLinha = 0;
+            var salvo = Number(it.comissaoValor);
+            if (!isNaN(salvo) && salvo > 0.009) {
+                valorLinha = +salvo.toFixed(2);
+            } else if (typeof obterDadosComissaoFuncionario === 'function') {
+                var dCom = obterDadosComissaoFuncionario(fid, tipoMao || 'servico');
+                if (typeof ehTipoMaoAmortOriginal === 'function' && ehTipoMaoAmortOriginal(tipoMao)) {
+                    valorLinha = +((Number(dCom.valorFixo) || 0) * qtd).toFixed(2);
+                } else {
+                    var pct = Number(it.comissaoPct);
+                    if (!(pct > 0)) pct = (dCom && dCom.pct) || 0;
+                    var base = Number(it.total != null ? it.total : it.venda) || 0;
+                    if (pct > 0 && base > 0) valorLinha = +(base * pct / 100).toFixed(2);
+                }
             }
-            var base = Number(it.total != null ? it.total : it.venda) || 0;
-            if (pct > 0 && base > 0) comV += +(base * pct / 100).toFixed(2);
+            comV += valorLinha;
+            if (ehMao) comVMao += valorLinha;
         });
         pecas += t.pecas;
         ganho += t.ganhoPecas;
@@ -6328,7 +6487,7 @@ function calcularRelatorioOficina(periodo) {
             ganho: t.ganhoPecas,
             mao: t.mao,
             comissao: comV,
-            maoCasa: Math.max(0, t.mao - comV),
+            maoCasa: Math.max(0, t.mao - comVMao),
             total: t.total,
             pago: true,
             vendaId: o.id,

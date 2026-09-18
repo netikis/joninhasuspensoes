@@ -607,7 +607,7 @@ function preencherSelectMaoFunc() {
 }
 
 function preencherSelectMecanicoVenda() {
-    var sels = ['vdMecanicoId', 'vdMecanicoId2', 'vdMaoFuncId'];
+    var sels = ['vdMecanicoId', 'vdMecanicoId2', 'vdMaoFuncId', 'vdProdFuncId', 'vdAvFuncId'];
     var funcs = [];
     try {
         comCanalInterno(function () {
@@ -627,14 +627,16 @@ function preencherSelectMecanicoVenda() {
         var sel = document.getElementById(id);
         if (!sel) return;
         var cur = sel.value;
-        var first = id === 'vdMaoFuncId'
-            ? '<option value="">— usar funcionário 1 —</option>'
+        var first = (id === 'vdMaoFuncId' || id === 'vdProdFuncId' || id === 'vdAvFuncId')
+            ? (id === 'vdMaoFuncId' ? '<option value="">— usar funcionário 1 —</option>' : '<option value="">— sem comissão —</option>')
             : '<option value="">— sem funcionário —</option>';
         sel.innerHTML = first + opts;
         if (cur) sel.value = cur;
     });
     if (typeof atualizarRotulosTipoMaoOriginal === 'function') atualizarRotulosTipoMaoOriginal();
     if (typeof atualizarPreviewComissaoVd === 'function') atualizarPreviewComissaoVd();
+    if (typeof atualizarPreviewComissaoEstoqueVd === 'function') atualizarPreviewComissaoEstoqueVd();
+    if (typeof atualizarPreviewComissaoAvulsoVd === 'function') atualizarPreviewComissaoAvulsoVd();
 }
 
 function resolverComissaoLinha(it, f, tipoMao, base) {
@@ -648,7 +650,10 @@ function resolverComissaoLinha(it, f, tipoMao, base) {
             var valorSalvoF = Number(it.comissaoValor);
             if (!isNaN(valorSalvoF) && valorSalvoF > 0) fixo = valorSalvoF;
         }
-        return { pct: 0, pctTxt: 'fixo', valor: +Number(fixo || 0).toFixed(2) };
+        var qtd = Math.max(1, Number(it && it.qtd) || 1);
+        var valor = +((Number(fixo || 0) * qtd).toFixed(2));
+        if (it && Number(it.comissaoValor) > 0.009) valor = +Number(it.comissaoValor).toFixed(2);
+        return { pct: 0, pctTxt: 'fixo' + (qtd > 1 ? ' × ' + qtd : ''), valor: valor };
     }
     var pct = typeof pctComissaoPorTipo === 'function'
         ? pctComissaoPorTipo(f, tipoMao)
@@ -726,7 +731,8 @@ function listarComissoes(filtroFuncId, mesYYYYMM) {
         (o.itens || []).forEach(function (it) {
             if (!it) return;
             var ehMao = (it.origem || it.tipo || '') === 'mao';
-            if (!ehMao) return;
+            var temCom = ehMao || (it.funcionarioId && it.tipoMao) || (Number(it.comissaoValor) > 0.009);
+            if (!temCom) return;
             var fid = it.funcionarioId ? String(it.funcionarioId) : String(fidDoc || '');
             if (!fid) return;
             if (filtroFuncId && fid !== String(filtroFuncId)) return;
@@ -738,7 +744,7 @@ function listarComissoes(filtroFuncId, mesYYYYMM) {
                 data: dV,
                 cliente: o.clienteNome || ('Venda Nº ' + (o.numero || '')),
                 placa: o.placa || '',
-                desc: '[Venda] [' + rotuloTipoMaoComissao(tipoMao) + '] ' + (it.desc || 'Mão de obra'),
+                desc: '[Venda] [' + rotuloTipoMaoComissao(tipoMao) + '] ' + (it.desc || (ehMao ? 'Mão de obra' : 'Item')),
                 base: base,
                 pct: calc.pct,
                 pctTxt: calc.pctTxt,
