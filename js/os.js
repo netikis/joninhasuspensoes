@@ -319,6 +319,12 @@ function renderItens() {
     } else {
         html += idxsMao.map(function (idx) { return htmlLinhaItemOs(itensTemp[idx], idx); }).join('');
     }
+    var tot = totaisItens(itensTemp);
+    html += '<div class="os-itens-total">' +
+        '<div class="os-itens-total-linha"><span>Peças</span><strong>' + moeda(tot.pecas) + '</strong></div>' +
+        '<div class="os-itens-total-linha"><span>Mão de obra</span><strong>' + moeda(tot.mao) + '</strong></div>' +
+        '<div class="os-itens-total-final"><span>TOTAL</span><strong>' + moeda(tot.total) + '</strong></div>' +
+        '</div>';
     box.innerHTML = html;
 
     box.querySelectorAll('[data-rm]').forEach(function (b) {

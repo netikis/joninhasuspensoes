@@ -616,7 +616,54 @@
         .box .total-line,
         .box .total-line span,
         .box .total-line strong {
-            color: #fff !important;
+            color: #152642 !important;
+            font-weight: 800;
+        }
+        .box .total-line #atTotal {
+            color: #0f7a3f !important;
+            font-size: 1.45rem;
+        }
+        .os-itens-total {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 2px solid #c9a227;
+            background: #f8fafc;
+        }
+        .os-itens-total-linha {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            font-weight: 700;
+            color: #334155;
+            margin-bottom: 4px;
+            font-size: 0.95rem;
+        }
+        .box .os-itens-total-linha span,
+        .box .os-itens-total-linha strong {
+            color: #334155 !important;
+            font-weight: 800;
+        }
+        .os-itens-total-final {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e2e8f0;
+            font-weight: 800;
+            color: #152642;
+            font-size: 1.15rem;
+        }
+        .box .os-itens-total-final span {
+            color: #152642 !important;
+            font-weight: 800;
+        }
+        .os-itens-total-final strong,
+        .box .os-itens-total-final strong {
+            color: #0f7a3f !important;
+            font-size: 1.45rem;
             font-weight: 800;
         }
 

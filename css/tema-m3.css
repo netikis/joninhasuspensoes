@@ -707,6 +707,21 @@ tbody tr:hover { background: #f3f6fb; }
 .tbl-click tbody tr:hover { background: #eef3fb; }
 tr.row-click { cursor: pointer; }
 
+.box .os-itens-total-linha span,
+.box .os-itens-total-linha strong {
+    color: #334155 !important;
+    font-weight: 800;
+}
+.box .os-itens-total-final span {
+    color: #152642 !important;
+    font-weight: 800;
+}
+.box .os-itens-total-final strong,
+.box .total-line #atTotal {
+    color: #0f7a3f !important;
+    font-weight: 800;
+}
+
 @media print {
     .sidebar, .topbar, .sidebar-overlay { display: none !important; }
     .main, .conteudo { overflow: visible !important; height: auto !important; background: #fff; }
