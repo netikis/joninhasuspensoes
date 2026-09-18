@@ -2714,7 +2714,93 @@ function aplicarAssinaturaImportada(data) {
     }
 }
 
+function textoFormasPagamentoDoc(doc) {
+    if (!doc) return '';
+    var recs = doc.recebimentos || [];
+    if (recs.length) {
+        var formas = [];
+        recs.forEach(function (r) {
+            var f = String((r && r.forma) || '').trim();
+            if (f && formas.indexOf(f) < 0) formas.push(f);
+        });
+        if (formas.length) return formas.join(' + ');
+    }
+    return String(doc.formaPagamento || '').trim();
+}
+
+function htmlBadgePagamentoHist(doc, comCanal) {
+    if (!doc) return '';
+    var st = String(doc.statusPagamento || '').toUpperCase();
+    var forma = textoFormasPagamentoDoc(doc);
+    var canal = '';
+    if (comCanal) canal = doc.canalRecebimento === 'interno' ? ' · Interno' : ' · Oficial';
+    var txt = '';
+    if (st === 'PAGO') {
+        txt = 'PAGO' + (forma ? ' · ' + esc(forma) : '') + canal;
+    } else if (st === 'PARCIAL') {
+        txt = 'PARCIAL · ABERTO ' + moeda(Number(doc.saldoAberto) || 0);
+    } else if (st === 'PENDENTE') {
+        var aberto = Number(doc.saldoAberto != null ? doc.saldoAberto : (doc.total || doc.valor) || 0);
+        txt = 'EM ABERTO · ' + moeda(aberto);
+    } else {
+        return '';
+    }
+    return '<div class="badge-pago-os">' + txt + '</div>';
+}
+
+function htmlEngrenagemAcoes(innerHtml) {
+    return '<div class="cx-opcoes-wrap hist-opcoes-wrap">' +
+        '<button type="button" class="btn btn-secondary btn-opcoes-nota" title="Ações" aria-label="Ações">⚙️</button>' +
+        '<div class="cx-opcoes-menu hist-acoes-menu">' + (innerHtml || '') + '</div></div>';
+}
+
+function ligarCliquesEngrenagemGlobal() {
+    if (window._histEngrenagemDoc) return;
+    window._histEngrenagemDoc = true;
+    document.addEventListener('click', function (e) {
+        var opt = e.target.closest('.btn-opcoes-nota');
+        if (opt) {
+            var wrapOp = opt.closest('.cx-opcoes-wrap');
+            if (wrapOp && wrapOp.closest('#tabelaAtend, #tabelaOrc')) {
+                e.preventDefault();
+                e.stopPropagation();
+                document.querySelectorAll('.cx-opcoes-wrap.aberto').forEach(function (w) {
+                    if (w !== wrapOp) w.classList.remove('aberto');
+                });
+                wrapOp.classList.toggle('aberto');
+            }
+            return;
+        }
+        if (!e.target.closest('.cx-opcoes-wrap')) {
+            document.querySelectorAll('#tabelaAtend .cx-opcoes-wrap.aberto, #tabelaOrc .cx-opcoes-wrap.aberto').forEach(function (w) {
+                w.classList.remove('aberto');
+            });
+        }
+    });
+}
+
+function excluirDocumentoVenda(id) {
+    if (!id) return;
+    if (!confirm('Excluir esta venda? (não estorna estoque automaticamente)')) return;
+    var db2 = carregar();
+    var idEx = String(id);
+    if (canalVendas !== 'interno' && typeof marcarExcluido === 'function') marcarExcluido(db2, 'orcamentos', idEx);
+    db2.orcamentos = (db2.orcamentos || []).filter(function (x) { return String(x.id) !== idEx; });
+    db2.caixa = (db2.caixa || []).filter(function (l) { return String(l.vendaId || '') !== idEx; });
+    db2.caixaBanco = (db2.caixaBanco || []).filter(function (l) { return String(l.vendaId || '') !== idEx; });
+    db2.pendentes = (db2.pendentes || []).filter(function (l) { return String(l.vendaId || '') !== idEx; });
+    salvar(db2);
+    toast('Venda excluída.');
+    if (typeof renderHistorico === 'function') renderHistorico();
+    if (typeof renderOrcamentos === 'function') renderOrcamentos();
+    if (typeof renderCaixa === 'function') renderCaixa();
+    if (typeof renderCaixaBanco === 'function') renderCaixaBanco();
+    if (typeof renderPendentes === 'function') renderPendentes();
+    if (typeof atualizarKPIs === 'function') atualizarKPIs(db2);
+}
+
 function renderHistorico() {
+    ligarCliquesEngrenagemGlobal();
     sincronizarAssinaturasNoDb();
     var db = carregar();
     var q = (document.getElementById('buscaAtend').value || '').toLowerCase().trim();
@@ -2814,20 +2900,30 @@ function renderHistorico() {
             : '';
         var jaPago = String(a.statusPagamento || '').toUpperCase() === 'PAGO';
         var stPg = String(a.statusPagamento || '').toUpperCase();
-        var badgePago = jaPago
-            ? '<div class="badge-pago-os">PAGO · ' + esc(a.formaPagamento || '—') +
-                (a.canalRecebimento === 'interno' ? ' · Interno' : ' · Oficial') + '</div>'
-            : (stPg === 'PARCIAL'
-                ? '<div class="badge-pago-os" style="background:#7a4b00">PARCIAL · aberto ' + moeda(Number(a.saldoAberto) || 0) + '</div>'
-                : (stPg === 'PENDENTE'
-                    ? '<div class="badge-pago-os" style="background:#7a4b00">EM ABERTO · ' + moeda(Number(a.saldoAberto != null ? a.saldoAberto : a.total) || 0) + '</div>'
-                    : ''));
+        var badgePago = htmlBadgePagamentoHist(a, true);
         var btnReceber = jaPago
             ? ''
             : '<button type="button" class="btn btn-receber" data-rec="' + a.id + '">💰 Receber</button>' +
                 ((stPg !== 'PARCIAL' && stPg !== 'PENDENTE' && atendimentoEmAberto(a))
                     ? '<button type="button" class="btn btn-ok" data-fin-cx="' + a.id + '">Mandar ao caixa</button>'
                     : '');
+        var acoesOs = htmlEngrenagemAcoes(
+            '<select class="status-at-select' + (ehAgendado ? ' status-agendado' : '') +
+            '" data-st="' + a.id + '" title="Alterar status">' +
+            opcoesStatusAt(statusAtual) +
+            '</select>' +
+            btnReceber +
+            '<button type="button" class="btn btn-ver" data-ver="' + a.id + '">Ver nota</button>' +
+            '<button type="button" class="btn btn-pdf" data-pdf="' + a.id + '">PDF</button>' +
+            '<button type="button" class="btn btn-assinar" data-link="' + a.id + '">Enviar nota</button>' +
+            '<button type="button" class="btn btn-ok" data-wa-checklist="' + a.id + '" title="Checklist no WhatsApp">📱 Check</button>' +
+            '<button type="button" class="btn btn-secondary" data-wa-orc="' + a.id + '" title="Orçamento no WhatsApp">📱 Orç</button>' +
+            (atendimentoTemFotos(a)
+                ? '<button type="button" class="btn btn-secondary" data-expf="' + a.id + '">Exportar fotos</button>'
+                : '') +
+            '<button type="button" class="btn btn-secondary" data-ed="' + a.id + '">Editar</button>' +
+            '<button type="button" class="btn btn-danger" data-ex="' + a.id + '">Excluir</button>'
+        );
         var tr = document.createElement('tr');
         if (ehAgendado) tr.className = 'linha-agendada';
         tr.innerHTML =
@@ -2838,23 +2934,7 @@ function renderHistorico() {
             '<td style="color:#fff;font-weight:600">' + esc(a.carro || '—') + '</td>' +
             '<td style="color:#fff;font-weight:700">' + esc(a.placa || '—') + '</td>' +
             '<td style="color:#fff;font-weight:700">' + moeda(a.total) + '</td>' +
-            '<td class="actions">' +
-            '<select class="status-at-select' + (ehAgendado ? ' status-agendado' : '') +
-            '" data-st="' + a.id + '" title="Alterar status" style="min-width:150px;padding:6px 8px;font-size:0.75rem;font-weight:700">' +
-            opcoesStatusAt(statusAtual) +
-            '</select>' +
-            btnReceber +
-            '<button type="button" class="btn btn-ver" data-ver="' + a.id + '">Ver nota</button>' +
-            '<button type="button" class="btn btn-pdf" data-pdf="' + a.id + '">PDF</button>' +
-            '<button type="button" class="btn btn-assinar" data-link="' + a.id + '">Enviar nota</button>' +
-            '<button type="button" class="btn btn-ok" data-wa-checklist="' + a.id + '" title="Checklist no WhatsApp (texto/JPEG/PDF/assinar)">📱 Check</button>' +
-            '<button type="button" class="btn btn-secondary" data-wa-orc="' + a.id + '" title="Orçamento no WhatsApp (texto/JPEG/PDF/assinar)">📱 Orç</button>' +
-            (atendimentoTemFotos(a)
-                ? '<button type="button" class="btn btn-secondary" data-expf="' + a.id + '">Exportar fotos</button>'
-                : '') +
-            '<button type="button" class="btn btn-secondary" data-ed="' + a.id + '">Editar</button>' +
-            '<button type="button" class="btn btn-danger" data-ex="' + a.id + '">Excluir</button>' +
-            '</td>';
+            '<td class="actions cx-acoes-cell">' + acoesOs + '</td>';
         tb.appendChild(tr);
             return;
         }
@@ -2862,22 +2942,24 @@ function renderHistorico() {
         var nomeV = o.clienteNome || '—';
         var nro = o.numero ? ('Venda Nº ' + o.numero) : 'Venda';
         var tipoLbl = (o.tipo || 'VENDA') === 'ORCAMENTO' ? 'ORÇAMENTO' : 'VENDA';
-        var jaPagoV = String(o.statusPagamento || '').toUpperCase() === 'PAGO';
+        var badgePagoV = htmlBadgePagamentoHist(o, false);
+        var acoesVd = htmlEngrenagemAcoes(
+            '<button type="button" class="btn btn-ver" data-vd-ver="' + esc(o.id) + '">Ver</button>' +
+            '<button type="button" class="btn btn-secondary" data-vd-ed="' + esc(o.id) + '">Editar</button>' +
+            '<button type="button" class="btn btn-pdf" data-vd-pdf="' + esc(o.id) + '">PDF</button>' +
+            '<button type="button" class="btn btn-danger" data-vd-ex="' + esc(o.id) + '">Excluir</button>'
+        );
         var trv = document.createElement('tr');
         trv.innerHTML =
             '<td style="color:#fff;font-weight:600">' + esc(fmtData(o.dataEmissao || o.criadoEm)) + '</td>' +
             '<td style="color:#fff;font-weight:800">' + esc(nomeV) +
             ' <span style="font-size:0.68rem;font-weight:700;color:#f1c40f">' + esc(tipoLbl) + '</span>' +
-            (jaPagoV ? '<div class="badge-pago-os">PAGO · ' + esc(o.formaPagamento || '—') + '</div>' : '') +
+            badgePagoV +
             '</td>' +
             '<td style="color:#fff;font-weight:600">' + esc(nro) + '</td>' +
             '<td style="color:#fff;font-weight:700">' + esc(o.placa || '—') + '</td>' +
             '<td style="color:#fff;font-weight:700">' + moeda(o.valor || o.total || 0) + '</td>' +
-            '<td class="actions">' +
-            '<button type="button" class="btn btn-ver" data-vd-ver="' + esc(o.id) + '">Ver</button>' +
-            '<button type="button" class="btn btn-secondary" data-vd-ed="' + esc(o.id) + '">Editar</button>' +
-            '<button type="button" class="btn btn-pdf" data-vd-pdf="' + esc(o.id) + '">PDF</button>' +
-            '</td>';
+            '<td class="actions cx-acoes-cell">' + acoesVd + '</td>';
         tb.appendChild(trv);
     });
     tb.querySelectorAll('[data-st]').forEach(function (sel) {
@@ -2922,6 +3004,10 @@ function renderHistorico() {
     tb.querySelectorAll('[data-vd-pdf]').forEach(function (b) {
         b.addEventListener('click', function () { imprimirDocumentoVenda(b.getAttribute('data-vd-pdf')); });
     });
+    tb.querySelectorAll('[data-vd-ex]').forEach(function (b) {
+        b.addEventListener('click', function () { excluirDocumentoVenda(b.getAttribute('data-vd-ex')); });
+    });
+    ligarCliquesEngrenagemGlobal();
     renderCarrosEmAberto(db);
 }
 
@@ -5115,6 +5201,7 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
 });
 
 function renderOrcamentos() {
+    ligarCliquesEngrenagemGlobal();
     var db = carregar();
     var tb = document.getElementById('tabelaOrc');
     tb.innerHTML = '';
@@ -5153,7 +5240,12 @@ function renderOrcamentos() {
             '<button type="button" class="btn btn-pdf" data-orc-pdf="' + esc(o.id) + '">PDF</button>' +
             '<button type="button" class="btn btn-secondary" data-orc-edit="' + esc(o.id) + '">Editar</button>' +
             '<button type="button" class="btn btn-danger" data-ex="' + esc(o.id) + '">Excluir</button>';
-        tr.querySelector('.cx-acoes-cell').appendChild(wrap);
+        var cellOrc = tr.querySelector('.cx-acoes-cell');
+        if (typeof compactarAcoesOpcoesNota === 'function') {
+            cellOrc.appendChild(compactarAcoesOpcoesNota(wrap));
+        } else {
+            cellOrc.appendChild(wrap);
+        }
         tb.appendChild(tr);
     });
     if (!tb._orcClickLigado) {
@@ -5170,20 +5262,7 @@ function renderOrcamentos() {
             if (b) { editarDocumentoVenda(b.getAttribute('data-orc-edit')); return; }
             b = e.target.closest('[data-ex]');
             if (!b) return;
-            if (!confirm('Excluir documento? (não estorna estoque automaticamente)')) return;
-            var db2 = carregar();
-            var idEx = b.getAttribute('data-ex');
-            if (canalVendas !== 'interno') marcarExcluido(db2, 'orcamentos', idEx);
-            db2.orcamentos = (db2.orcamentos || []).filter(function (x) { return x.id !== idEx; });
-            db2.caixa = (db2.caixa || []).filter(function (l) { return String(l.vendaId || '') !== String(idEx); });
-            db2.caixaBanco = (db2.caixaBanco || []).filter(function (l) { return String(l.vendaId || '') !== String(idEx); });
-            db2.pendentes = (db2.pendentes || []).filter(function (l) { return String(l.vendaId || '') !== String(idEx); });
-            salvar(db2);
-            renderOrcamentos();
-            renderCaixa();
-            renderCaixaBanco();
-            renderPendentes();
-            atualizarKPIs(db2);
+            excluirDocumentoVenda(b.getAttribute('data-ex'));
         });
     }
 }

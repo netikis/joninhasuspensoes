@@ -1268,6 +1268,31 @@
 
         .actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .actions .btn { padding: 6px 10px; font-size: 0.75rem; }
+        #tabelaAtend td.actions,
+        #tabelaOrc td.actions {
+            overflow: visible;
+            width: 56px;
+            text-align: right;
+            vertical-align: middle;
+        }
+        #painelHistorico .box {
+            overflow: visible;
+        }
+        .hist-acoes-menu {
+            min-width: 214px;
+            max-height: min(70vh, 440px);
+            overflow-y: auto;
+        }
+        .hist-acoes-menu .btn,
+        .hist-acoes-menu select {
+            width: 100%;
+            justify-content: flex-start;
+        }
+        .hist-acoes-menu select {
+            min-height: 36px;
+            font-weight: 700;
+            font-size: 0.78rem;
+        }
 
         .muted { color: var(--muted); font-size: 0.85rem; }
         .hint {
@@ -1843,14 +1868,17 @@
         }
         .badge-pago-os {
             display: inline-block;
-            margin-top: 4px;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.68rem;
-            font-weight: 700;
-            background: rgba(39, 174, 96, 0.2);
-            color: #2ecc71;
-            border: 1px solid rgba(39, 174, 96, 0.45);
+            margin-top: 6px;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            line-height: 1.25;
+            background: #000 !important;
+            color: #fff !important;
+            border: 1px solid #000;
+            max-width: 100%;
         }
         .badge-agendado {
             display: inline-block;
