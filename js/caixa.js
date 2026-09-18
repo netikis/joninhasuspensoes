@@ -25,7 +25,16 @@ function formaEhDigitalCx(forma) {
 }
 
 function dataLancISO(x) {
-    return String(x && (x.criadoEm || x.data) || '').slice(0, 10);
+    return String(x && (x.data || x.criadoEm) || '').slice(0, 10);
+}
+
+function ordenarLancamentosPorData(lista) {
+    return (lista || []).slice().sort(function (a, b) {
+        var da = dataLancISO(a);
+        var dbd = dataLancISO(b);
+        if (da !== dbd) return String(dbd).localeCompare(String(da));
+        return String(b.criadoEm || b.id || '').localeCompare(String(a.criadoEm || a.id || ''));
+    });
 }
 
 function renderResumoCaixaHoje() {
@@ -433,7 +442,7 @@ function renderCaixa() {
     renderResumoCaixaHoje();
 
     var q = ((document.getElementById('buscaCaixaBalcao') && document.getElementById('buscaCaixaBalcao').value) || '').toLowerCase().trim();
-    var listaFiltrada = lista.slice().reverse().filter(function (x) {
+    var listaFiltrada = ordenarLancamentosPorData(lista).filter(function (x) {
         if (!q) return true;
         var dataLanc = fmtData(x.criadoEm);
         var venc = x.vencimento ? fmtData(x.vencimento) : dataLanc;
@@ -828,7 +837,7 @@ function renderCaixaBanco() {
         gerarArvorePastasCaixa({ elId: 'arvorePastasBanco', filtro: 'banco', idPrefix: 'pasta_ban' });
     }
     var qBk = ((document.getElementById('buscaCaixaBanco') && document.getElementById('buscaCaixaBanco').value) || '').toLowerCase().trim();
-    var listaFiltradaBk = lista.slice().reverse().filter(function (x) {
+    var listaFiltradaBk = ordenarLancamentosPorData(lista).filter(function (x) {
         if (!qBk) return true;
         var blob = [numDocCaixaFh(x), clienteCaixaFh(x), x.descricao, x.forma, x.tipo, fmtData(x.criadoEm)].join(' ').toLowerCase();
         return blob.indexOf(qBk) > -1;

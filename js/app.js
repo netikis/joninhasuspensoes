@@ -2772,7 +2772,36 @@ function renderHistorico() {
     tb.innerHTML = '';
     if (!listaOs.length && !listaVendas.length) { vazio.style.display = ''; renderCarrosEmAberto(db); return; }
     vazio.style.display = 'none';
+    var linhasHist = [];
     listaOs.forEach(function (a) {
+        linhasHist.push({
+            ag: (a.status || '') === 'Agendado' ? 0 : 1,
+            data: (a.status || '') === 'Agendado'
+                ? String(a.agendadoPara || '9999-99-99')
+                : String(a.entrada || a.criadoEm || '').slice(0, 10),
+            hora: String(a.entrada || a.criadoEm || ''),
+            kind: 'os',
+            item: a
+        });
+    });
+    listaVendas.forEach(function (o) {
+        linhasHist.push({
+            ag: 1,
+            data: String(o.dataEmissao || o.criadoEm || '').slice(0, 10),
+            hora: String(o.dataEmissao || o.criadoEm || ''),
+            kind: 'vd',
+            item: o
+        });
+    });
+    linhasHist.sort(function (a, b) {
+        if (a.ag !== b.ag) return a.ag - b.ag;
+        if (a.ag === 0) return String(a.data).localeCompare(String(b.data));
+        if (a.data !== b.data) return String(b.data).localeCompare(String(a.data));
+        return String(b.hora).localeCompare(String(a.hora));
+    });
+    linhasHist.forEach(function (row) {
+        if (row.kind === 'os') {
+        var a = row.item;
         var nome = nomeAtendimento(db, a);
         var tagAvulso = a.clienteAvulso
             ? ' <span style="font-size:0.68rem;font-weight:700;color:#8fe0b8">AVULSO</span>'
@@ -2827,8 +2856,9 @@ function renderHistorico() {
             '<button type="button" class="btn btn-danger" data-ex="' + a.id + '">Excluir</button>' +
             '</td>';
         tb.appendChild(tr);
-    });
-    listaVendas.forEach(function (o) {
+            return;
+        }
+        var o = row.item;
         var nomeV = o.clienteNome || '—';
         var nro = o.numero ? ('Venda Nº ' + o.numero) : 'Venda';
         var tipoLbl = (o.tipo || 'VENDA') === 'ORCAMENTO' ? 'ORÇAMENTO' : 'VENDA';
@@ -3118,7 +3148,7 @@ function confirmarRecebimentoOs() {
                 totalOs: tot.totalFinal,
                 entrada: a.entrada || a.criadoEm || ''
             },
-            criadoEm: agoraIso
+            criadoEm: isoComDataLocal(a.entrada || hojeISO())
         };
         if (formaPagamentoEhDigital(r.forma)) {
             if (!dbCx.caixaBanco) dbCx.caixaBanco = [];
@@ -3146,7 +3176,7 @@ function confirmarRecebimentoOs() {
             atendimentoId: a.id,
             formaPrevista: ehBoleto ? 'Boleto' : (formas.join(' + ') || ''),
             ehBoleto: ehBoleto,
-            criadoEm: agoraIso
+            criadoEm: isoComDataLocal(a.entrada || hojeISO())
         });
     }
     salvar(dbCx);
@@ -4790,7 +4820,9 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
         placa: placa,
         statusPagamento: status,
         formaPagamento: forma,
-        dataEmissao: document.getElementById('vdEmissao').value,
+        dataEmissao: dataISODia(document.getElementById('vdEmissao').value)
+            || dataISODia(editando && docExistente && docExistente.dataEmissao)
+            || hojeISO(),
         dataVencimento: document.getElementById('vdVenc').value,
         itens: carrinhoVenda.slice(),
         subtotal: totais.subtotal,
@@ -4804,7 +4836,11 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
         troco: totais.troco,
         observacao: document.getElementById('vdObs').value.trim(),
         descricao: carrinhoVenda.map(function (x) { return x.desc; }).join(', '),
-        criadoEm: editando ? (docExistente.criadoEm || new Date().toISOString()) : new Date().toISOString(),
+        criadoEm: isoComDataLocal(
+            dataISODia(document.getElementById('vdEmissao').value)
+            || dataISODia(editando && docExistente && docExistente.dataEmissao)
+            || hojeISO()
+        ),
         atualizadoEm: new Date().toISOString()
     };
     if (!db.orcamentos) db.orcamentos = [];
@@ -4851,7 +4887,7 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
                 valor: Number(r.valor) || 0,
                 forma: r.forma || forma,
                 vendaId: doc.id,
-                criadoEm: new Date().toISOString()
+                criadoEm: isoComDataLocal(doc.dataEmissao)
             };
             if (formaPagamentoEhDigital(lanc.forma)) {
                 if (!db.caixaBanco) db.caixaBanco = [];
@@ -4879,7 +4915,7 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
                 vendaId: doc.id,
                 formaPrevista: forma,
                 ehBoleto: String(forma || '').toLowerCase().indexOf('boleto') >= 0,
-                criadoEm: new Date().toISOString()
+                criadoEm: isoComDataLocal(doc.dataEmissao)
             });
         }
     }
@@ -4919,7 +4955,9 @@ function renderOrcamentos() {
         tb.innerHTML = '<tr><td colspan="7" class="muted">Nenhum documento.</td></tr>';
         return;
     }
-    db.orcamentos.slice().reverse().forEach(function (o) {
+    db.orcamentos.slice().sort(function (a, b) {
+        return String(b.dataEmissao || b.criadoEm || '').localeCompare(String(a.dataEmissao || a.criadoEm || ''));
+    }).forEach(function (o) {
         var nome = o.funcionarioNome || o.clienteNome || nomeCliente(db, o.clienteId) || '—';
         var tagAvulso = o.clienteAvulso ? ' <span style="font-size:0.68rem;font-weight:700;color:#8fe0b8">AVULSO</span>' : '';
         var tagFunc = o.vendaFuncionario || o.funcionarioId
@@ -5217,6 +5255,9 @@ function montarAtendimentoDoFormulario() {
     var id = document.getElementById('atId').value;
     var tots = totaisItens(itensTemp);
     var base = id ? (db.atendimentos || []).find(function (x) { return x.id === id; }) : null;
+    var dataEntrada = dataISODia(document.getElementById('atEntrada').value)
+        || dataISODia(base && base.entrada)
+        || hojeISO();
     var a = {
         id: id || ('temp_' + Date.now()),
         clienteId: resolvido.ok ? resolvido.clienteId : '',
@@ -5232,7 +5273,7 @@ function montarAtendimentoDoFormulario() {
         anoModelo: document.getElementById('atAnoModelo').value.trim(),
         chassi: document.getElementById('atChassi').value.trim(),
         km: document.getElementById('atKm').value,
-        entrada: document.getElementById('atEntrada').value || hojeISO(),
+        entrada: dataEntrada,
         saida: document.getElementById('atSaida').value,
         status: document.getElementById('atStatus').value,
         agendadoPara: document.getElementById('atAgendadoPara').value || '',
@@ -5252,7 +5293,7 @@ function montarAtendimentoDoFormulario() {
         tokenAssinatura: base ? base.tokenAssinatura : null,
         assinaturaCliente: base ? base.assinaturaCliente : null,
         assinadoEm: base ? base.assinadoEm : null,
-        criadoEm: (base && base.criadoEm) || new Date().toISOString()
+        criadoEm: isoComDataLocal(dataEntrada)
     };
     if (typeof preservarFinanceiroOs === 'function') a = preservarFinanceiroOs(a, base);
     var wa = obterTelefoneWhatsAppOs();
@@ -5423,6 +5464,10 @@ function salvarAtendimentoRapidoParaEnvio() {
     }
     var id = document.getElementById('atId').value;
     var tots = totaisItens(itensTemp);
+    var existenteRapido = id ? (db.atendimentos || []).find(function (a) { return a && a.id === id; }) : null;
+    var dataEntradaRap = dataISODia(document.getElementById('atEntrada').value)
+        || dataISODia(existenteRapido && existenteRapido.entrada)
+        || hojeISO();
     var payload = {
         id: id || uid(),
         clienteId: resolvido.clienteId,
@@ -5438,7 +5483,7 @@ function salvarAtendimentoRapidoParaEnvio() {
         anoModelo: document.getElementById('atAnoModelo').value.trim(),
         chassi: document.getElementById('atChassi').value.trim(),
         km: document.getElementById('atKm').value,
-        entrada: document.getElementById('atEntrada').value || hojeISO(),
+        entrada: dataEntradaRap,
         saida: document.getElementById('atSaida').value,
         status: document.getElementById('atStatus').value,
         agendadoPara: document.getElementById('atAgendadoPara').value || '',
@@ -5455,9 +5500,9 @@ function salvarAtendimentoRapidoParaEnvio() {
         custoPecas: tots.custoPecas,
         ganhoPecas: tots.ganhoPecas,
         total: tots.total,
-        atualizadoEm: new Date().toISOString()
+        atualizadoEm: new Date().toISOString(),
+        criadoEm: isoComDataLocal(dataEntradaRap)
     };
-    var existenteRapido = id ? (db.atendimentos || []).find(function (a) { return a && a.id === id; }) : null;
     if (typeof preservarFinanceiroOs === 'function') payload = preservarFinanceiroOs(payload, existenteRapido);
     var wa = obterTelefoneWhatsAppOs();
     if (wa) {
@@ -5474,11 +5519,9 @@ function salvarAtendimentoRapidoParaEnvio() {
             }
             db.atendimentos[i] = Object.assign({}, db.atendimentos[i], payload);
         } else {
-            payload.criadoEm = new Date().toISOString();
             db.atendimentos.push(payload);
         }
     } else {
-        payload.criadoEm = new Date().toISOString();
         db.atendimentos.push(payload);
     }
     limparExcluido(db, 'atendimentos', payload.id);

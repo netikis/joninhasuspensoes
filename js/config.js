@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.3.42';
+var APP_VERSION = '1.3.43';
 
 function rotuloBuildApp() {
     var v = String(APP_VERSION || '');
@@ -11,6 +11,17 @@ function rotuloBuildApp() {
 
 function textoBuildApp() {
     return 'Build ' + rotuloBuildApp();
+}
+
+function dataISODia(ymd) {
+    var d = String(ymd || '').slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '';
+}
+
+function isoComDataLocal(ymd) {
+    var d = dataISODia(ymd);
+    if (!d) return new Date().toISOString();
+    return d + 'T12:00:00.000';
 }
 var STORAGE_KEY = 'joninha_suspensoes_v1';
 var STORAGE_INTERNO = 'joninha_suspensoes_interno_v1';

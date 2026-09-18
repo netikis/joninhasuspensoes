@@ -837,6 +837,10 @@ async function salvarAtendimentoAtual() {
         return;
     }
     var id = document.getElementById('atId').value;
+    var existente = id ? (db.atendimentos || []).find(function (a) { return a && String(a.id) === String(id); }) : null;
+    var dataEntrada = dataISODia(document.getElementById('atEntrada').value)
+        || dataISODia(existente && existente.entrada)
+        || (typeof hojeISO === 'function' ? hojeISO() : dataISODia(new Date().toISOString()));
     itensTemp.forEach(function (it) {
         if (!it) return;
         if ((it.tipo || 'peca') !== 'mao') {
@@ -879,7 +883,7 @@ async function salvarAtendimentoAtual() {
         anoModelo: document.getElementById('atAnoModelo').value.trim(),
         chassi: document.getElementById('atChassi').value.trim(),
         km: document.getElementById('atKm').value,
-        entrada: document.getElementById('atEntrada').value,
+        entrada: dataEntrada,
         saida: document.getElementById('atSaida').value,
         status: document.getElementById('atStatus').value,
         agendadoPara: document.getElementById('atAgendadoPara').value || '',
@@ -896,9 +900,9 @@ async function salvarAtendimentoAtual() {
         custoPecas: tots.custoPecas,
         ganhoPecas: tots.ganhoPecas,
         total: tots.total,
-        atualizadoEm: new Date().toISOString()
+        atualizadoEm: new Date().toISOString(),
+        criadoEm: isoComDataLocal(dataEntrada)
     };
-    var existente = id ? (db.atendimentos || []).find(function (a) { return a && a.id === id; }) : null;
     payload = preservarFinanceiroOs(payload, existente);
 
     var btn = document.getElementById('btnSalvarAt');
@@ -925,7 +929,6 @@ async function salvarAtendimentoAtual() {
             if (i >= 0) db.atendimentos[i] = Object.assign({}, db.atendimentos[i], payload);
             else db.atendimentos.push(payload);
         } else {
-            payload.criadoEm = new Date().toISOString();
             db.atendimentos.push(payload);
         }
         limparExcluido(db, 'atendimentos', payload.id);
