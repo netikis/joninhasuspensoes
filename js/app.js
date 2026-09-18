@@ -1177,9 +1177,10 @@ function atualizarKPIs(db) {
 
 function atendimentoEmAberto(a) {
     if (!a) return false;
+    if (a.enviadoAoCaixa) return false;
     if (String(a.statusPagamento || '').toUpperCase() === 'PAGO') return false;
     var st = a.status || 'Em andamento';
-    if (st === 'Entregue' || st === 'Agendado') return false;
+    if (st === 'Entregue' || st === 'Agendado' || st === 'Pronto') return false;
     return true;
 }
 
@@ -1237,15 +1238,17 @@ function finalizarEMandarAoCaixa(id) {
         editarAtendimento(id);
         return;
     }
-    if ((a.status || '') === 'Em andamento' || (a.status || '') === 'Aguardando peça' || !a.status) {
+    a.enviadoAoCaixa = true;
+    if ((a.status || '') !== 'Entregue') {
         a.status = 'Pronto';
         a.saida = a.saida || hojeISO();
-        a.atualizadoEm = new Date().toISOString();
-        db.atendimentos[i] = a;
-        if (typeof salvarMain === 'function') salvarMain(db);
-        else salvar(db);
     }
+    a.atualizadoEm = new Date().toISOString();
+    db.atendimentos[i] = a;
+    if (typeof salvarMain === 'function') salvarMain(db);
+    else salvar(db);
     renderCarrosEmAberto(db);
+    if (typeof atualizarKPIs === 'function') atualizarKPIs(db);
     renderHistorico();
     abrirModalReceberOs(id);
 }
@@ -1278,7 +1281,7 @@ function montarLinhasRelatorioServicos(tipo) {
                 data: l.data,
                 tipo: l.origem === 'VENDA' ? ('Venda' + (l.numero != null ? ' Nº ' + l.numero : '')) : 'OS',
                 cliente: l.cliente,
-                carro: '',
+                carro: l.carro || '',
                 placa: (l.placa || '—').toUpperCase(),
                 valor: l.total,
                 atendimentoId: l.atendimentoId || '',
@@ -1291,14 +1294,22 @@ function montarLinhasRelatorioServicos(tipo) {
         (lista || []).forEach(function (x) {
             if (!x || x.tipo === 'saida') return;
             var os = x.osResumo || {};
+            var atId = x.atendimentoId || '';
+            var at = atId ? (db.atendimentos || []).find(function (y) { return y && String(y.id) === String(atId); }) : null;
+            if (!at && typeof acharAtendimentoPorId === 'function') {
+                at = acharAtendimentoPorId(atId, os.placa || x.descricao);
+            }
+            var placa = (os.placa || (at && at.placa) || (typeof placaDeTextoLivre === 'function' ? placaDeTextoLivre(x.descricao) : '') || '—').toUpperCase();
+            var carro = os.carro || (at && at.carro) || '';
+            var cliente = os.cliente || (at && typeof nomeAtendimento === 'function' ? nomeAtendimento(db, at) : '') || x.descricao || '—';
             linhas.push({
                 data: x.criadoEm,
-                tipo: (x.atendimentoId || x.origemOficina) ? 'OS' : (origem || x.forma || 'Entrada'),
-                cliente: os.cliente || x.descricao || '—',
-                carro: os.carro || '',
-                placa: (os.placa || '—').toUpperCase(),
+                tipo: (x.atendimentoId || x.origemOficina || at) ? 'OS' : (origem || x.forma || 'Entrada'),
+                cliente: cliente,
+                carro: carro,
+                placa: placa,
                 valor: Number(x.valor) || 0,
-                atendimentoId: x.atendimentoId || '',
+                atendimentoId: atId || (at && at.id) || '',
                 vendaId: x.orcamentoId || x.vendaId || ''
             });
         });
@@ -1314,8 +1325,8 @@ function montarLinhasRelatorioServicos(tipo) {
 function abrirDocumentoServico(linha) {
     var overlay = document.getElementById('modalRelatorioServicos');
     if (overlay) overlay.classList.remove('aberto');
-    if (linha.atendimentoId && typeof editarAtendimento === 'function') {
-        editarAtendimento(linha.atendimentoId);
+    if ((linha.atendimentoId || (linha.placa && linha.placa !== '—')) && typeof editarAtendimento === 'function') {
+        editarAtendimento(linha.atendimentoId, linha.placa || linha.cliente);
         return;
     }
     if (linha.vendaId && typeof editarDocumentoVenda === 'function') {
@@ -2323,7 +2334,8 @@ document.getElementById('btnExportarFotosForm').addEventListener('click', functi
 async function abrirNota(id) {
     sincronizarAssinaturasNoDb();
     var db = carregar();
-    var a = db.atendimentos.find(function (x) { return x.id === id; });
+    var a = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(id); });
+    if (!a && typeof acharAtendimentoPorId === 'function') a = acharAtendimentoPorId(id);
     if (!a) { toast('Atendimento não encontrado.'); return; }
 
     if (!a.assinaturaCliente) {
@@ -2332,7 +2344,7 @@ async function abrirNota(id) {
             await sincronizarAssinaturaDoAtendimento(id);
         } catch (eAss) { /* offline */ }
         db = carregar();
-        a = db.atendimentos.find(function (x) { return x.id === id; }) || a;
+        a = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(id); }) || a;
     }
 
     atendimentoNotaAtual = a;
@@ -3074,10 +3086,11 @@ function confirmarRecebimentoOs() {
     a.dataVencimento = venc;
     a.recebidoEm = agoraIso;
     a.atualizadoEm = agoraIso;
+    a.enviadoAoCaixa = true;
     if (status === 'PAGO') {
         if ((a.status || '') !== 'Entregue') a.status = 'Entregue';
         if (!a.saida) a.saida = hojeISO();
-    } else if ((a.status || '') === 'Em andamento' || (a.status || '') === 'Aguardando peça' || !a.status) {
+    } else if ((a.status || '') !== 'Entregue') {
         a.status = 'Pronto';
         a.saida = a.saida || hojeISO();
     }
@@ -3126,7 +3139,7 @@ function confirmarRecebimentoOs() {
             id: uid(),
             cliente: nome,
             clienteId: a.clienteId || null,
-            descricao: 'OS ' + placa + ' — saldo em aberto',
+            descricao: 'OS ' + placa + (nome && nome !== '—' ? ' · ' + nome : '') + ' — saldo em aberto',
             valor: +tot.aberto.toFixed(2),
             vencimento: venc,
             status: 'aberto',
@@ -3149,7 +3162,10 @@ function confirmarRecebimentoOs() {
     renderPendentes();
     renderRelatorioCaixa();
     renderRelatorioOficina();
-    atualizarKPIs(carregar());
+    atualizarKPIs(typeof carregarMain === 'function' ? carregarMain() : carregar());
+    if (typeof renderCarrosEmAberto === 'function') {
+        renderCarrosEmAberto(typeof carregarMain === 'function' ? carregarMain() : carregar());
+    }
     var msgStatus = status === 'PAGO'
         ? 'OS baixada (pago).'
         : (status === 'PARCIAL'
@@ -5833,6 +5849,7 @@ function calcularRelatorioOficina(periodo) {
             data: d,
             cliente: a.clienteNome || nomeAtendimento(db, a),
             placa: a.placa || '',
+            carro: a.carro || '',
             pecas: t.pecas,
             ganho: t.ganhoPecas,
             mao: t.mao,

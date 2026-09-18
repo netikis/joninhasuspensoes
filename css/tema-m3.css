@@ -710,11 +710,20 @@ tr.row-click:hover { background: #e2e8f0; }
 
 .box .os-itens-total-linha span,
 .box .os-itens-total-linha strong {
-    color: #334155 !important;
+    color: #0f172a !important;
     font-weight: 800;
 }
 .box .os-itens-total-final span {
-    color: #152642 !important;
+    color: #0f172a !important;
+    font-weight: 800;
+}
+.box .total-line,
+.box .total-line span,
+.box .total-line strong,
+.box .total-line .muted,
+#atSubPecas,
+#atSubMao {
+    color: #0f172a !important;
     font-weight: 800;
 }
 .box .os-itens-total-final strong,

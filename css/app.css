@@ -615,13 +615,19 @@
 
         .box .total-line,
         .box .total-line span,
-        .box .total-line strong {
-            color: #152642 !important;
+        .box .total-line strong,
+        .box .total-line .muted {
+            color: #0f172a !important;
             font-weight: 800;
         }
         .box .total-line #atTotal {
             color: #0f7a3f !important;
             font-size: 1.45rem;
+        }
+        #atSubPecas,
+        #atSubMao {
+            color: #0f172a !important;
+            font-weight: 800;
         }
         .os-itens-total {
             margin-top: 14px;
@@ -634,14 +640,14 @@
             display: flex;
             justify-content: space-between;
             gap: 12px;
-            font-weight: 700;
-            color: #334155;
+            font-weight: 800;
+            color: #0f172a;
             margin-bottom: 4px;
-            font-size: 0.95rem;
+            font-size: 1.02rem;
         }
         .box .os-itens-total-linha span,
         .box .os-itens-total-linha strong {
-            color: #334155 !important;
+            color: #0f172a !important;
             font-weight: 800;
         }
         .os-itens-total-final {
@@ -1978,9 +1984,9 @@
             margin-top: 10px;
             padding-top: 8px;
             border-top: 1px solid rgba(201, 162, 39, 0.45);
-            font-size: 0.82rem;
-            font-weight: 700;
-            color: #1e293b;
+            font-size: 0.92rem;
+            font-weight: 800;
+            color: #0f172a;
             line-height: 1.5;
         }
         .alerta-vencidos-30 {

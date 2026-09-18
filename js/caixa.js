@@ -1073,6 +1073,17 @@ function renderPendentes() {
     }
     lista.slice().reverse().forEach(function (p) {
         var tr = document.createElement('tr');
+        var descExibir = p.descricao || '';
+        if (p.atendimentoId) {
+            var osPend = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(p.atendimentoId); });
+            var placaPend = (osPend && osPend.placa)
+                ? String(osPend.placa).toUpperCase()
+                : (typeof placaDeTextoLivre === 'function' ? placaDeTextoLivre(descExibir) : '');
+            var nomePend = p.cliente || '';
+            if (!descExibir || /^OS\b/i.test(descExibir) || /saldo em aberto/i.test(descExibir)) {
+                descExibir = 'OS ' + (placaPend || 'sem placa') + (nomePend ? ' · ' + nomePend : '') + ' — saldo em aberto';
+            }
+        }
         var acoesDoc = p.vendaId
             ? '<button type="button" class="btn btn-secondary" data-cx-ver-vd="' + esc(p.vendaId) + '">Ver</button>' +
               '<button type="button" class="btn btn-secondary" data-cx-imp-vd="' + esc(p.vendaId) + '">Imprimir</button>' +
@@ -1090,16 +1101,18 @@ function renderPendentes() {
             if (!isNaN(dv.getTime())) atraso = Math.floor((hj.getTime() - dv.getTime()) / 86400000);
         }
         var vencHtml = esc(fmtData(p.vencimento));
-        if (atraso >= 30) vencHtml += ' <span style="color:#ffb4b4;font-weight:800">30+ dias vencido</span>';
-        else if (atraso > 0) vencHtml += ' <span style="color:#fbbf24;font-weight:800">Vencido</span>';
+        if (atraso >= 30) vencHtml += ' <span style="color:#b91c1c;font-weight:800">30+ dias vencido</span>';
+        else if (atraso > 0) vencHtml += ' <span style="color:#b45309;font-weight:800">Vencido</span>';
+        var recAvulso = p.atendimentoId
+            ? ''
+            : '<button type="button" class="btn btn-ok" data-rec-b="' + p.id + '">Receber balcão</button>' +
+              '<button type="button" class="btn btn-primary" data-rec-k="' + p.id + '">Receber banco</button>';
         tr.innerHTML =
             '<td>' + esc(p.cliente) + '</td>' +
-            '<td>' + esc(p.descricao) + '</td>' +
+            '<td>' + esc(descExibir) + '</td>' +
             '<td>' + vencHtml + '</td>' +
             '<td>' + moeda(p.valor) + '</td>' +
-            '<td class="actions"><div class="cx-acoes-fh">' + acoesDoc +
-            '<button type="button" class="btn btn-ok" data-rec-b="' + p.id + '">Receber balcão</button>' +
-            '<button type="button" class="btn btn-primary" data-rec-k="' + p.id + '">Receber banco</button>' +
+            '<td class="actions"><div class="cx-acoes-fh">' + acoesDoc + recAvulso +
             '<button type="button" class="btn btn-danger" data-ex="' + p.id + '">Excluir</button>' +
             '</div></td>';
         tb.appendChild(tr);

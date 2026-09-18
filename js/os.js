@@ -1,6 +1,45 @@
 'use strict';
 /* Joninha — OS / atendimento / fotos (etapa 2.2) */
 
+function placaDeTextoLivre(txt) {
+    var u = String(txt || '').toUpperCase();
+    var m = u.match(/\b([A-Z]{3}\d[A-Z0-9]\d{2})\b/) || u.match(/\b([A-Z]{3}\d{4})\b/);
+    return m ? m[1] : '';
+}
+
+function acharAtendimentoPorId(id, placaHint) {
+    var hit = acharAtendimentoComDb(id, placaHint);
+    return hit ? hit.a : null;
+}
+
+function acharAtendimentoComDb(id, placaHint) {
+    function buscar(db) {
+        if (!db) return null;
+        var lista = db.atendimentos || [];
+        var alvo = String(id || '').trim();
+        var a = alvo ? lista.find(function (x) { return x && String(x.id) === alvo; }) : null;
+        if (!a) {
+            var pl = placaDeTextoLivre(placaHint);
+            if (pl) {
+                var hits = lista.filter(function (x) {
+                    return x && placaDeTextoLivre(x.placa) === pl;
+                });
+                if (hits.length) {
+                    hits.sort(function (x, y) {
+                        return String(y.atualizadoEm || y.criadoEm || '').localeCompare(String(x.atualizadoEm || x.criadoEm || ''));
+                    });
+                    a = hits[0];
+                }
+            }
+        }
+        return a ? { a: a, db: db } : null;
+    }
+    var r = buscar(typeof carregar === 'function' ? carregar() : null);
+    if (r) return r;
+    if (typeof carregarMain === 'function') return buscar(carregarMain());
+    return null;
+}
+
 /* ---------- Atendimento / veículo ---------- */
 function atualizarPlaca() {
     var placa = (document.getElementById('atPlaca').value || 'PLACA').toUpperCase();
@@ -548,10 +587,10 @@ function atualizarPreviewComissaoMao() {
         var faixaLbl = rotuloTipoMaoComissao(tipo);
         if (!(dados.valorFixo > 0)) {
             el.textContent = (dados.nome || 'Funcionário') + ' — sem R$ de ' + faixaLbl.toLowerCase() + ' no cadastro.';
-            el.style.color = '#ffb4b4';
+            el.style.color = '#b91c1c';
             return;
         }
-        el.style.color = '#8fe0b8';
+        el.style.color = '#14532d';
         el.textContent = (dados.nome || 'Funcionário') + ' · ' + faixaLbl + ' — recebe ' +
             moeda(dados.valorFixo) + ' (valor fixo do cadastro)';
         return;
@@ -559,10 +598,10 @@ function atualizarPreviewComissaoMao() {
     var com = calcularValorComissaoMao(valor, dados.pct);
     if (!dados.pct) {
         el.textContent = (dados.nome || 'Funcionário') + ' — sem % de ' + rotuloTipoMaoComissao(tipo) + ' no cadastro.';
-        el.style.color = '#ffb4b4';
+        el.style.color = '#b91c1c';
         return;
     }
-    el.style.color = '#8fe0b8';
+    el.style.color = '#14532d';
     el.textContent = (dados.nome || 'Funcionário') + ' · ' + rotuloTipoMaoComissao(tipo) +
         ' — comissão agora: ' + moeda(com) + ' (salva no mês em Comissões)';
 }
@@ -943,10 +982,14 @@ async function salvarAtendimentoAtual() {
     }
 })();
 
-function editarAtendimento(id) {
-    var db = carregar();
-    var a = db.atendimentos.find(function (x) { return x.id === id; });
-    if (!a) return;
+function editarAtendimento(id, placaHint) {
+    var hit = acharAtendimentoComDb(id, placaHint);
+    if (!hit || !hit.a) {
+        toast('OS não encontrada.');
+        return;
+    }
+    var a = hit.a;
+    var db = hit.db;
     abrirPainel('painelVeiculo');
     document.getElementById('atId').value = a.id;
     document.getElementById('atClienteId').value = a.clienteId || '';
@@ -960,7 +1003,7 @@ function editarAtendimento(id) {
     }
     document.getElementById('atResponsavel').value = a.responsavel || '';
     document.getElementById('atCarro').value = a.carro || '';
-    document.getElementById('atPlaca').value = a.placa || '';
+    document.getElementById('atPlaca').value = a.placa || placaDeTextoLivre(placaHint) || '';
     document.getElementById('atCidadePlaca').value = a.cidadePlaca || '';
     document.getElementById('atCor').value = a.cor || '';
     document.getElementById('atAnoFabricacao').value = a.anoFabricacao || '';
@@ -1022,6 +1065,12 @@ function editarAtendimento(id) {
     renderItens();
     carregarFotosNoForm(a.fotos);
     atualizarPlaca();
+    setTimeout(function () {
+        var alvo = document.getElementById('listaItens');
+        if (alvo && itensTemp && itensTemp.length) {
+            try { alvo.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (eScr) { /* ok */ }
+        }
+    }, 80);
 }
 
 function excluirAtendimento(id) {
