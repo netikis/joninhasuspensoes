@@ -1,0 +1,14 @@
+---
+description: Enviar ao GitHub/Vercel após cada atualização, sem pedir.
+alwaysApply: true
+---
+
+# Envio automático
+
+Depois de concluir uma atualização do sistema (layout, correção, função), faça commit e `git push origin main` **sem perguntar**. O Vercel publica pelo `main`.
+
+- Não peça “faça o envio”.
+- Não commitar `.env`, `firebase-env.js`, `FIREBASE CHAVE.txt`, vídeos, nem a pasta `audios que não deve subir pro GITHUB E VERCEL/`.
+- PowerShell: use `;`, não `&&`.
+- Se o push para `main` for bloqueado pelo auto-review, repetir o mesmo comando com aprovação.
+- Se o site não atualizar, o usuário pode Redeploy no painel da Vercel.
