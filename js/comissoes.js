@@ -582,28 +582,33 @@ document.getElementById('buscaPagFunc').addEventListener('input', renderPagFunci
 
 
 function preencherSelectMaoFunc() {
-    var sel = document.getElementById('maoFuncId');
-    if (!sel) return;
-    var cur = sel.value;
     var funcs = [];
     try {
         comCanalInterno(function () {
             funcs = listarFuncionariosOrdenados(carregar(), true);
         });
     } catch (e) {
-        var db = carregar();
-        /* fallback: lê interno */
         try {
             var raw = localStorage.getItem(STORAGE_INTERNO);
             var int = raw ? JSON.parse(raw) : {};
             funcs = (int.funcionarios || []).filter(function (f) { return f.ativo !== false; });
         } catch (e2) { funcs = []; }
     }
-    sel.innerHTML = '<option value="">— sem funcionário —</option>' + funcs.map(function (f) {
+    var opts = funcs.map(function (f) {
         return '<option value="' + esc(f.id) + '">' + esc(f.nome || '') + '</option>';
     }).join('');
-    if (cur) sel.value = cur;
+    function preencher(id, first) {
+        var sel = document.getElementById(id);
+        if (!sel) return;
+        var cur = sel.value;
+        sel.innerHTML = first + opts;
+        if (cur) sel.value = cur;
+    }
+    preencher('maoFuncId', '<option value="">— sem funcionário —</option>');
+    preencher('pecaFuncId', '<option value="">— sem comissão —</option>');
     if (typeof atualizarRotulosTipoMaoOriginal === 'function') atualizarRotulosTipoMaoOriginal();
+    if (typeof atualizarPreviewComissaoMao === 'function') atualizarPreviewComissaoMao();
+    if (typeof atualizarPreviewComissaoPeca === 'function') atualizarPreviewComissaoPeca();
 }
 
 function preencherSelectMecanicoVenda() {
@@ -696,18 +701,22 @@ function listarComissoes(filtroFuncId, mesYYYYMM) {
         if (!d) return;
         if (mesYYYYMM && d.slice(0, 7) !== mesYYYYMM) return;
         (a.itens || []).forEach(function (it) {
-            if ((it.tipo || '') !== 'mao') return;
+            if (!it) return;
+            var ehMao = (it.tipo || '') === 'mao';
+            var temCom = ehMao || (it.funcionarioId && it.tipoMao) || (Number(it.comissaoValor) > 0.009);
+            if (!temCom) return;
             var fid = it.funcionarioId ? String(it.funcionarioId) : '';
             if (!fid) return;
             if (filtroFuncId && fid !== String(filtroFuncId)) return;
             var f = funcsMap[fid] || {};
-            var tipoMao = it.tipoMao || 'servico';
+            var tipoMao = it.tipoMao || (ehMao ? 'servico' : '');
             var base = Number(it.valor) || 0;
             var calc = resolverComissaoLinha(it, f, tipoMao, base);
             var pct = calc.pct;
             var valor = calc.valor;
-            var descMo = it.desc || 'Mão de obra';
+            var descMo = it.desc || (ehMao ? 'Mão de obra' : 'Peça');
             if (it.tipoMao) descMo = '[' + rotuloTipoMaoComissao(tipoMao) + '] ' + descMo;
+            if (!ehMao) descMo = '[Peça] ' + descMo;
             out.push({
                 data: d,
                 cliente: a.clienteNome || nomeAtendimento(db, a),

@@ -6432,10 +6432,14 @@ function dataCorteVendaISO(o, mapaPag) {
     return String(o.criadoEm || '').slice(0, 10);
 }
 
-function comissaoMaoAtendimento(a) {
+function comissaoItensAtendimento(a) {
     var total = 0;
+    var soMao = 0;
     (a && a.itens || []).forEach(function (it) {
-        if (!it || (it.tipo || 'peca') !== 'mao') return;
+        if (!it) return;
+        var ehMao = (it.tipo || 'peca') === 'mao';
+        var temCom = ehMao || (it.funcionarioId && it.tipoMao) || (Number(it.comissaoValor) > 0.009);
+        if (!temCom) return;
         if (!it.funcionarioId) return;
         var pct = it.comissaoPct != null ? Number(it.comissaoPct) : NaN;
         if ((isNaN(pct) || pct <= 0) && typeof obterDadosComissaoFuncionario === 'function') {
@@ -6454,8 +6458,13 @@ function comissaoMaoAtendimento(a) {
             valor = +(base * pct / 100).toFixed(2);
         }
         total += valor || 0;
+        if (ehMao) soMao += valor || 0;
     });
-    return +total.toFixed(2);
+    return { total: +total.toFixed(2), mao: +soMao.toFixed(2) };
+}
+
+function comissaoMaoAtendimento(a) {
+    return comissaoItensAtendimento(a).total;
 }
 
 function totaisLucroVendaDoc(o) {
@@ -6509,8 +6518,9 @@ function calcularRelatorioOficina(periodo) {
             t.ganhoPecas = 0;
             t.total = Number(a.total) || (t.pecas + t.mao);
         }
-        var com = comissaoMaoAtendimento(a);
-        var maoCasaLinha = Math.max(0, t.mao - com);
+        var comDet = comissaoItensAtendimento(a);
+        var com = comDet.total;
+        var maoCasaLinha = Math.max(0, t.mao - comDet.mao);
         pecas += t.pecas;
         ganho += t.ganhoPecas;
         mao += t.mao;

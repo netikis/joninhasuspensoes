@@ -293,6 +293,7 @@ function aplicarQtdPeca(idx, novaQtd) {
     it.qtd = Math.max(1, Math.round(Number(novaQtd) || 1));
     it.valor = +(it.valorUnit * it.qtd).toFixed(2);
     it.custo = +(it.custoUnit * it.qtd).toFixed(2);
+    recalcularComissaoItemOs(it);
     renderItens();
 }
 
@@ -336,8 +337,13 @@ function iniciarEdicaoItemOs(idx) {
         document.getElementById('itemCusto').value = fmtNumOs(it.custoUnit);
         document.getElementById('itemValor').value = fmtNumOs(it.valorUnit);
         if (document.getElementById('itemQtd')) document.getElementById('itemQtd').value = String(it.qtd || 1);
+        var selPF = document.getElementById('pecaFuncId');
+        if (selPF) selPF.value = it.funcionarioId || '';
+        var selPT = document.getElementById('pecaTipoComissao');
+        if (selPT) selPT.value = it.tipoMao || '';
         document.getElementById('btnAddItem').textContent = 'Salvar peça';
         document.getElementById('btnAddMao').textContent = '+ Mão de obra';
+        if (typeof atualizarPreviewComissaoPeca === 'function') atualizarPreviewComissaoPeca();
         try {
             document.getElementById('itemValor').scrollIntoView({ behavior: 'smooth', block: 'center' });
             document.getElementById('itemValor').focus();
@@ -354,9 +360,10 @@ function aplicarValorLinhaPeca(idx, campo, raw) {
     normalizarPecaItem(it);
     var n = parseMoeda(raw);
     if (n < 0) n = 0;
-    if (campo === 'custo') it.custoUnit = n;
+    if (campo === 'custo')     it.custoUnit = n;
     else it.valorUnit = n;
     normalizarPecaItem(it);
+    recalcularComissaoItemOs(it);
     renderItens();
 }
 
@@ -384,6 +391,16 @@ function htmlLinhaItemOs(it, idx) {
             esc(fmtNumOs(it.valorUnit)) + '" title="Venda unitária"></label>' +
             '<span>Total custo ' + moeda(it.custo) +
             ' · Ganho <span class="ganho-linha">' + moeda(ganhoItem(it)) + '</span></span></div>';
+        if (it.funcionarioId && it.tipoMao) {
+            var tipoPecaLbl = rotuloTipoMaoComissao(it.tipoMao);
+            var nomePecaF = it.funcionarioNome || 'Funcionário';
+            extraP += '<div class="muted" style="font-size:0.8rem;margin-top:2px">' +
+                esc(nomePecaF) + ' · ' + esc(tipoPecaLbl);
+            if (Number(it.comissaoValor) > 0.009) {
+                extraP += ' · Comissão <span class="ganho-linha" style="font-weight:800">' + moeda(it.comissaoValor) + '</span>';
+            }
+            extraP += '</div>';
+        }
         return '<div class="row os-item-linha' + clsEdit + '" style="margin-bottom:8px;align-items:center;gap:6px">' +
             '<div class="col" style="flex:2"><span class="os-tag os-tag-peca">PEÇA</span>' +
             esc(it.desc) + extraP + '</div>' +
@@ -560,6 +577,83 @@ function addLinhaValor(tipo, descId, valorId, msgVazio) {
     renderItens();
 }
 
+function aplicarComissaoCamposPecaOs(item) {
+    var selF = document.getElementById('pecaFuncId');
+    var selT = document.getElementById('pecaTipoComissao');
+    var fid = selF && selF.value ? selF.value : '';
+    var tipoMao = selT && selT.value ? selT.value : '';
+    item.funcionarioId = '';
+    item.tipoMao = '';
+    item.funcionarioNome = '';
+    item.comissaoPct = 0;
+    item.comissaoValor = 0;
+    if (!fid || !tipoMao) return item;
+    item.funcionarioId = fid;
+    item.tipoMao = tipoMao;
+    var dados = obterDadosComissaoFuncionario(fid, tipoMao);
+    var nomeSel = '';
+    if (selF && selF.selectedIndex >= 0 && selF.options[selF.selectedIndex]) {
+        nomeSel = selF.options[selF.selectedIndex].text || '';
+        if (nomeSel.indexOf('sem comissão') >= 0) nomeSel = '';
+    }
+    item.funcionarioNome = dados.nome || nomeSel || '';
+    item.comissaoPct = ehTipoMaoAmortOriginal(tipoMao) ? 0 : (dados.pct || 0);
+    item.comissaoValor = valorComissaoDoItemMao(item, dados);
+    return item;
+}
+
+function recalcularComissaoItemOs(it) {
+    if (!it || (it.tipo || 'peca') === 'mao') return;
+    if (!it.funcionarioId || !it.tipoMao) {
+        it.comissaoPct = 0;
+        it.comissaoValor = 0;
+        return;
+    }
+    var dados = obterDadosComissaoFuncionario(it.funcionarioId, it.tipoMao);
+    if (!it.funcionarioNome) it.funcionarioNome = dados.nome;
+    it.comissaoPct = ehTipoMaoAmortOriginal(it.tipoMao) ? 0 : (dados.pct || it.comissaoPct || 0);
+    it.comissaoValor = valorComissaoDoItemMao(it, dados);
+}
+
+function atualizarPreviewComissaoPeca() {
+    if (typeof atualizarRotulosTipoMaoOriginal === 'function') atualizarRotulosTipoMaoOriginal();
+    var el = document.getElementById('pecaComissaoPreview');
+    if (!el) return;
+    var fid = document.getElementById('pecaFuncId') && document.getElementById('pecaFuncId').value;
+    var tipo = document.getElementById('pecaTipoComissao') && document.getElementById('pecaTipoComissao').value;
+    if (!fid || !tipo) {
+        el.textContent = 'Sem comissão nesta peça — escolha funcionário e tipo (ex.: Amortecedor) se ele fez o serviço.';
+        el.style.color = '#64748b';
+        return;
+    }
+    var dados = obterDadosComissaoFuncionario(fid, tipo);
+    var tipoLbl = rotuloTipoMaoComissao(tipo);
+    var qtd = Math.max(1, Math.round(Number(String((document.getElementById('itemQtd') && document.getElementById('itemQtd').value) || '1').replace(',', '.')) || 1));
+    if (ehTipoMaoAmortOriginal(tipo)) {
+        var fixo = Number(dados.valorFixo) || 0;
+        if (!(fixo > 0)) {
+            el.textContent = (dados.nome || 'Funcionário') + ' — sem R$ de ' + tipoLbl.toLowerCase() + ' no cadastro.';
+            el.style.color = '#b91c1c';
+            return;
+        }
+        el.style.color = '#14532d';
+        el.textContent = (dados.nome || 'Funcionário') + ' · ' + tipoLbl + ': ' + moeda(fixo) +
+            (qtd > 1 ? ' × ' + qtd + ' = ' + moeda(fixo * qtd) : ' (fixo)');
+        return;
+    }
+    var vendaUnit = parseMoeda(document.getElementById('itemValor') && document.getElementById('itemValor').value);
+    var base = qtd * vendaUnit;
+    var com = calcularValorComissaoMao(base, dados.pct || 0);
+    if (!(dados.pct > 0)) {
+        el.textContent = (dados.nome || 'Funcionário') + ' — sem % de ' + tipoLbl + ' no cadastro.';
+        el.style.color = '#b91c1c';
+        return;
+    }
+    el.style.color = '#14532d';
+    el.textContent = (dados.nome || 'Funcionário') + ' · ' + tipoLbl + ': ' + (dados.pct || 0) + '%' +
+        (base > 0 ? ' → ' + moeda(com) : '');
+}
+
 document.getElementById('btnAddItem').addEventListener('click', function () {
     var desc = document.getElementById('itemDesc').value.trim();
     var custoUnit = parseMoeda(document.getElementById('itemCusto').value);
@@ -580,20 +674,30 @@ document.getElementById('btnAddItem').addEventListener('click', function () {
         itemEd.valorUnit = valorUnit;
         itemEd.custo = +(custoUnit * qtd).toFixed(2);
         itemEd.valor = +(valorUnit * qtd).toFixed(2);
+        aplicarComissaoCamposPecaOs(itemEd);
         cancelarEdicaoItemOs();
         document.getElementById('itemDesc').value = '';
         document.getElementById('itemCusto').value = '';
         document.getElementById('itemValor').value = '';
         if (document.getElementById('itemQtd')) document.getElementById('itemQtd').value = '1';
+        if (typeof atualizarPreviewComissaoPeca === 'function') atualizarPreviewComissaoPeca();
         renderItens();
-        toast('Peça atualizada.');
+        toast(itemEd.comissaoValor > 0.009
+            ? ('Peça atualizada. Comissão ' + moeda(itemEd.comissaoValor) + '.')
+            : 'Peça atualizada.');
         return;
     }
 
     /* Se já existe a mesma peça (mesmo nome + unitários), só soma a quantidade */
+    var selPF = document.getElementById('pecaFuncId');
+    var selPT = document.getElementById('pecaTipoComissao');
+    var fidAdd = selPF && selPF.value ? selPF.value : '';
+    var tipoAdd = selPT && selPT.value ? selPT.value : '';
     var iExist = itensTemp.findIndex(function (x) {
         if (!x || (x.tipo || 'peca') === 'mao') return false;
         if (String(x.desc || '').toLowerCase() !== desc.toLowerCase()) return false;
+        if (String(x.funcionarioId || '') !== String(fidAdd || '')) return false;
+        if (String(x.tipoMao || '') !== String(tipoAdd || '')) return false;
         normalizarPecaItem(x);
         return Number(x.valorUnit) === valorUnit && Number(x.custoUnit) === custoUnit;
     });
@@ -617,12 +721,18 @@ document.getElementById('btnAddItem').addEventListener('click', function () {
         custo: +(custoUnit * qtd).toFixed(2),
         valor: +(valorUnit * qtd).toFixed(2)
     };
+    aplicarComissaoCamposPecaOs(item);
     itensTemp.push(item);
     document.getElementById('itemDesc').value = '';
     document.getElementById('itemCusto').value = '';
     document.getElementById('itemValor').value = '';
     if (document.getElementById('itemQtd')) document.getElementById('itemQtd').value = '1';
+    if (typeof atualizarPreviewComissaoPeca === 'function') atualizarPreviewComissaoPeca();
     renderItens();
+    if (Number(item.comissaoValor) > 0.009) {
+        toast('Peça adicionada. Comissão ' + moeda(item.comissaoValor) +
+            ' para ' + (item.funcionarioNome || 'funcionário') + '.');
+    }
 });
 
 function faixaAmortecedorOriginal(tipo) {
@@ -700,7 +810,8 @@ function obterDadosComissaoFuncionario(fid, tipoMao) {
 function valorComissaoDoItemMao(it, dados) {
     var tipo = (it && it.tipoMao) || (dados && dados.tipo) || 'servico';
     if (ehTipoMaoAmortOriginal(tipo)) {
-        if (dados && Number(dados.valorFixo) > 0) return +Number(dados.valorFixo).toFixed(2);
+        var q = Math.max(1, Number(it && it.qtd) || 1);
+        if (dados && Number(dados.valorFixo) > 0) return +((Number(dados.valorFixo) * q).toFixed(2));
         var vFix = it && it.comissaoValor != null ? Number(it.comissaoValor) : 0;
         return vFix > 0 ? +vFix.toFixed(2) : 0;
     }
@@ -743,6 +854,7 @@ function atualizarRotulosTipoMaoOriginal() {
     }
     rotulosPorSelect('vdProdFuncId', 'vdProdTipoComissao');
     rotulosPorSelect('vdAvFuncId', 'vdAvTipoComissao');
+    rotulosPorSelect('pecaFuncId', 'pecaTipoComissao');
 }
 
 function atualizarPreviewComissaoMao() {
@@ -822,6 +934,8 @@ window._mapaEnterOs = {
     itemCusto: 'btnAddItem',
     itemValor: 'btnAddItem',
     itemQtd: 'btnAddItem',
+    pecaFuncId: 'btnAddItem',
+    pecaTipoComissao: 'btnAddItem',
     maoDesc: 'btnAddMao',
     maoValor: 'btnAddMao',
     maoTipoComissao: 'btnAddMao',
@@ -859,7 +973,7 @@ window._osSalvando = false;
         clicarAdd(botaoId, e);
     }, true);
     if (typeof window.enterClicaBotao === 'function') {
-        window.enterClicaBotao(['itemDesc', 'itemCusto', 'itemValor', 'itemQtd'], 'btnAddItem');
+        window.enterClicaBotao(['itemDesc', 'itemCusto', 'itemValor', 'itemQtd', 'pecaFuncId', 'pecaTipoComissao'], 'btnAddItem');
         window.enterClicaBotao(['maoDesc', 'maoValor', 'maoTipoComissao', 'maoFuncId'], 'btnAddMao');
     }
     var btnS = document.getElementById('btnSalvarAt');
@@ -890,6 +1004,17 @@ window._osSalvando = false;
     }
     if (s) s.addEventListener('change', atualizarPreviewComissaoMao);
     if (t) t.addEventListener('change', atualizarPreviewComissaoMao);
+    var pf = document.getElementById('pecaFuncId');
+    var pt = document.getElementById('pecaTipoComissao');
+    var pq = document.getElementById('itemQtd');
+    var pv = document.getElementById('itemValor');
+    if (pf) pf.addEventListener('change', atualizarPreviewComissaoPeca);
+    if (pt) pt.addEventListener('change', atualizarPreviewComissaoPeca);
+    if (pq) pq.addEventListener('input', atualizarPreviewComissaoPeca);
+    if (pv) {
+        pv.addEventListener('input', atualizarPreviewComissaoPeca);
+        pv.addEventListener('change', atualizarPreviewComissaoPeca);
+    }
 })();
 
 function limparAtendimento() {
@@ -1034,6 +1159,7 @@ async function salvarAtendimentoAtual() {
         if (!it) return;
         if ((it.tipo || 'peca') !== 'mao') {
             normalizarPecaItem(it);
+            recalcularComissaoItemOs(it);
             return;
         }
         if (!it.tipoMao) it.tipoMao = 'servico';
@@ -1216,11 +1342,12 @@ function editarAtendimento(id, placaHint) {
     cancelarEdicaoItemOs();
     itensTemp = (a.itens || []).map(function (it) {
         var fid = it.funcionarioId || '';
-        var tipoMao = it.tipoMao || 'servico';
+        var ehMao = (it.tipo || '') === 'mao';
+        var tipoMao = it.tipoMao || (ehMao ? 'servico' : '');
         var pct = it.comissaoPct != null ? Number(it.comissaoPct) : NaN;
         var nome = it.funcionarioNome || '';
-        if (fid && ((it.tipo || '') === 'mao')) {
-            var dados = obterDadosComissaoFuncionario(fid, tipoMao);
+        if (fid && (ehMao || tipoMao)) {
+            var dados = obterDadosComissaoFuncionario(fid, tipoMao || 'servico');
             if (!nome) nome = dados.nome;
             if (ehTipoMaoAmortOriginal(tipoMao)) {
                 pct = 0;
@@ -1228,11 +1355,13 @@ function editarAtendimento(id, placaHint) {
         }
         if (isNaN(pct)) pct = 0;
         var valorMo = Number(it.valor) || 0;
-        var comVal = ehTipoMaoAmortOriginal(tipoMao)
-            ? valorComissaoDoItemMao({ tipoMao: tipoMao, valor: valorMo, comissaoValor: it.comissaoValor }, fid ? obterDadosComissaoFuncionario(fid, tipoMao) : { valorFixo: 0, tipo: tipoMao })
-            : (it.comissaoValor != null
-                ? Number(it.comissaoValor)
-                : calcularValorComissaoMao(valorMo, pct));
+        var comVal = (ehMao || tipoMao)
+            ? (ehTipoMaoAmortOriginal(tipoMao)
+                ? valorComissaoDoItemMao({ tipoMao: tipoMao, valor: valorMo, qtd: it.qtd, comissaoValor: it.comissaoValor }, fid ? obterDadosComissaoFuncionario(fid, tipoMao) : { valorFixo: 0, tipo: tipoMao })
+                : (it.comissaoValor != null
+                    ? Number(it.comissaoValor)
+                    : calcularValorComissaoMao(valorMo, pct)))
+            : 0;
         var row = {
             tipo: it.tipo || 'peca',
             tipoMao: tipoMao,
@@ -1571,6 +1700,7 @@ function aplicarProdutoNoOrcamentoOs(p) {
     if (venda) {
         try { venda.focus(); venda.select(); } catch (eF) { /* ok */ }
     }
+    if (typeof atualizarPreviewComissaoPeca === 'function') atualizarPreviewComissaoPeca();
     toast('Produto selecionado: ' + (p.nome || ''));
 }
 
