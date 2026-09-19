@@ -756,6 +756,24 @@ tr.row-click:hover { background: #e2e8f0; }
     padding: 12px 14px 14px;
 }
 
+.vd-totais-box,
+.vd-split-pgto {
+    background: #fff !important;
+    border: 3px solid #111 !important;
+    color: #111 !important;
+}
+.vd-split-pgto label,
+.vd-totais-box,
+.vd-totais-linha,
+.vd-totais-linha span,
+.vd-totais-linha strong,
+.vd-totais-total,
+.vd-totais-total strong,
+.vd-totais-aberto strong {
+    color: #111 !important;
+    font-weight: 800 !important;
+}
+
 .badge-pago-os {
     margin-left: 12px;
     vertical-align: middle;
