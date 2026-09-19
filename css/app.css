@@ -3224,3 +3224,20 @@
         }
         .login-tabs button.active { background: var(--blue); color: #fff; border-color: var(--blue-soft); }
         .ganho-linha { color: #15803d; font-weight: 700; }
+        .os-bloco-valores {
+            margin-top: 12px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .os-bloco-valores + .os-bloco-valores { margin-top: 14px; }
+        .os-bloco-valores-cab {
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.06);
+            border-bottom: 1px solid var(--line);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .os-bloco-valores-corpo { padding: 12px 14px 14px; }
