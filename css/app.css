@@ -1910,7 +1910,9 @@
         }
         .badge-pago-os {
             display: inline-block;
-            margin-top: 6px;
+            margin-top: 4px;
+            margin-left: 12px;
+            vertical-align: middle;
             padding: 5px 12px;
             border-radius: 999px;
             font-size: 0.72rem;

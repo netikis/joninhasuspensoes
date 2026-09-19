@@ -756,6 +756,11 @@ tr.row-click:hover { background: #e2e8f0; }
     padding: 12px 14px 14px;
 }
 
+.badge-pago-os {
+    margin-left: 12px;
+    vertical-align: middle;
+}
+
 @media print {
     .sidebar, .topbar, .sidebar-overlay { display: none !important; }
     .main, .conteudo { overflow: visible !important; height: auto !important; background: #fff; }
