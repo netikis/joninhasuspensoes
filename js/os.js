@@ -1874,7 +1874,9 @@ function rotuloPrecoCatalogo(custo, venda) {
             var qtd = (p.qtd != null && Number(p.qtd) === Number(p.qtd)) ? Number(p.qtd) : null;
             var extra = [
                 p.codigo ? 'cód. ' + p.codigo : '',
-                qtd != null ? 'estoque ' + qtd : '',
+                (typeof produtoEhServico === 'function' && produtoEhServico(p))
+                    ? 'tipo de serviço'
+                    : (qtd != null ? 'estoque ' + qtd : ''),
                 rotuloPrecoCatalogo(p.custo, p.venda)
             ].filter(Boolean).join(' · ');
             return {
