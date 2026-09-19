@@ -2193,6 +2193,40 @@
             opacity: 0.9;
             font-weight: 600;
         }
+        .alerta-vencidos-lista {
+            max-height: 240px;
+            overflow: auto;
+        }
+        .alerta-vencido-linha {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 5px 0;
+            flex-wrap: wrap;
+        }
+        .alerta-vencido-item {
+            flex: 1 1 220px;
+            min-width: 0;
+            text-align: left;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.32);
+            color: #fff;
+            font: inherit;
+            font-size: 0.82rem;
+            font-weight: 700;
+            border-radius: 8px;
+            padding: 7px 10px;
+            cursor: pointer;
+        }
+        .alerta-vencido-item:hover {
+            background: rgba(255,255,255,0.22);
+        }
+        .alerta-vencidos-30 .alerta-vencido-rec {
+            flex-shrink: 0;
+            padding: 6px 10px;
+            font-size: 0.75rem;
+            font-weight: 800;
+        }
         .pd-venc-td { min-width: 168px; }
         .pd-venc-linha {
             display: flex;

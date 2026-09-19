@@ -3357,6 +3357,54 @@ function irParaContasReceber() {
     else if (typeof abrirPainel === 'function') abrirPainel('painelPendentes');
 }
 
+var alertaVencidosItensAtuais = [];
+
+function acharPendenteAlerta(item) {
+    if (!item) return null;
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+    return (db.pendentes || []).find(function (p) {
+        if (!p || p.status === 'pago') return false;
+        if (item.pendenteId && String(p.id) === String(item.pendenteId)) return true;
+        if (item.osId && String(p.atendimentoId || '') === String(item.osId)) return true;
+        if (item.vendaId && String(p.vendaId || '') === String(item.vendaId)) return true;
+        return false;
+    }) || null;
+}
+
+function abrirNotaAlertaVencido(item) {
+    if (!item) return;
+    if (item.osId && typeof abrirNota === 'function') {
+        abrirNota(item.osId);
+        return;
+    }
+    if (item.vendaId && typeof abrirDocumentoVenda === 'function') {
+        abrirDocumentoVenda(item.vendaId);
+        return;
+    }
+    if (typeof irParaContasReceber === 'function') irParaContasReceber();
+    else if (typeof irParaPastaInicio === 'function') irParaPastaInicio('pendentes');
+}
+
+function receberAlertaVencido(item) {
+    if (!item) return;
+    if (item.osId && typeof abrirModalReceberOs === 'function') {
+        abrirModalReceberOs(item.osId);
+        return;
+    }
+    if (item.vendaId && typeof editarDocumentoVenda === 'function') {
+        editarDocumentoVenda(item.vendaId);
+        toast('Dê baixa nesta venda: informe o recebido e salve.');
+        return;
+    }
+    var p = acharPendenteAlerta(item);
+    if (p && typeof irParaContasReceber === 'function') {
+        irParaContasReceber();
+        toast('Receba esta conta em Contas a receber.');
+        return;
+    }
+    if (typeof irParaContasReceber === 'function') irParaContasReceber();
+}
+
 function renderAlertaVencidos30(db) {
     var el = document.getElementById('alertaVencidos30');
     if (!el) return;
@@ -3371,13 +3419,22 @@ function renderAlertaVencidos30(db) {
     }
     var itens = [];
     var vistos = {};
-    function add(chave, txt, venc, aberto) {
+    function add(chave, txt, venc, aberto, extra) {
         if (!(aberto > 0.009)) return;
         var dias = atrasoDias(venc);
         if (dias == null || dias < 0) return;
         if (chave && vistos[chave]) return;
         if (chave) vistos[chave] = true;
-        itens.push({ txt: txt, venc: venc, aberto: aberto, dias: dias });
+        extra = extra || {};
+        itens.push({
+            txt: txt,
+            venc: venc,
+            aberto: aberto,
+            dias: dias,
+            osId: extra.osId || '',
+            vendaId: extra.vendaId || '',
+            pendenteId: extra.pendenteId || ''
+        });
     }
     (db.atendimentos || []).forEach(function (a) {
         if (!a) return;
@@ -3386,7 +3443,13 @@ function renderAlertaVencidos30(db) {
         var aberto = a.saldoAberto != null
             ? Number(a.saldoAberto)
             : Math.max(0, (Number(a.total) || 0) - (Number(a.valorRecebido) || 0));
-        add('os:' + a.id, 'OS ' + ((a.placa || '').toUpperCase()) + ' · ' + (a.clienteNome || nomeAtendimento(db, a)), a.dataVencimento, aberto);
+        add(
+            'os:' + a.id,
+            'OS ' + ((a.placa || '').toUpperCase()) + ' · ' + (a.clienteNome || nomeAtendimento(db, a)),
+            a.dataVencimento,
+            aberto,
+            { osId: a.id }
+        );
     });
     (db.orcamentos || []).forEach(function (o) {
         if (!o) return;
@@ -3394,13 +3457,24 @@ function renderAlertaVencidos30(db) {
         var aberto = o.saldoAberto != null
             ? Number(o.saldoAberto)
             : Math.max(0, (Number(o.valor) || 0) - (Number(o.valorRecebido) || 0));
-        add('vd:' + o.id, (o.tipo || 'Doc') + ' Nº ' + (o.numero || ''), o.dataVencimento, aberto);
+        add(
+            'vd:' + o.id,
+            (o.tipo || 'Doc') + ' Nº ' + (o.numero || ''),
+            o.dataVencimento,
+            aberto,
+            { vendaId: o.id }
+        );
     });
     (db.pendentes || []).forEach(function (p) {
         if (!p || p.status === 'pago') return;
         var chave = p.atendimentoId ? 'os:' + p.atendimentoId : (p.vendaId ? 'vd:' + p.vendaId : 'pd:' + p.id);
-        add(chave, (p.cliente || '') + ' · ' + (p.descricao || 'Conta'), p.vencimento, Number(p.valor) || 0);
+        add(chave, (p.cliente || '') + ' · ' + (p.descricao || 'Conta'), p.vencimento, Number(p.valor) || 0, {
+            osId: p.atendimentoId || '',
+            vendaId: p.vendaId || '',
+            pendenteId: p.id
+        });
     });
+    alertaVencidosItensAtuais = itens;
     if (!itens.length) {
         el.style.display = 'none';
         el.innerHTML = '';
@@ -3408,6 +3482,7 @@ function renderAlertaVencidos30(db) {
         return;
     }
     itens.sort(function (a, b) { return b.dias - a.dias; });
+    alertaVencidosItensAtuais = itens;
     var soma = itens.reduce(function (s, x) { return s + x.aberto; }, 0);
     var nHoje = itens.filter(function (x) { return x.dias === 0; }).length;
     var nAtraso = itens.filter(function (x) { return x.dias > 0; }).length;
@@ -3430,12 +3505,18 @@ function renderAlertaVencidos30(db) {
         '</button>' +
         '</div>' +
         '<div class="bloco-recolhe-corpo">' +
-        '<div style="font-size:0.82rem;font-weight:600">' +
-        itens.slice(0, 5).map(function (x) {
+        '<div class="alerta-vencidos-lista">' +
+        itens.map(function (x, idx) {
             var quando = x.dias === 0 ? 'hoje' : (x.dias + ' dia(s)');
-            return esc(x.txt) + ' · ' + moeda(x.aberto) + ' · ' + quando;
-        }).join('<br>') + (itens.length > 5 ? '<br>…' : '') + '</div>' +
-        '<div class="alerta-vencidos-acao">Clique no título para abrir Contas a receber</div>' +
+            return '<div class="alerta-vencido-linha">' +
+                '<button type="button" class="alerta-vencido-item" data-alerta-ver="' + idx + '">' +
+                esc(x.txt) + ' · ' + moeda(x.aberto) + ' · ' + quando +
+                '</button>' +
+                '<button type="button" class="btn btn-ok alerta-vencido-rec" data-alerta-rec="' + idx + '">Receber</button>' +
+                '</div>';
+        }).join('') +
+        '</div>' +
+        '<div class="alerta-vencidos-acao">Clique na nota para abrir · Receber dá baixa · título abre Contas a receber</div>' +
         '</div>';
     el.onclick = null;
     var btnAbrir = document.getElementById('btnAlertaVencidasAbrir');
@@ -3447,10 +3528,24 @@ function renderAlertaVencidos30(db) {
             else if (typeof abrirPainel === 'function') abrirPainel('painelPendentes');
         });
     }
+    el.querySelectorAll('[data-alerta-ver]').forEach(function (b) {
+        b.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            abrirNotaAlertaVencido(alertaVencidosItensAtuais[Number(b.getAttribute('data-alerta-ver'))]);
+        });
+    });
+    el.querySelectorAll('[data-alerta-rec]').forEach(function (b) {
+        b.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            receberAlertaVencido(alertaVencidosItensAtuais[Number(b.getAttribute('data-alerta-rec'))]);
+        });
+    });
     ligarPainelRecolhe(el, 'vencidas');
     if (!window._alertaVencTocado) {
         window._alertaVencTocado = true;
-        toast('Atenção: ' + partes.join(', ') + '.');
+        toast('Atenção: ' + partes.join(', ') + '. Clique na nota para abrir ou em Receber para dar baixa.');
     }
 }
 
