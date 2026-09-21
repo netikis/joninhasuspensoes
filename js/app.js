@@ -1127,9 +1127,121 @@ function atualizarSugestoesClienteAt() {
 /* ui nav: ver js/ui.js */
 
 /* ---------- KPIs / selects ---------- */
+function sincronizarPendentesDoAberto(db) {
+    if (!db) return false;
+    if (!Array.isArray(db.pendentes)) db.pendentes = [];
+    var mudou = false;
+    var hoje = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
+
+    function idxPor(campo, id) {
+        var sid = String(id || '');
+        for (var i = 0; i < db.pendentes.length; i++) {
+            var p = db.pendentes[i];
+            if (p && String(p[campo] || '') === sid) return i;
+        }
+        return -1;
+    }
+
+    function upsert(campo, id, rec) {
+        var i = idxPor(campo, id);
+        if (i >= 0) {
+            var p = db.pendentes[i];
+            if (p.status === 'pago') { p.status = 'aberto'; mudou = true; }
+            if (Math.abs((Number(p.valor) || 0) - rec.valor) > 0.009) { p.valor = rec.valor; mudou = true; }
+            if (rec.vencimento && String(p.vencimento || '').slice(0, 10) !== String(rec.vencimento).slice(0, 10)) {
+                p.vencimento = rec.vencimento;
+                mudou = true;
+            }
+            if (rec.cliente && p.cliente !== rec.cliente) { p.cliente = rec.cliente; mudou = true; }
+            if (rec.descricao && p.descricao !== rec.descricao) { p.descricao = rec.descricao; mudou = true; }
+            if (rec.clienteId && !p.clienteId) { p.clienteId = rec.clienteId; mudou = true; }
+            rec[campo] = id;
+            return;
+        }
+        rec.id = (typeof uid === 'function') ? uid() : ('pd_' + Date.now());
+        rec.status = 'aberto';
+        rec.criadoEm = rec.criadoEm || new Date().toISOString();
+        rec[campo] = id;
+        db.pendentes.push(rec);
+        mudou = true;
+    }
+
+    function removerPor(campo, id) {
+        var sid = String(id || '');
+        var next = [];
+        (db.pendentes || []).forEach(function (p) {
+            if (!p || String(p[campo] || '') !== sid) {
+                next.push(p);
+                return;
+            }
+            if (typeof marcarExcluido === 'function' && canalVendas !== 'interno') {
+                marcarExcluido(db, 'pendentes', p.id);
+            }
+            mudou = true;
+        });
+        if (next.length !== db.pendentes.length) db.pendentes = next;
+    }
+
+    (db.atendimentos || []).forEach(function (a) {
+        if (!a || !a.id) return;
+        var st = String(a.statusPagamento || '').toUpperCase();
+        var aberto = a.saldoAberto != null
+            ? Number(a.saldoAberto)
+            : Math.max(0, (Number(a.total) || 0) - (Number(a.valorRecebido) || 0));
+        var vale = (st === 'PARCIAL' || st === 'PENDENTE') && aberto > 0.009;
+        if (!vale) {
+            if (idxPor('atendimentoId', a.id) >= 0) removerPor('atendimentoId', a.id);
+            return;
+        }
+        var nome = a.clienteNome || (typeof nomeAtendimento === 'function' ? nomeAtendimento(db, a) : '') || '—';
+        var placa = String(a.placa || '').toUpperCase();
+        upsert('atendimentoId', a.id, {
+            cliente: nome,
+            clienteId: a.clienteId || null,
+            descricao: 'OS ' + (placa || 'sem placa') + (nome && nome !== '—' ? ' · ' + nome : '') + ' — saldo em aberto',
+            valor: +aberto.toFixed(2),
+            vencimento: a.dataVencimento || hoje,
+            atendimentoId: a.id,
+            formaPrevista: a.formaPagamento || '',
+            ehBoleto: String(a.formaPagamento || '').toLowerCase().indexOf('boleto') >= 0
+        });
+    });
+
+    (db.orcamentos || []).forEach(function (o) {
+        if (!o || !o.id) return;
+        var st = String(o.statusPagamento || '').toUpperCase();
+        var aberto = o.saldoAberto != null
+            ? Number(o.saldoAberto)
+            : Math.max(0, (Number(o.valor) || 0) - (Number(o.valorRecebido) || 0));
+        var vale = st !== 'PAGO' && aberto > 0.009;
+        if (!vale) {
+            if (idxPor('vendaId', o.id) >= 0) removerPor('vendaId', o.id);
+            return;
+        }
+        var tipo = String(o.tipo || 'VENDA').toUpperCase();
+        var rotulo = (tipo === 'ORCAMENTO' ? 'Orçamento' : 'Venda') + ' Nº ' + (o.numero || '');
+        upsert('vendaId', o.id, {
+            cliente: o.clienteNome || '—',
+            clienteId: o.clienteId || null,
+            descricao: rotulo + ' — saldo em aberto',
+            valor: +aberto.toFixed(2),
+            vencimento: o.dataVencimento || o.dataEmissao || hoje,
+            vendaId: o.id,
+            formaPrevista: o.formaPagamento || '',
+            ehBoleto: String(o.formaPagamento || '').toLowerCase().indexOf('boleto') >= 0
+        });
+    });
+
+    return mudou;
+}
+
 function atualizarKPIs(db) {
     /* KPIs do painel sempre do balcão oficial (não misturar com interno) */
     db = carregarMain();
+    if (typeof sincronizarPendentesDoAberto === 'function' && sincronizarPendentesDoAberto(db)) {
+        if (typeof salvarMain === 'function') salvarMain(db);
+        else salvar(db);
+    }
     var setTxt = function (id, val) {
         var el = document.getElementById(id);
         if (el) el.textContent = val;

@@ -1156,6 +1156,9 @@ function receberPendente(id, destino) {
 
 function renderPendentes() {
     var db = carregar();
+    if (typeof sincronizarPendentesDoAberto === 'function' && sincronizarPendentesDoAberto(db)) {
+        salvar(db);
+    }
     var lista = (db.pendentes || []).filter(function (p) { return p.status !== 'pago'; });
     var total = lista.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
     document.getElementById('pdTotal').textContent = moeda(total);
