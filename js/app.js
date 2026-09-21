@@ -1132,54 +1132,110 @@ function sincronizarPendentesDoAberto(db) {
     if (!Array.isArray(db.pendentes)) db.pendentes = [];
     var mudou = false;
     var hoje = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
+    var removerIds = {};
 
-    function idxPor(campo, id) {
-        var sid = String(id || '');
-        for (var i = 0; i < db.pendentes.length; i++) {
-            var p = db.pendentes[i];
-            if (p && String(p[campo] || '') === sid) return i;
+    function marcarFora(p) {
+        if (!p || !p.id) return;
+        removerIds[String(p.id)] = true;
+        if (typeof marcarExcluido === 'function' && canalVendas !== 'interno') {
+            marcarExcluido(db, 'pendentes', p.id);
         }
-        return -1;
-    }
-
-    function upsert(campo, id, rec) {
-        var i = idxPor(campo, id);
-        if (i >= 0) {
-            var p = db.pendentes[i];
-            if (p.status === 'pago') { p.status = 'aberto'; mudou = true; }
-            if (Math.abs((Number(p.valor) || 0) - rec.valor) > 0.009) { p.valor = rec.valor; mudou = true; }
-            if (rec.vencimento && String(p.vencimento || '').slice(0, 10) !== String(rec.vencimento).slice(0, 10)) {
-                p.vencimento = rec.vencimento;
-                mudou = true;
-            }
-            if (rec.cliente && p.cliente !== rec.cliente) { p.cliente = rec.cliente; mudou = true; }
-            if (rec.descricao && p.descricao !== rec.descricao) { p.descricao = rec.descricao; mudou = true; }
-            if (rec.clienteId && !p.clienteId) { p.clienteId = rec.clienteId; mudou = true; }
-            rec[campo] = id;
-            return;
-        }
-        rec.id = (typeof uid === 'function') ? uid() : ('pd_' + Date.now());
-        rec.status = 'aberto';
-        rec.criadoEm = rec.criadoEm || new Date().toISOString();
-        rec[campo] = id;
-        db.pendentes.push(rec);
         mudou = true;
     }
 
-    function removerPor(campo, id) {
+    function aplicarRemocoes() {
+        var n = db.pendentes.length;
+        db.pendentes = db.pendentes.filter(function (p) {
+            return p && !removerIds[String(p.id)];
+        });
+        if (db.pendentes.length !== n) mudou = true;
+    }
+
+    function numDaDesc(desc) {
+        var m = String(desc || '').match(/venda\s*n[ºo°]?\s*(\d+)/i);
+        return m ? m[1] : '';
+    }
+
+    function placaDaDesc(desc) {
+        var m = String(desc || '').match(/^os\s+([a-z0-9]+)/i);
+        if (!m) return '';
+        var pl = String(m[1] || '').toUpperCase();
+        return (pl === 'SEM') ? '' : pl;
+    }
+
+    (db.orcamentos || []).forEach(function (o) {
+        if (!o || !o.id) return;
+        var num = String(o.numero || '');
+        if (!num) return;
+        db.pendentes.forEach(function (p) {
+            if (!p || p.status === 'pago' || p.vendaId || p.atendimentoId) return;
+            if (numDaDesc(p.descricao) === num) {
+                p.vendaId = o.id;
+                mudou = true;
+            }
+        });
+    });
+    (db.atendimentos || []).forEach(function (a) {
+        if (!a || !a.id) return;
+        var placa = String(a.placa || '').toUpperCase().replace(/\s+/g, '');
+        db.pendentes.forEach(function (p) {
+            if (!p || p.status === 'pago' || p.atendimentoId || p.vendaId) return;
+            if (placa && placa.length >= 4 && placaDaDesc(p.descricao) === placa) {
+                p.atendimentoId = a.id;
+                mudou = true;
+            }
+        });
+    });
+
+    function gruposPorCampo(campo) {
+        var map = {};
+        db.pendentes.forEach(function (p) {
+            if (!p || p.status === 'pago' || removerIds[String(p.id)]) return;
+            var k = String(p[campo] || '');
+            if (!k) return;
+            if (!map[k]) map[k] = [];
+            map[k].push(p);
+        });
+        Object.keys(map).forEach(function (k) {
+            var arr = map[k];
+            if (arr.length < 2) return;
+            arr.sort(function (a, b) {
+                return String(a.criadoEm || '').localeCompare(String(b.criadoEm || ''));
+            });
+            for (var i = 1; i < arr.length; i++) marcarFora(arr[i]);
+        });
+    }
+    gruposPorCampo('vendaId');
+    gruposPorCampo('atendimentoId');
+    aplicarRemocoes();
+
+    function acharPendente(campo, id, testeExtra) {
         var sid = String(id || '');
-        var next = [];
-        (db.pendentes || []).forEach(function (p) {
-            if (!p || String(p[campo] || '') !== sid) {
-                next.push(p);
+        for (var i = 0; i < db.pendentes.length; i++) {
+            var p = db.pendentes[i];
+            if (!p || p.status === 'pago') continue;
+            if (sid && String(p[campo] || '') === sid) return p;
+            if (testeExtra && testeExtra(p)) return p;
+        }
+        return null;
+    }
+
+    function aplicarCampos(p, rec) {
+        ['valor', 'vencimento', 'cliente', 'descricao', 'clienteId', 'vendaId', 'atendimentoId', 'formaPrevista', 'ehBoleto'].forEach(function (k) {
+            if (rec[k] == null || rec[k] === '') return;
+            if (k === 'valor') {
+                if (Math.abs((Number(p.valor) || 0) - Number(rec.valor)) > 0.009) {
+                    p.valor = rec.valor;
+                    mudou = true;
+                }
                 return;
             }
-            if (typeof marcarExcluido === 'function' && canalVendas !== 'interno') {
-                marcarExcluido(db, 'pendentes', p.id);
+            if (p[k] !== rec[k]) {
+                p[k] = rec[k];
+                mudou = true;
             }
-            mudou = true;
         });
-        if (next.length !== db.pendentes.length) db.pendentes = next;
+        if (p.status === 'pago') { p.status = 'aberto'; mudou = true; }
     }
 
     (db.atendimentos || []).forEach(function (a) {
@@ -1189,13 +1245,18 @@ function sincronizarPendentesDoAberto(db) {
             ? Number(a.saldoAberto)
             : Math.max(0, (Number(a.total) || 0) - (Number(a.valorRecebido) || 0));
         var vale = (st === 'PARCIAL' || st === 'PENDENTE') && aberto > 0.009;
+        var placa = String(a.placa || '').toUpperCase().replace(/\s+/g, '');
+        var p = acharPendente('atendimentoId', a.id, function (x) {
+            return placa && placa.length >= 4 && placaDaDesc(x.descricao) === placa;
+        });
         if (!vale) {
-            if (idxPor('atendimentoId', a.id) >= 0) removerPor('atendimentoId', a.id);
+            db.pendentes.forEach(function (x) {
+                if (x && String(x.atendimentoId || '') === String(a.id)) marcarFora(x);
+            });
             return;
         }
         var nome = a.clienteNome || (typeof nomeAtendimento === 'function' ? nomeAtendimento(db, a) : '') || '—';
-        var placa = String(a.placa || '').toUpperCase();
-        upsert('atendimentoId', a.id, {
+        var rec = {
             cliente: nome,
             clienteId: a.clienteId || null,
             descricao: 'OS ' + (placa || 'sem placa') + (nome && nome !== '—' ? ' · ' + nome : '') + ' — saldo em aberto',
@@ -1204,7 +1265,15 @@ function sincronizarPendentesDoAberto(db) {
             atendimentoId: a.id,
             formaPrevista: a.formaPagamento || '',
             ehBoleto: String(a.formaPagamento || '').toLowerCase().indexOf('boleto') >= 0
-        });
+        };
+        if (p) aplicarCampos(p, rec);
+        else {
+            rec.id = (typeof uid === 'function') ? uid() : ('pd_' + Date.now());
+            rec.status = 'aberto';
+            rec.criadoEm = new Date().toISOString();
+            db.pendentes.push(rec);
+            mudou = true;
+        }
     });
 
     (db.orcamentos || []).forEach(function (o) {
@@ -1214,13 +1283,19 @@ function sincronizarPendentesDoAberto(db) {
             ? Number(o.saldoAberto)
             : Math.max(0, (Number(o.valor) || 0) - (Number(o.valorRecebido) || 0));
         var vale = st !== 'PAGO' && aberto > 0.009;
+        var num = String(o.numero || '');
+        var p = acharPendente('vendaId', o.id, function (x) {
+            return num && numDaDesc(x.descricao) === num;
+        });
         if (!vale) {
-            if (idxPor('vendaId', o.id) >= 0) removerPor('vendaId', o.id);
+            db.pendentes.forEach(function (x) {
+                if (x && String(x.vendaId || '') === String(o.id)) marcarFora(x);
+            });
             return;
         }
         var tipo = String(o.tipo || 'VENDA').toUpperCase();
         var rotulo = (tipo === 'ORCAMENTO' ? 'Orçamento' : 'Venda') + ' Nº ' + (o.numero || '');
-        upsert('vendaId', o.id, {
+        var rec = {
             cliente: o.clienteNome || '—',
             clienteId: o.clienteId || null,
             descricao: rotulo + ' — saldo em aberto',
@@ -1229,9 +1304,21 @@ function sincronizarPendentesDoAberto(db) {
             vendaId: o.id,
             formaPrevista: o.formaPagamento || '',
             ehBoleto: String(o.formaPagamento || '').toLowerCase().indexOf('boleto') >= 0
-        });
+        };
+        if (p) aplicarCampos(p, rec);
+        else {
+            rec.id = (typeof uid === 'function') ? uid() : ('pd_' + Date.now());
+            rec.status = 'aberto';
+            rec.criadoEm = new Date().toISOString();
+            db.pendentes.push(rec);
+            mudou = true;
+        }
     });
 
+    aplicarRemocoes();
+    gruposPorCampo('vendaId');
+    gruposPorCampo('atendimentoId');
+    aplicarRemocoes();
     return mudou;
 }
 
