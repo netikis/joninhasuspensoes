@@ -1837,28 +1837,58 @@
         }
         #printFrame {
             position: fixed;
-            right: 0;
-            bottom: 0;
-            width: 0;
-            height: 0;
+            left: 0;
+            top: 0;
+            width: 210mm;
+            min-width: 210mm;
+            height: 297mm;
+            min-height: 297mm;
             border: 0;
             opacity: 0;
             pointer-events: none;
+            background: #fff;
         }
         #hmPdfRenderTemp {
             position: fixed !important;
             left: 0 !important;
             top: 0 !important;
             width: 794px !important;
-            max-width: 100vw;
-            max-height: none;
-            overflow: visible;
+            min-width: 794px !important;
+            max-width: 794px !important;
+            max-height: none !important;
+            overflow: visible !important;
             background: #fff !important;
-            padding: 16px !important;
+            padding: 0 !important;
+            margin: 0 !important;
             box-sizing: border-box !important;
-            z-index: 200 !important;
-            opacity: 0.02 !important;
+            z-index: 2147483000 !important;
+            opacity: 0.01 !important;
             pointer-events: none !important;
+            transform: none !important;
+        }
+        #hmPdfRenderTemp .nota-espelho {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 10mm !important;
+            margin: 0 !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+        }
+        #hmPdfRenderTemp .nota-grid,
+        #hmPdfRenderTemp .nota-grid-compacta,
+        #hmPdfRenderTemp .nota-sigs,
+        #hmPdfRenderTemp .nota-fotos {
+            display: block !important;
+            max-width: 100% !important;
+            overflow: visible !important;
+            grid-template-columns: none !important;
+        }
+        #hmPdfRenderTemp .nota-campo,
+        #hmPdfRenderTemp .nota-campo.full {
+            display: block !important;
+            max-width: 100% !important;
+            overflow: visible !important;
+            float: none !important;
         }
         /* Força cabeçalho lado a lado na exportação PDF */
         #hmPdfRenderTemp .nota-topo-linha {
@@ -2513,14 +2543,18 @@
 
         @media print {
             @page {
-                size: A4;
-                margin: 10mm;
+                size: A4 portrait;
+                margin: 0;
             }
 
             html, body {
                 background: #fff !important;
                 color: #000 !important;
                 height: auto !important;
+                width: 210mm !important;
+                max-width: 210mm !important;
+                margin: 0 !important;
+                padding: 0 !important;
                 overflow: visible !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
@@ -2571,7 +2605,10 @@
             .mirror-print-section .nota-espelho {
                 font-size: 10pt !important;
                 line-height: 1.25 !important;
-                padding: 0 !important;
+                width: 210mm !important;
+                max-width: 210mm !important;
+                padding: 10mm !important;
+                box-sizing: border-box !important;
                 color: #000 !important;
             }
             .mirror-print-section .nota-topo-linha {
@@ -2663,8 +2700,25 @@
                 color: #000 !important;
             }
             .mirror-print-section .nota-grid-compacta {
-                gap: 1pt 8pt !important;
+                display: block !important;
+                gap: 0 !important;
                 padding: 3pt 5pt !important;
+            }
+            .mirror-print-section .nota-grid,
+            .mirror-print-section .nota-sigs,
+            .mirror-print-section .nota-fotos {
+                display: block !important;
+                max-width: 100% !important;
+            }
+            .mirror-print-section .nota-campo,
+            .mirror-print-section .nota-grid-compacta .nota-campo {
+                display: block !important;
+                max-width: 100% !important;
+                overflow: visible !important;
+            }
+            .mirror-print-section img,
+            .mirror-print-section table {
+                max-width: 100% !important;
             }
             .mirror-print-section .nota-grid-compacta .nota-label,
             .mirror-print-section .nota-label {

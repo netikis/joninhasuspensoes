@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.3.62';
+var APP_VERSION = '1.3.63';
 
 function rotuloBuildApp() {
     var v = String(APP_VERSION || '');

@@ -169,46 +169,65 @@ function ehCelular() {
     return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
 }
 
+function cssNotaCaberPagina() {
+    return '*,*::before,*::after{box-sizing:border-box!important}' +
+        '.nota-espelho{background:#fff;color:#111;margin:0;overflow:visible!important;transform:none!important;float:none!important}' +
+        '.nota-grid,.nota-grid-compacta,.nota-sigs,.nota-fotos{display:block!important;max-width:100%!important;overflow:visible!important;grid-template-columns:none!important;gap:0!important;float:none!important;position:static!important;transform:none!important}' +
+        '.nota-campo,.nota-campo.full{display:block!important;max-width:100%!important;min-width:0!important;overflow:visible!important;float:none!important;position:static!important;flex:none!important}' +
+        '.nota-grid-compacta .nota-campo{display:block!important}' +
+        '.nota-grid-compacta .nota-label,.nota-grid-compacta .nota-valor{display:inline!important;flex:none!important}' +
+        '.nota-sig{display:inline-block!important;width:48%!important;max-width:48%!important;vertical-align:top!important}' +
+        '.nota-topo-linha{width:100%!important;display:table!important;table-layout:fixed!important;border-collapse:collapse!important}' +
+        '.nota-topo-linha tr{display:table-row!important}' +
+        '.nota-topo-logo,.nota-topo-dados{display:table-cell!important;overflow:visible!important}' +
+        'img,table,canvas,svg{max-width:100%!important;height:auto}' +
+        '.nota-itens{width:100%!important;max-width:100%!important}';
+}
+
 function cssDocumentoImpressao() {
-    return 'html,body{margin:0;padding:0;background:#fff;color:#000;box-sizing:border-box;}' +
-        '*,*::before,*::after{box-sizing:border-box;}' +
-        'body{padding:12mm;font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.25;}' +
-        '.nota-espelho{background:#fff;color:#111;width:100%;max-width:100%;margin:0;overflow:visible;}' +
-        '.nota-topo{text-align:center;border-bottom:3px solid #e61e25;padding-bottom:8pt;margin-bottom:10pt;}' +
-        '.nota-topo-linha{width:100%;border-collapse:collapse;table-layout:fixed;}' +
-        '.nota-topo-logo{width:42%;vertical-align:middle;padding:0 8pt 0 0;}' +
-        '.nota-topo-logo img{display:block;width:100%;max-width:100%;max-height:32mm;height:auto;object-fit:contain;object-position:left center;}' +
-        '.nota-topo-dados{width:58%;vertical-align:middle;text-align:left;font-size:9.5pt;line-height:1.3;color:#000;}' +
-        '.nota-topo-dados .linha{display:block;white-space:normal;overflow-wrap:anywhere;word-break:break-word;color:#000;}' +
-        '.nota-topo-dados .linha-end{font-size:9pt;}' +
-        '.nota-topo-dados .linha-tel{font-weight:600;}' +
-        '.nota-titulo-espelho{margin-top:8pt;margin-bottom:0;font-size:12pt;font-weight:800;color:#e61e25;letter-spacing:.06em;text-align:center;}' +
-        '.nota-registro{margin-top:4pt;text-align:center;font-size:9pt;}' +
-        '.nota-bloco{margin-bottom:8pt;border:1px solid #ccc;border-radius:4px;overflow:visible;page-break-inside:avoid;}' +
-        '.nota-bloco .tit{padding:4pt 6pt;font-size:9pt;font-weight:800;text-transform:uppercase;color:#000;background:#fff;border-bottom:1.5pt solid #000;}' +
-        '.nota-grid{display:grid;grid-template-columns:1fr 1fr;gap:4pt 8pt;padding:6pt;}' +
-        '.nota-campo.full{grid-column:1/-1;}' +
-        '.nota-grid-compacta{gap:2pt 8pt;padding:4pt 6pt;}' +
-        '.nota-grid-compacta .nota-campo{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 4pt;min-width:0;}' +
-        '.nota-grid-compacta .nota-label{display:inline;font-size:7.5pt;font-weight:800;text-transform:uppercase;margin:0;}' +
-        '.nota-grid-compacta .nota-label::after{content:":";}' +
-        '.nota-grid-compacta .nota-valor{display:inline;font-size:9pt;margin:0;overflow-wrap:anywhere;word-break:break-word;min-width:0;flex:1 1 auto;}' +
-        '.nota-chassi{font-family:Consolas,Courier New,monospace;word-break:break-all;}' +
-        '.nota-itens{width:100%;border-collapse:collapse;font-size:9pt;}' +
-        '.nota-itens th,.nota-itens td{border-bottom:1px solid #ddd;padding:3pt;text-align:left;overflow-wrap:anywhere;}' +
-        '.nota-itens th{font-weight:800;}' +
-        '.nota-valores-pad{padding:6pt;}' +
-        '.nota-subtotais{margin-top:4pt;font-size:9pt;}' +
-        '.nota-total{text-align:right;font-size:11pt;font-weight:800;margin-top:4pt;}' +
-        '.nota-sigs{display:grid;grid-template-columns:1fr 1fr;gap:16pt;margin-top:14pt;}' +
-        '.nota-sig{text-align:center;font-size:9pt;}' +
-        '.nota-sig-espaco{min-height:18mm;border-bottom:1px solid #000;}' +
-        '.nota-sig-base{padding-top:4pt;font-weight:700;}' +
-        '.nota-sig img{max-height:18mm;max-width:100%;}' +
-        '.nota-fotos{display:flex;flex-wrap:wrap;gap:6pt;padding:6pt;}' +
-        '.nota-fotos img{width:45mm;height:34mm;object-fit:cover;}' +
-        '@page{size:A4;margin:12mm;}' +
-        '@media print{html,body{padding:0;margin:0;}.nota-espelho{width:100%;}}';
+    return 'html,body{margin:0;padding:0;background:#fff;color:#000;box-sizing:border-box;width:210mm;max-width:210mm;overflow:visible}' +
+        '*,*::before,*::after{box-sizing:border-box}' +
+        'body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.25}' +
+        '.nota-espelho{background:#fff;color:#111;width:210mm;max-width:210mm;margin:0;padding:10mm;overflow:visible;box-sizing:border-box}' +
+        '.nota-topo{text-align:center;border-bottom:3px solid #e61e25;padding-bottom:8pt;margin-bottom:10pt}' +
+        '.nota-topo-linha{width:100%;border-collapse:collapse;table-layout:fixed}' +
+        '.nota-topo-logo{width:38%;vertical-align:middle;padding:0 6pt 0 0}' +
+        '.nota-topo-logo img{display:block;width:100%;max-width:100%;max-height:28mm;height:auto;object-fit:contain;object-position:left center}' +
+        '.nota-topo-dados{width:62%;vertical-align:middle;text-align:left;font-size:9pt;line-height:1.3;color:#000}' +
+        '.nota-topo-dados .linha{display:block;white-space:normal;overflow-wrap:anywhere;word-break:break-word;color:#000}' +
+        '.nota-topo-dados .linha-end{font-size:8.5pt}' +
+        '.nota-topo-dados .linha-tel{font-weight:600}' +
+        '.nota-titulo-espelho{margin-top:8pt;margin-bottom:0;font-size:12pt;font-weight:800;color:#e61e25;letter-spacing:.04em;text-align:center}' +
+        '.nota-registro{margin-top:4pt;text-align:center;font-size:9pt}' +
+        '.nota-bloco{margin-bottom:6pt;border:1px solid #ccc;border-radius:4px;overflow:visible;page-break-inside:avoid}' +
+        '.nota-bloco .tit{padding:4pt 6pt;font-size:9pt;font-weight:800;text-transform:uppercase;color:#000;background:#fff;border-bottom:1.5pt solid #000}' +
+        '.nota-grid{display:block;padding:6pt}' +
+        '.nota-campo{display:block;margin:0 0 3pt;min-width:0;max-width:100%;overflow:visible}' +
+        '.nota-campo.full{display:block}' +
+        '.nota-grid-compacta{padding:4pt 6pt}' +
+        '.nota-grid-compacta .nota-campo{display:block}' +
+        '.nota-grid-compacta .nota-label{display:inline;font-size:7.5pt;font-weight:800;text-transform:uppercase;margin:0}' +
+        '.nota-grid-compacta .nota-label::after{content:": "}' +
+        '.nota-grid-compacta .nota-valor{display:inline;font-size:9pt;margin:0;overflow-wrap:anywhere;word-break:break-word}' +
+        '.nota-chassi{font-family:Consolas,Courier New,monospace;word-break:break-all}' +
+        '.nota-itens{width:100%;max-width:100%;border-collapse:collapse;font-size:9pt;table-layout:auto}' +
+        '.nota-itens th,.nota-itens td{border-bottom:1px solid #ddd;padding:3pt;text-align:left;overflow-wrap:anywhere;word-break:break-word}' +
+        '.nota-itens th{font-weight:800}' +
+        '.nota-valores-pad{padding:6pt}' +
+        '.nota-subtotais{margin-top:4pt;font-size:9pt}' +
+        '.nota-total{text-align:right;font-size:11pt;font-weight:800;margin-top:4pt}' +
+        '.nota-sigs{display:block;margin-top:12pt}' +
+        '.nota-sig{display:inline-block;width:48%;vertical-align:top;text-align:center;font-size:9pt}' +
+        '.nota-sig-espaco{min-height:16mm;border-bottom:1px solid #000}' +
+        '.nota-sig-base{padding-top:4pt;font-weight:700}' +
+        '.nota-sig img{max-height:16mm;max-width:100%}' +
+        '.nota-fotos{display:block;padding:6pt}' +
+        '.nota-fotos img{width:42%;max-width:80mm;height:auto;max-height:32mm;object-fit:cover;margin:0 4pt 4pt 0}' +
+        'img,table,canvas{max-width:100%}' +
+        cssNotaCaberPagina() +
+        '@page{size:A4 portrait;margin:0}' +
+        '@media print{html,body{width:210mm!important;max-width:210mm!important;margin:0!important;padding:0!important}' +
+        '.nota-espelho{width:210mm!important;max-width:210mm!important;padding:10mm!important;box-sizing:border-box!important}}';
 }
 
 function montarHtmlDocumentoImpressao(htmlCorpo) {
@@ -293,7 +312,7 @@ function executarImpressaoHtml(html) {
         document.body.appendChild(iframe);
     }
     /* Precisa ter tamanho real — iframe 0×0 gera PDF em branco no Chrome */
-    iframe.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;border:0;z-index:-1;opacity:0;pointer-events:none;';
+    iframe.style.cssText = 'position:fixed;left:0;top:0;width:210mm;min-width:210mm;height:297mm;min-height:297mm;border:0;z-index:-1;opacity:0;pointer-events:none;background:#fff;';
 
     var idoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
     if (!idoc) {
@@ -597,59 +616,75 @@ function aguardarImagensElemento(el) {
     });
 }
 
+function aplicarEstilosNotaPagina(root) {
+    if (!root || !root.querySelectorAll) return;
+    var nota = root.classList && root.classList.contains('nota-espelho') ? root : root.querySelector('.nota-espelho');
+    if (nota) {
+        nota.style.setProperty('width', '100%', 'important');
+        nota.style.setProperty('max-width', '100%', 'important');
+        nota.style.setProperty('margin', '0', 'important');
+        nota.style.setProperty('padding', '10mm', 'important');
+        nota.style.setProperty('overflow', 'visible', 'important');
+        nota.style.setProperty('box-sizing', 'border-box', 'important');
+        nota.style.setProperty('transform', 'none', 'important');
+        nota.style.setProperty('background', '#fff', 'important');
+    }
+    root.querySelectorAll('.nota-grid,.nota-grid-compacta,.nota-sigs,.nota-fotos').forEach(function (el) {
+        el.style.setProperty('display', 'block', 'important');
+        el.style.setProperty('max-width', '100%', 'important');
+        el.style.setProperty('overflow', 'visible', 'important');
+        el.style.setProperty('grid-template-columns', 'none', 'important');
+        el.style.setProperty('transform', 'none', 'important');
+    });
+    root.querySelectorAll('.nota-campo').forEach(function (el) {
+        el.style.setProperty('display', 'block', 'important');
+        el.style.setProperty('max-width', '100%', 'important');
+        el.style.setProperty('overflow', 'visible', 'important');
+        el.style.setProperty('float', 'none', 'important');
+    });
+    root.querySelectorAll('.nota-topo-dados .linha').forEach(function (ln) {
+        ln.style.whiteSpace = 'normal';
+        ln.style.overflowWrap = 'anywhere';
+        ln.style.wordBreak = 'break-word';
+    });
+    var tabela = root.querySelector('.nota-topo-linha');
+    if (tabela) {
+        tabela.style.cssText = 'width:100%;border-collapse:collapse;table-layout:fixed;display:table;';
+        var logoTd = root.querySelector('.nota-topo-logo');
+        var dadosTd = root.querySelector('.nota-topo-dados');
+        if (logoTd) logoTd.style.cssText = 'width:42%;vertical-align:middle;padding:0 10px 0 0;display:table-cell;overflow:visible;';
+        if (dadosTd) dadosTd.style.cssText = 'width:58%;vertical-align:middle;padding:0;display:table-cell;text-align:left;font-size:9.5pt;line-height:1.3;color:#222;overflow:visible;';
+        var img = root.querySelector('.nota-topo-logo img');
+        if (img) img.style.cssText = 'display:block;width:100%;max-height:110px;height:auto;object-fit:contain;object-position:left center;';
+    }
+}
+
 async function montarElementoRenderNota(html) {
     await carregarHtml2Pdf();
     var htmlFonte = html || obterHtmlNotaAtual();
     var velho = document.getElementById('hmPdfRenderTemp');
     if (velho && velho.parentNode) velho.parentNode.removeChild(velho);
 
-    var iframe = document.createElement('iframe');
-    iframe.id = 'hmPdfRenderTemp';
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.cssText = 'position:fixed;left:0;top:0;width:794px;height:1123px;border:0;background:#fff;z-index:-1;opacity:0.01;pointer-events:none;';
-    document.body.appendChild(iframe);
-    var idoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
-    if (!idoc) {
-        iframe.remove();
-        throw new Error('iframe pdf');
-    }
-    idoc.open();
-    idoc.write(montarHtmlDocumentoImpressao(htmlFonte));
-    idoc.close();
-    idoc.documentElement.style.margin = '0';
-    idoc.body.style.margin = '0';
-    idoc.body.style.padding = '16px';
-    idoc.body.style.background = '#fff';
-    idoc.body.style.overflow = 'visible';
+    var wrap = document.createElement('div');
+    wrap.id = 'hmPdfRenderTemp';
+    wrap.setAttribute('aria-hidden', 'true');
+    wrap.style.cssText = 'position:fixed;left:0;top:0;width:794px;min-width:794px;max-width:794px;height:auto;border:0;background:#fff;z-index:-1;opacity:0.01;pointer-events:none;overflow:visible;padding:0;margin:0;box-sizing:border-box;';
+    var estilo = document.createElement('style');
+    estilo.textContent =
+        '#hmPdfRenderTemp,#hmPdfRenderTemp *{box-sizing:border-box!important}' +
+        '#hmPdfRenderTemp{width:794px!important;max-width:794px!important;overflow:visible!important}' +
+        '#hmPdfRenderTemp .nota-espelho{width:100%!important;max-width:100%!important;padding:10mm!important;margin:0!important;overflow:visible!important;background:#fff!important}' +
+        '#hmPdfRenderTemp .nota-grid,#hmPdfRenderTemp .nota-grid-compacta,#hmPdfRenderTemp .nota-sigs,#hmPdfRenderTemp .nota-fotos{display:block!important;max-width:100%!important;overflow:visible!important;grid-template-columns:none!important}' +
+        '#hmPdfRenderTemp .nota-campo,#hmPdfRenderTemp .nota-campo.full{display:block!important;max-width:100%!important;overflow:visible!important}';
+    wrap.appendChild(estilo);
+    wrap.insertAdjacentHTML('beforeend', htmlFonte);
+    document.body.appendChild(wrap);
 
-    var alvo = idoc.querySelector('.nota-espelho') || idoc.body;
-    alvo.style.width = '100%';
-    alvo.style.maxWidth = '100%';
-    alvo.style.margin = '0';
-    alvo.style.overflow = 'visible';
-    alvo.style.transform = 'none';
-    alvo.style.boxSizing = 'border-box';
-    idoc.querySelectorAll('.nota-topo-dados .linha').forEach(function (ln) {
-        ln.style.whiteSpace = 'normal';
-        ln.style.overflowWrap = 'anywhere';
-        ln.style.wordBreak = 'break-word';
-    });
-
-    var tabela = idoc.querySelector('.nota-topo-linha');
-    if (tabela) {
-        tabela.style.cssText = 'width:100%;border-collapse:collapse;table-layout:fixed;display:table;';
-        var logoTd = idoc.querySelector('.nota-topo-logo');
-        var dadosTd = idoc.querySelector('.nota-topo-dados');
-        if (logoTd) logoTd.style.cssText = 'width:42%;vertical-align:middle;padding:0 10px 0 0;display:table-cell;';
-        if (dadosTd) dadosTd.style.cssText = 'width:58%;vertical-align:middle;padding:0;display:table-cell;text-align:left;font-size:9.5pt;line-height:1.3;color:#222;';
-        var img = idoc.querySelector('.nota-topo-logo img');
-        if (img) img.style.cssText = 'display:block;width:100%;max-height:110px;height:auto;object-fit:contain;object-position:left center;';
-    }
-
+    var alvo = wrap.querySelector('.nota-espelho') || wrap;
+    aplicarEstilosNotaPagina(wrap);
     await aguardarImagensElemento(alvo);
-    var h = Math.max(alvo.scrollHeight + 48, idoc.body.scrollHeight + 48, 1123);
-    iframe.style.height = h + 'px';
-    return { wrap: iframe, alvo: alvo };
+    wrap.style.height = Math.max(alvo.scrollHeight, wrap.scrollHeight, 1123) + 'px';
+    return { wrap: wrap, alvo: alvo };
 }
 
 function optHtml2CanvasNota() {
@@ -659,40 +694,32 @@ function optHtml2CanvasNota() {
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: 794,
         imageTimeout: 8000,
         onclone: function (doc) {
-            var b = doc.body;
-            if (b) {
-                b.style.margin = '0';
-                b.style.padding = '16px';
-                b.style.background = '#fff';
-                b.style.transform = 'none';
-            }
-            doc.querySelectorAll('.nota-topo-dados .linha').forEach(function (ln) {
-                ln.style.whiteSpace = 'normal';
-                ln.style.overflowWrap = 'anywhere';
-            });
+            var extra = doc.createElement('style');
+            extra.textContent = '.html2pdf__container,.html2pdf__container *{box-sizing:border-box!important;overflow:visible!important}' +
+                '.html2pdf__overlay{opacity:1!important;overflow:visible!important}' +
+                '.html2pdf__container .nota-espelho{width:100%!important;max-width:100%!important;padding:10mm!important;margin:0!important;overflow:visible!important;transform:none!important}' +
+                cssNotaCaberPagina();
+            (doc.head || doc.documentElement).appendChild(extra);
+            var cont = doc.querySelector('.html2pdf__container') || doc.body;
+            aplicarEstilosNotaPagina(cont);
         }
     };
 }
 
 async function gerarPdfBlobDaNota(html, nomeArq) {
     var prep = await montarElementoRenderNota(html);
-    var opt = {
-        margin: [10, 10, 10, 10],
-        filename: nomeArq || 'ORCAMENTO.pdf',
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: optHtml2CanvasNota(),
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-        enableLinks: false
-    };
-
     try {
-        return await html2pdf().set(opt).from(prep.alvo).outputPdf('blob');
+        return await html2pdf().set({
+            margin: 0,
+            filename: nomeArq || 'ORCAMENTO.pdf',
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: optHtml2CanvasNota(),
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['css', 'legacy'] },
+            enableLinks: false
+        }).from(prep.alvo).outputPdf('blob');
     } finally {
         if (prep.wrap && prep.wrap.parentNode) prep.wrap.parentNode.removeChild(prep.wrap);
     }
@@ -701,10 +728,12 @@ async function gerarPdfBlobDaNota(html, nomeArq) {
 async function gerarJpegBlobDaNota(html) {
     var prep = await montarElementoRenderNota(html);
     try {
-        var canvas = await html2pdf().set({
+        var worker = html2pdf().set({
             html2canvas: optHtml2CanvasNota(),
             image: { type: 'jpeg', quality: 0.92 }
         }).from(prep.alvo).toCanvas();
+        await worker;
+        var canvas = worker.prop && worker.prop.canvas;
         return await new Promise(function (resolve, reject) {
             if (!canvas || !canvas.toBlob) {
                 reject(new Error('canvas'));
