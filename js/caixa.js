@@ -1505,6 +1505,14 @@ function gerarRelatorioMensalPDF(filtro, mesAnoFixo) {
         return;
     }
     var montado = montarHtmlSecoesRelatorioMes(itens, filtro);
+    var ymRel = mesAno.slice(3) + '-' + mesAno.slice(0, 2);
+    var nAtend = 0;
+    if (typeof contarAtendimentosNoMes === 'function') {
+        nAtend = contarAtendimentosNoMes((typeof carregarMain === 'function') ? carregarMain() : db, ymRel).total;
+    }
+    var boxAtend =
+        '<div class="resumo"><div class="resumo-box" style="color:#1e3a5f">ATENDIMENTOS NO MÊS (OS + VENDA)<b>' +
+        nAtend + '</b></div></div>';
     var titulo = REL_MES_TITULOS[filtro] || REL_MES_TITULOS.geral;
     var html =
         '<div class="nota-espelho relatorio-mensal-print">' +
@@ -1523,6 +1531,7 @@ function gerarRelatorioMensalPDF(filtro, mesAnoFixo) {
         '.relatorio-mensal-print table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:11px}' +
         '.relatorio-mensal-print th{background:#ecf0f1;color:#111;padding:8px;text-align:left;font-size:10px;border-bottom:2px solid #bdc3c7}' +
         '</style>' +
+        boxAtend +
         montado.html +
         '<div style="text-align:center;margin-top:24px;font-size:9px;color:#777">' +
         'Documento gerado pelo Joninha Suspensões em ' + esc(new Date().toLocaleString('pt-BR')) +

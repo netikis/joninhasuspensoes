@@ -129,7 +129,9 @@ function abrirPainel(id, btn, opcoes) {
         setTimeout(focarLeitor, 80);
     }
     if (id === 'painelOrcamento') {
-        prepararVendaForm();
+        if (!(typeof vendaEmEdicaoId !== 'undefined' && vendaEmEdicaoId)) {
+            prepararVendaForm();
+        }
         renderCarrinhoVenda();
     }
     if (id === 'painelRelatorioCaixa') renderRelatorioCaixa();
@@ -249,6 +251,12 @@ document.querySelectorAll('[data-relatorio-servicos]').forEach(function (btn) {
         if (typeof abrirRelatorioServicos === 'function') {
             abrirRelatorioServicos(btn.getAttribute('data-relatorio-servicos'));
         }
+    });
+});
+
+document.querySelectorAll('[data-atend-mes]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        if (typeof abrirModalAtendimentosMes === 'function') abrirModalAtendimentosMes();
     });
 });
 

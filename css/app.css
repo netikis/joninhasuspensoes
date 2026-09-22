@@ -3353,3 +3353,52 @@
             text-transform: uppercase;
         }
         .os-bloco-valores-corpo { padding: 12px 14px 14px; }
+
+        .alerta-novo-mes-atend {
+            margin: 10px 0 14px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            background: #0f2744;
+            border: 2px solid #c9a227;
+            color: #fff;
+            font-weight: 700;
+            line-height: 1.45;
+        }
+        .alerta-novo-mes-atend .alerta-vencidos-acao {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .atend-mes-agora {
+            background: #f4f7fb;
+            border: 1px solid #d5deea;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        #atendMesLista table {
+            width: 100%;
+            background: #fff;
+        }
+        #atendMesLista th, #atendMesLista td {
+            color: #0f172a;
+            padding: 8px;
+        }
+        #modalAtendimentosMes .modal-box {
+            background: #fff;
+            color: #0f172a;
+        }
+        .rof-detalhe {
+            overflow-x: auto;
+        }
+        .rof-detalhe table {
+            min-width: 760px;
+        }
+        .rof-detalhe tr.row-click {
+            cursor: pointer;
+        }
+        .rof-detalhe tr.row-click:hover {
+            background: #eef4ff;
+        }

@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=66">
-    <link rel="stylesheet" href="css/tema-m3.css?v=66">
+    <link rel="stylesheet" href="css/app.css?v=67">
+    <link rel="stylesheet" href="css/tema-m3.css?v=67">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -187,6 +187,7 @@
                 <div class="hero-tag">Timbre oficial · Joninha Suspensões</div>
             </div>
             <div id="alertaVencidos30" class="alerta-vencidos-30" style="display:none"></div>
+            <div id="alertaNovoMesAtend" class="alerta-novo-mes-atend" style="display:none"></div>
             <div class="box box-andamento-destaque" id="boxCarrosAndamentoInicio">
                 <div class="bloco-recolhe-cab">
                     <h2>🔧 Carros em andamento <span class="bloco-recolhe-qtd" id="qtdCarrosAndamentoInicio"></span></h2>
@@ -242,10 +243,10 @@
                     <div class="v" id="kpiCarrosAberto">0</div>
                     <div class="card-sub">Ainda não foram ao caixa</div>
                 </button>
-                <button type="button" class="card card-atalho" data-goto="painelHistorico">
-                    <div class="k">Atendimentos</div>
+                <button type="button" class="card card-atalho" data-atend-mes="1" title="Ver atendimentos do mês e zerar o contador">
+                    <div class="k">Atendimentos do mês</div>
                     <div class="v" id="kpiAtend">0</div>
-                    <div class="card-sub">OS + venda rápida juntas</div>
+                    <div class="card-sub" id="kpiAtendSub">OS + venda · toque para ver / zerar</div>
                 </button>
                 <button type="button" class="card card-atalho" data-goto="painelProdutos">
                     <div class="k">Produtos</div>
@@ -1208,6 +1209,15 @@
                             <button type="button" class="btn btn-pdf" data-rel-mes="geral">📄 PDF</button>
                         </div>
                     </div>
+                    <div class="item-relatorio-mes">
+                        <div>
+                            <span class="titulo-relatorio">🧾 Atendimentos do mês</span>
+                            <span class="desc-relatorio">Quantos atendimentos (OS + venda) aquele mês teve — fica salvo mesmo depois de zerar o painel</span>
+                        </div>
+                        <div class="acoes-relatorio-mes">
+                            <button type="button" class="btn btn-secondary" id="btnVerAtendMesRel">Ver meses</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1233,7 +1243,7 @@
         <section id="painelRelatorioOficina" class="panel">
             <div class="box">
                 <h2>📊 Relatório Oficina — Lucro da casa</h2>
-                <p class="hint">Só entra o que está <strong>PAGO</strong> (OS + vendas do balcão). Data de corte = data do pagamento no caixa; se não houver, usa a data da OS/venda. Lucro da casa = lucro peças + MO da casa − despesas. Comissão do funcionário fica separada.</p>
+                <p class="hint">Só entra o que está <strong>PAGO</strong> (OS + vendas do balcão). <strong>Clique na linha</strong> para abrir a OS ou a venda. Data de corte = data do pagamento no caixa; se não houver, usa a data da OS/venda. Lucro da casa = lucro peças + MO da casa − despesas. Comissão do funcionário fica separada.</p>
                 <div class="row" style="margin-bottom:12px">
                     <div class="col"><label>Período</label>
                         <select id="rofPeriodo">
@@ -1262,7 +1272,7 @@
             </div>
             <div class="box" id="rofConteudo">
                 <h2>Detalhamento</h2>
-                <div id="rofDetalhe" class="muted">Escolha o período e clique em Atualizar.</div>
+                <div id="rofDetalhe" class="muted rof-detalhe">Escolha o período e clique em Atualizar.</div>
             </div>
         </section>
 
@@ -1635,6 +1645,22 @@
 
     <div class="toast" id="toast"></div>
 
+    <div class="modal-overlay" id="modalAtendimentosMes">
+        <div class="modal-box" style="width:min(560px,100%)">
+            <h3>Atendimentos por mês</h3>
+            <p class="hint" id="atendMesHint">O painel mostra só o mês atual. Zerar não apaga o histórico — o total de cada mês fica aqui e no relatório mensal.</p>
+            <div class="atend-mes-agora" id="atendMesAgora"></div>
+            <div class="row" style="margin-top:10px">
+                <button type="button" class="btn btn-ok" id="btnZerarAtendMesModal">Zerar contador do painel</button>
+                <button type="button" class="btn btn-secondary" id="btnAtendMesHistorico">Abrir histórico</button>
+            </div>
+            <div id="atendMesLista" style="margin-top:14px"></div>
+            <div class="modal-acoes" style="margin-top:14px">
+                <button type="button" class="btn btn-primary" id="btnAtendMesFechar">Fechar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modalRelatorioServicos">
         <div class="modal-box" style="width:min(920px,100%)">
             <h3 id="modalRelServTitulo">Serviços</h3>
@@ -1842,17 +1868,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=66"></script>
-    <script src="js/storage.js?v=66"></script>
-    <script src="js/ui.js?v=66"></script>
-    <script src="js/auth.js?v=66"></script>
-    <script src="js/os.js?v=66"></script>
-    <script src="js/nuvem.js?v=66"></script>
-    <script src="js/caixa.js?v=66"></script>
-    <script src="js/comissoes.js?v=66"></script>
-    <script src="js/app.js?v=66"></script>
-    <script src="js/perfil-cliente.js?v=66"></script>
-    <script src="js/navegacao.js?v=66"></script>
+    <script src="js/config.js?v=67"></script>
+    <script src="js/storage.js?v=67"></script>
+    <script src="js/ui.js?v=67"></script>
+    <script src="js/auth.js?v=67"></script>
+    <script src="js/os.js?v=67"></script>
+    <script src="js/nuvem.js?v=67"></script>
+    <script src="js/caixa.js?v=67"></script>
+    <script src="js/comissoes.js?v=67"></script>
+    <script src="js/app.js?v=67"></script>
+    <script src="js/perfil-cliente.js?v=67"></script>
+    <script src="js/navegacao.js?v=67"></script>
 </body>
 </html>
 

@@ -54,8 +54,27 @@ function estadoVazio() {
         pendentes: [],
         caixaConfig: { inicialBalcao: 0, inicialBanco: 0 },
         fechamentosCaixa: [],
-        excluidos: excluidosVazio()
+        excluidos: excluidosVazio(),
+        contagemAtendimentosMes: {},
+        contadorPainelAtend: null
     };
+}
+
+function mesclarFuncionarios(a, b) {
+    var map = {};
+    function add(lista) {
+        (lista || []).forEach(function (f) {
+            if (!f || !f.id) return;
+            var id = String(f.id);
+            var prev = map[id];
+            if (!prev || String(f.atualizadoEm || f.criadoEm || '') > String(prev.atualizadoEm || prev.criadoEm || '')) {
+                map[id] = f;
+            }
+        });
+    }
+    add(a);
+    add(b);
+    return Object.keys(map).map(function (k) { return map[k]; });
 }
 
 function excluidosVazio() {
@@ -182,7 +201,9 @@ function carregar() {
         caixaBanco: int.caixaBanco || [],
         pendentes: int.pendentes || [],
         caixaConfig: int.caixaConfig || { inicialBalcao: 0, inicialBanco: 0 },
-        funcionarios: int.funcionarios || [],
+        funcionarios: (typeof mesclarFuncionarios === 'function'
+            ? mesclarFuncionarios(main.funcionarios, int.funcionarios)
+            : (int.funcionarios || []).concat(main.funcionarios || [])),
         pagamentosFuncionarios: int.pagamentosFuncionarios || []
     });
 }
@@ -207,6 +228,11 @@ function salvar(db) {
         main.clientes = db.clientes || main.clientes;
         main.atendimentos = db.atendimentos || main.atendimentos;
         main.produtos = db.produtos || [];
+        if (typeof mesclarFuncionarios === 'function') {
+            main.funcionarios = mesclarFuncionarios(main.funcionarios, db.funcionarios);
+        } else if (db.funcionarios && db.funcionarios.length && !(main.funcionarios || []).length) {
+            main.funcionarios = db.funcionarios;
+        }
         if (db.excluidos) main.excluidos = garantirExcluidos(db);
         salvarMain(main);
     }

@@ -1404,12 +1404,16 @@ function atualizarKPIs(db) {
         if (el) el.textContent = val;
     };
     setTxt('kpiClientes', db.clientes.length);
-    var nVend = (db.orcamentos || []).filter(function (o) {
-        if (!o) return false;
-        var t = String(o.tipo || 'VENDA').toUpperCase();
-        return t === 'VENDA' || t === 'ORCAMENTO';
-    }).length;
-    setTxt('kpiAtend', (db.atendimentos || []).length + nVend);
+    var contMes = (typeof qtdPainelAtendimentosMes === 'function')
+        ? qtdPainelAtendimentosMes(db)
+        : ((db.atendimentos || []).length);
+    setTxt('kpiAtend', contMes);
+    var subAt = document.getElementById('kpiAtendSub');
+    if (subAt && typeof rotuloMesYm === 'function' && typeof ymAtual === 'function') {
+        subAt.textContent = rotuloMesYm(ymAtual()) + ' · toque para ver / zerar';
+    }
+    if (typeof sincronizarArquivoContagemMes === 'function') sincronizarArquivoContagemMes(db);
+    if (typeof renderBannerNovoMesAtend === 'function') renderBannerNovoMesAtend(db);
     setTxt('kpiProd', db.produtos.length);
     var cfg = db.caixaConfig || { inicialBalcao: 0, inicialBanco: 0 };
     var entradas = (db.caixa || []).filter(function (x) { return x.tipo === 'entrada'; })
@@ -1443,6 +1447,236 @@ function atualizarKPIs(db) {
     if (typeof renderCarrosEmAberto === 'function') renderCarrosEmAberto(db);
     if (typeof renderAlertaVencidos30 === 'function') renderAlertaVencidos30(db);
 }
+
+function ymAtual() {
+    return ((typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10)).slice(0, 7);
+}
+
+function mesAnteriorYm(ym) {
+    var p = String(ym || ymAtual()).split('-');
+    var y = Number(p[0]) || 0;
+    var m = Number(p[1]) || 1;
+    m -= 1;
+    if (m < 1) { m = 12; y -= 1; }
+    return y + '-' + (m < 10 ? '0' : '') + m;
+}
+
+function rotuloMesYm(ym) {
+    var p = String(ym || '').split('-');
+    var nomes = ['', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+        'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    var m = Number(p[1]) || 0;
+    return (nomes[m] || p[1] || '') + (p[0] ? ' de ' + p[0] : '');
+}
+
+function dataDocAtendimento(a) {
+    return String((a && (a.entrada || a.recebidoEm || a.criadoEm)) || '').slice(0, 10);
+}
+
+function dataDocVendaContagem(o) {
+    return String((o && (o.dataEmissao || o.criadoEm)) || '').slice(0, 10);
+}
+
+function contarAtendimentosNoMes(db, ym) {
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
+    ym = ym || ymAtual();
+    var nOs = 0;
+    (db.atendimentos || []).forEach(function (a) {
+        if (a && dataDocAtendimento(a).slice(0, 7) === ym) nOs += 1;
+    });
+    var nVd = 0;
+    (db.orcamentos || []).forEach(function (o) {
+        if (!o) return;
+        var t = String(o.tipo || 'VENDA').toUpperCase();
+        if (t !== 'VENDA' && t !== 'ORCAMENTO') return;
+        if (dataDocVendaContagem(o).slice(0, 7) === ym) nVd += 1;
+    });
+    return { os: nOs, vendas: nVd, total: nOs + nVd };
+}
+
+function arquivoContagemMes(db) {
+    if (!db.contagemAtendimentosMes || typeof db.contagemAtendimentosMes !== 'object' || Array.isArray(db.contagemAtendimentosMes)) {
+        db.contagemAtendimentosMes = {};
+    }
+    return db.contagemAtendimentosMes;
+}
+
+function gravarContagemMes(db, ym, qtd) {
+    var arq = arquivoContagemMes(db);
+    var prev = arq[ym] || {};
+    arq[ym] = {
+        qtd: Number(qtd) || 0,
+        atualizadoEm: new Date().toISOString(),
+        fechadoEm: prev.fechadoEm || ''
+    };
+}
+
+function sincronizarArquivoContagemMes(db) {
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
+    var ym = ymAtual();
+    var live = contarAtendimentosNoMes(db, ym);
+    var arq = arquivoContagemMes(db);
+    var prev = arq[ym];
+    if (!prev || Number(prev.qtd) !== live.total) {
+        gravarContagemMes(db, ym, live.total);
+        if (typeof salvarMain === 'function') salvarMain(db);
+        else salvar(db);
+    }
+}
+
+function qtdPainelAtendimentosMes(db) {
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
+    var ym = ymAtual();
+    var cfg = db.contadorPainelAtend || {};
+    if (cfg.mes === ym && cfg.zeradoEm) {
+        var corte = String(cfg.zeradoEm).slice(0, 10);
+        var extra = 0;
+        (db.atendimentos || []).forEach(function (a) {
+            var d = dataDocAtendimento(a);
+            if (d.slice(0, 7) === ym && d >= corte) extra += 1;
+        });
+        (db.orcamentos || []).forEach(function (o) {
+            if (!o) return;
+            var t = String(o.tipo || 'VENDA').toUpperCase();
+            if (t !== 'VENDA' && t !== 'ORCAMENTO') return;
+            var d = dataDocVendaContagem(o);
+            if (d.slice(0, 7) === ym && d >= corte) extra += 1;
+        });
+        return extra;
+    }
+    return contarAtendimentosNoMes(db, ym).total;
+}
+
+function zerarContadorAtendimentosPainel() {
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+    var ym = ymAtual();
+    var live = contarAtendimentosNoMes(db, ym);
+    gravarContagemMes(db, ym, live.total);
+    var arq = arquivoContagemMes(db);
+    if (arq[ym]) arq[ym].fechadoEm = new Date().toISOString();
+    db.contadorPainelAtend = { mes: ym, zeradoEm: hojeISO(), qtdNoReset: live.total };
+    try { localStorage.setItem('joninha_mes_atend_visto', ym); } catch (eV) { /* ok */ }
+    if (typeof salvarMain === 'function') salvarMain(db);
+    else salvar(db);
+    atualizarKPIs(db);
+    if (typeof renderListaAtendimentosMes === 'function') renderListaAtendimentosMes();
+    toast(live.total + ' atendimentos de ' + rotuloMesYm(ym) + ' ficaram no relatório. O painel começa do zero.');
+}
+
+function renderBannerNovoMesAtend(db) {
+    var el = document.getElementById('alertaNovoMesAtend');
+    if (!el) return;
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
+    var ym = ymAtual();
+    var visto = '';
+    try { visto = localStorage.getItem('joninha_mes_atend_visto') || ''; } catch (eV) { visto = ''; }
+    if (!visto) {
+        try { localStorage.setItem('joninha_mes_atend_visto', ym); } catch (eS) { /* ok */ }
+        el.style.display = 'none';
+        return;
+    }
+    if (visto === ym) {
+        el.style.display = 'none';
+        return;
+    }
+    var prev = mesAnteriorYm(ym);
+    var qtdPrev = contarAtendimentosNoMes(db, prev).total;
+    if (arquivoContagemMes(db)[prev] && Number(arquivoContagemMes(db)[prev].qtd) > qtdPrev) {
+        qtdPrev = Number(arquivoContagemMes(db)[prev].qtd);
+    }
+    gravarContagemMes(db, prev, qtdPrev);
+    el.style.display = '';
+    el.innerHTML = '<div>Começou <strong>' + esc(rotuloMesYm(ym)) + '</strong>. ' +
+        esc(rotuloMesYm(prev)) + ' teve <strong>' + qtdPrev + '</strong> atendimentos — esse número ficou no relatório mensal.</div>' +
+        '<div class="alerta-vencidos-acao">' +
+        '<button type="button" class="btn btn-ok" id="btnZerarAtendMes">Zerar contador do painel</button>' +
+        '<button type="button" class="btn btn-secondary" id="btnDispensarNovoMes">Depois</button></div>';
+    var b1 = document.getElementById('btnZerarAtendMes');
+    if (b1) b1.onclick = function () { zerarContadorAtendimentosPainel(); };
+    var b2 = document.getElementById('btnDispensarNovoMes');
+    if (b2) b2.onclick = function () {
+        try { localStorage.setItem('joninha_mes_atend_visto', ym); } catch (eD) { /* ok */ }
+        el.style.display = 'none';
+    };
+}
+
+function listarMesesContagemAtend(db) {
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
+    var set = {};
+    (db.atendimentos || []).forEach(function (a) {
+        var ym = dataDocAtendimento(a).slice(0, 7);
+        if (/^\d{4}-\d{2}$/.test(ym)) set[ym] = true;
+    });
+    (db.orcamentos || []).forEach(function (o) {
+        if (!o) return;
+        var t = String(o.tipo || 'VENDA').toUpperCase();
+        if (t !== 'VENDA' && t !== 'ORCAMENTO') return;
+        var ym = dataDocVendaContagem(o).slice(0, 7);
+        if (/^\d{4}-\d{2}$/.test(ym)) set[ym] = true;
+    });
+    Object.keys(arquivoContagemMes(db)).forEach(function (ym) { set[ym] = true; });
+    set[ymAtual()] = true;
+    return Object.keys(set).sort().reverse();
+}
+
+function renderListaAtendimentosMes() {
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+    var ym = ymAtual();
+    var live = contarAtendimentosNoMes(db, ym);
+    var painel = qtdPainelAtendimentosMes(db);
+    var agora = document.getElementById('atendMesAgora');
+    if (agora) {
+        agora.innerHTML = '<div>' + esc(rotuloMesYm(ym)) + '</div>' +
+            '<div style="font-size:1.6rem;margin-top:4px">' + painel + ' no painel</div>' +
+            '<div class="hint" style="margin:6px 0 0;font-weight:600">Total real do mês: <strong>' + live.total +
+            '</strong> (' + live.os + ' OS + ' + live.vendas + ' vendas) — este total vai para o relatório</div>';
+    }
+    var lista = document.getElementById('atendMesLista');
+    if (!lista) return;
+    var meses = listarMesesContagemAtend(db);
+    if (!meses.length) {
+        lista.innerHTML = '<div class="empty">Ainda não há atendimentos.</div>';
+        return;
+    }
+    lista.innerHTML = '<table><thead><tr><th>Mês</th><th>Atendimentos</th><th>OS</th><th>Vendas</th></tr></thead><tbody>' +
+        meses.map(function (m) {
+            var c = contarAtendimentosNoMes(db, m);
+            var arq = arquivoContagemMes(db)[m];
+            var qtd = Math.max(c.total, arq ? Number(arq.qtd) || 0 : 0);
+            return '<tr><td>' + esc(rotuloMesYm(m)) + '</td><td><strong>' + qtd + '</strong></td><td>' +
+                c.os + '</td><td>' + c.vendas + '</td></tr>';
+        }).join('') + '</tbody></table>';
+}
+
+function abrirModalAtendimentosMes() {
+    renderListaAtendimentosMes();
+    var overlay = document.getElementById('modalAtendimentosMes');
+    if (overlay) overlay.classList.add('aberto');
+}
+window.abrirModalAtendimentosMes = abrirModalAtendimentosMes;
+window.contarAtendimentosNoMes = contarAtendimentosNoMes;
+window.rotuloMesYm = rotuloMesYm;
+
+(function ligarModalAtendimentosMes() {
+    var fechar = document.getElementById('btnAtendMesFechar');
+    if (fechar) fechar.addEventListener('click', function () {
+        var o = document.getElementById('modalAtendimentosMes');
+        if (o) o.classList.remove('aberto');
+    });
+    var zerar = document.getElementById('btnZerarAtendMesModal');
+    if (zerar) zerar.addEventListener('click', function () {
+        if (!confirm('Zerar o contador do painel neste mês? O total do mês continua no relatório mensal.')) return;
+        zerarContadorAtendimentosPainel();
+    });
+    var hist = document.getElementById('btnAtendMesHistorico');
+    if (hist) hist.addEventListener('click', function () {
+        var o = document.getElementById('modalAtendimentosMes');
+        if (o) o.classList.remove('aberto');
+        if (typeof abrirPainel === 'function') abrirPainel('painelHistorico');
+    });
+    var rel = document.getElementById('btnVerAtendMesRel');
+    if (rel) rel.addEventListener('click', abrirModalAtendimentosMes);
+})();
 
 function atendimentoEmAberto(a) {
     if (!a) return false;
@@ -1642,12 +1876,12 @@ function montarLinhasRelatorioServicos(tipo) {
 function abrirDocumentoServico(linha) {
     var overlay = document.getElementById('modalRelatorioServicos');
     if (overlay) overlay.classList.remove('aberto');
-    if ((linha.atendimentoId || (linha.placa && linha.placa !== '—')) && typeof editarAtendimento === 'function') {
-        editarAtendimento(linha.atendimentoId, linha.placa || linha.cliente);
-        return;
-    }
     if (linha.vendaId && typeof editarDocumentoVenda === 'function') {
         editarDocumentoVenda(linha.vendaId);
+        return;
+    }
+    if ((linha.atendimentoId || (linha.placa && linha.placa !== '—')) && typeof editarAtendimento === 'function') {
+        editarAtendimento(linha.atendimentoId, linha.placa || linha.cliente);
         return;
     }
     toast('Este lançamento não tem OS/venda para abrir.');
@@ -2384,15 +2618,26 @@ function htmlPagamentoOs(a) {
     var descP = Number(a.descontoPerc) || 0;
     var recs = (a.recebimentos || []).slice();
     var recebido = Number(a.valorRecebido) || recs.reduce(function (s, r) { return s + (Number(r.valor) || 0); }, 0);
-    var aberto = a.saldoAberto != null
-        ? Number(a.saldoAberto)
-        : Math.max(0, (Number(a.total) || 0) - recebido);
+    var bruto = 0;
+    if (typeof totaisItens === 'function' && a.itens && a.itens.length) {
+        var tIt = totaisItens(a.itens);
+        bruto = Number(tIt && tIt.total) || 0;
+    }
+    if (!(bruto > 0) && typeof brutoOrcamentoOs === 'function') bruto = brutoOrcamentoOs(a);
+    if (!(bruto > 0)) bruto = Number(a.total) || 0;
+    var totalDoc = (typeof totalAposDescontoOs === 'function')
+        ? totalAposDescontoOs(bruto, descR, descP)
+        : Math.max(0, bruto - descR);
+    if (!(totalDoc > 0) && Number(a.total) > 0) totalDoc = Number(a.total) || 0;
+    var abertoCalc = Math.max(0, +(totalDoc - recebido).toFixed(2));
+    var aberto = a.saldoAberto != null ? Number(a.saldoAberto) : abertoCalc;
+    if (aberto > totalDoc + 0.009) aberto = abertoCalc;
     var st = String(a.statusPagamento || '').toUpperCase();
     if (!(descR > 0) && !(descP > 0) && !recs.length && !(recebido > 0) && !st) return '';
     var html = '<div class="nota-subtotais compacto" style="margin-top:10px">';
     if (descR > 0) html += '<div>Desconto R$: <strong>− ' + moeda(descR) + '</strong></div>';
     if (descP > 0) html += '<div>Desconto ' + esc(String(descP)) + '%: <strong>aplicado</strong></div>';
-    html += '<div>Total a receber: <strong>' + moeda(a.total) + '</strong></div>';
+    html += '<div>Total a receber: <strong>' + moeda(totalDoc) + '</strong></div>';
     if (recs.length) {
         html += '<div style="margin-top:6px"><b>Como recebeu</b></div>';
         recs.forEach(function (r) {
@@ -4489,8 +4734,21 @@ function formaPagamentoEhDigital(formaPag) {
 
 function obterDocumentoVendaPorId(id) {
     if (!id) return null;
-    var db = carregar();
-    return (db.orcamentos || []).find(function (o) { return o && String(o.id) === String(id); }) || null;
+    function achar(db) {
+        return (db.orcamentos || []).find(function (o) { return o && String(o.id) === String(id); }) || null;
+    }
+    var o = achar(carregar());
+    if (o) return o;
+    if (typeof carregarMain === 'function') {
+        o = achar(carregarMain());
+        if (o) return o;
+    }
+    if (typeof comCanalInterno === 'function') {
+        try {
+            comCanalInterno(function () { o = achar(carregar()); });
+        } catch (e) { o = o || null; }
+    }
+    return o || null;
 }
 
 function htmlDocumentoVenda(db, o) {
