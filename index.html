@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=65">
-    <link rel="stylesheet" href="css/tema-m3.css?v=65">
+    <link rel="stylesheet" href="css/app.css?v=66">
+    <link rel="stylesheet" href="css/tema-m3.css?v=66">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -1653,6 +1653,7 @@
             <p class="hint" id="receberOsResumo"></p>
             <p class="hint" id="receberOsJaRec" style="display:none;color:#0f7a3f;font-weight:700"></p>
 
+            <div class="rec-os-scroll">
             <label>Destino do caixa</label>
             <select id="recOsDestino">
                 <option value="normal">Caixa / Relatórios (oficial)</option>
@@ -1673,7 +1674,15 @@
             </div>
 
             <div class="rec-os-bloco">
-                <p class="rec-os-tit">3 e 4) Como recebeu (pode misturar)</p>
+                <p class="rec-os-tit">3 e 4) Como recebeu — toque na forma</p>
+                <div class="rec-os-formas" id="recOsFormas">
+                    <button type="button" class="btn btn-secondary" data-rec-forma="recOsDinheiro">💵 Dinheiro</button>
+                    <button type="button" class="btn btn-secondary" data-rec-forma="recOsPix">📱 PIX</button>
+                    <button type="button" class="btn btn-secondary" data-rec-forma="recOsDebito">💳 Débito</button>
+                    <button type="button" class="btn btn-secondary" data-rec-forma="recOsCredito">💳 Crédito</button>
+                    <button type="button" class="btn btn-secondary" data-rec-forma="recOsBoleto">📄 Boleto</button>
+                    <button type="button" class="btn btn-secondary" data-rec-forma="">⏳ Em aberto</button>
+                </div>
                 <div class="row">
                     <div class="col"><label>Dinheiro</label><input id="recOsDinheiro" type="number" step="0.01" min="0" placeholder="0,00"></div>
                     <div class="col"><label>PIX</label><input id="recOsPix" type="number" step="0.01" min="0" placeholder="0,00"></div>
@@ -1686,13 +1695,16 @@
                     <div class="col"><label>Boleto (fica em aberto)</label><input id="recOsBoleto" type="number" step="0.01" min="0" placeholder="0,00"></div>
                     <div class="col"><label>Boleto — dias para vencer</label><input id="recOsBoletoDias" type="number" step="1" min="0" placeholder="30"></div>
                 </div>
-                <div class="rec-os-linha"><span>Valor recebido agora</span><strong id="recOsRecebido">R$ 0,00</strong></div>
-                <div class="rec-os-linha rec-os-aberto"><span>Em aberto (vai ao perfil do cliente)</span><strong id="recOsAberto">R$ 0,00</strong></div>
+            </div>
             </div>
 
-            <div class="modal-acoes" style="flex-direction:column;gap:8px;margin-top:12px">
-                <button type="button" class="btn btn-ok" id="btnReceberOsConfirmar" style="width:100%">✅ Confirmar e mandar ao caixa</button>
-                <button type="button" class="btn btn-danger" id="btnReceberOsFechar" style="width:100%">Cancelar</button>
+            <div class="rec-os-rodape">
+                <div class="rec-os-linha"><span>Valor recebido agora</span><strong id="recOsRecebido">R$ 0,00</strong></div>
+                <div class="rec-os-linha rec-os-aberto"><span>Em aberto (vai ao perfil do cliente)</span><strong id="recOsAberto">R$ 0,00</strong></div>
+                <div class="modal-acoes" style="flex-direction:column;gap:8px;margin-top:10px">
+                    <button type="button" class="btn btn-ok" id="btnReceberOsConfirmar" style="width:100%">✅ Confirmar e mandar ao caixa</button>
+                    <button type="button" class="btn btn-danger" id="btnReceberOsFechar" style="width:100%">Cancelar</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1830,17 +1842,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=65"></script>
-    <script src="js/storage.js?v=65"></script>
-    <script src="js/ui.js?v=65"></script>
-    <script src="js/auth.js?v=65"></script>
-    <script src="js/os.js?v=65"></script>
-    <script src="js/nuvem.js?v=65"></script>
-    <script src="js/caixa.js?v=65"></script>
-    <script src="js/comissoes.js?v=65"></script>
-    <script src="js/app.js?v=65"></script>
-    <script src="js/perfil-cliente.js?v=65"></script>
-    <script src="js/navegacao.js?v=65"></script>
+    <script src="js/config.js?v=66"></script>
+    <script src="js/storage.js?v=66"></script>
+    <script src="js/ui.js?v=66"></script>
+    <script src="js/auth.js?v=66"></script>
+    <script src="js/os.js?v=66"></script>
+    <script src="js/nuvem.js?v=66"></script>
+    <script src="js/caixa.js?v=66"></script>
+    <script src="js/comissoes.js?v=66"></script>
+    <script src="js/app.js?v=66"></script>
+    <script src="js/perfil-cliente.js?v=66"></script>
+    <script src="js/navegacao.js?v=66"></script>
 </body>
 </html>
 

@@ -3416,6 +3416,36 @@ function calcRecOsTotais() {
     };
 }
 
+function limparCamposFormaReceberOs() {
+    ['recOsDinheiro', 'recOsPix', 'recOsDebito', 'recOsCredito', 'recOsBoleto'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+}
+
+function marcarFormaReceberOs(campoId) {
+    document.querySelectorAll('#recOsFormas [data-rec-forma]').forEach(function (b) {
+        var v = b.getAttribute('data-rec-forma') || '';
+        b.classList.toggle('ativa', v === String(campoId || ''));
+    });
+}
+
+function preencherFormaReceberOs(campoId) {
+    var tot = calcRecOsTotais();
+    var falta = Math.max(0, +((tot.totalFinal - tot.jaRecebido).toFixed(2)));
+    limparCamposFormaReceberOs();
+    if (campoId) {
+        var el = document.getElementById(campoId);
+        if (el) el.value = falta.toFixed(2);
+        if (campoId === 'recOsBoleto') {
+            var dias = document.getElementById('recOsBoletoDias');
+            if (dias && !(Number(dias.value) > 0)) dias.value = '30';
+        }
+    }
+    marcarFormaReceberOs(campoId || '');
+    calcRecOsTotais();
+}
+
 function abrirModalReceberOs(atendimentoId) {
     var info = obterAtendimentoParaReceber(atendimentoId);
     if (!info || !info.a) {
@@ -3464,6 +3494,7 @@ function abrirModalReceberOs(atendimentoId) {
     var diasEl = document.getElementById('recOsBoletoDias');
     if (diasEl) diasEl.value = a.boletoDias != null ? String(a.boletoDias) : '';
     calcRecOsTotais();
+    marcarFormaReceberOs('');
     document.getElementById('modalReceberOs').classList.add('aberto');
 }
 
@@ -3827,6 +3858,11 @@ if (btnRecOsOk) btnRecOsOk.addEventListener('click', confirmarRecebimentoOs);
 ['recOsDescReais', 'recOsDescPerc', 'recOsDinheiro', 'recOsPix', 'recOsDebito', 'recOsCredito', 'recOsBoleto', 'recOsBoletoDias'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.addEventListener('input', calcRecOsTotais);
+});
+document.querySelectorAll('#recOsFormas [data-rec-forma]').forEach(function (b) {
+    b.addEventListener('click', function () {
+        preencherFormaReceberOs(b.getAttribute('data-rec-forma') || '');
+    });
 });
 (function ligarModalRelatorioServicos() {
     var overlay = document.getElementById('modalRelatorioServicos');
