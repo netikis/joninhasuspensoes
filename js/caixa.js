@@ -367,6 +367,7 @@ function classificarTipoCaixaFh(x) {
     if (x.tipo === 'saida' || x.tipo === 'DESPESA') return { sigla: 'DESPESAS', cls: 'despesas' };
     if (x.tipo === 'fechamento' || x.origemFechamento) return { sigla: 'FECH.CAIXA', cls: 'fech' };
     if (x.atendimentoId || x.origemOficina) return { sigla: 'ORDEM.SERV.', cls: 'os' };
+    if (x.origemVenda || x.vendaId || x.orcamentoId) return { sigla: 'VENDA', cls: 'entrada' };
     var ids = resolverDocCaixa(x);
     if (ids.idOs) return { sigla: 'ORDEM.SERV.', cls: 'os' };
     if (ids.idVd) return { sigla: 'VENDA', cls: 'entrada' };
@@ -375,12 +376,16 @@ function classificarTipoCaixaFh(x) {
 
 function numDocCaixaFh(x) {
     if (x.osResumo && x.osResumo.placa) return String(x.osResumo.placa).toUpperCase();
+    if (x.vendaResumo && x.vendaResumo.numero != null && String(x.vendaResumo.numero) !== '') {
+        return String(x.vendaResumo.numero);
+    }
     if (x.numDoc) return String(x.numDoc);
     return String(x.id || '—').slice(-6).toUpperCase();
 }
 
 function clienteCaixaFh(x) {
     if (x.osResumo && x.osResumo.cliente) return x.osResumo.cliente;
+    if (x.vendaResumo && x.vendaResumo.cliente) return x.vendaResumo.cliente;
     if (x.clienteNome) return x.clienteNome;
     return x.descricao || '—';
 }
@@ -1361,10 +1366,12 @@ function coletarItensRelatorioMensal(db, filtro, mesAno) {
         var desc = x.descricao || '';
         if (x.atendimentoId && x.osResumo) {
             desc = '[OS ' + (x.osResumo.placa || '') + '] ' + desc;
+        } else if (x.vendaId || x.origemVenda) {
+            desc = '[VENDA' + (x.numDoc ? ' ' + x.numDoc : '') + '] ' + desc;
         }
         itens.push({
             data: fmtData(x.criadoEm),
-            doc: x.atendimentoId ? 'OS' : (canal === 'banco' ? 'BANCO' : 'CX'),
+            doc: x.atendimentoId ? 'OS' : ((x.vendaId || x.origemVenda || x.orcamentoId) ? 'VENDA' : (canal === 'banco' ? 'BANCO' : 'CX')),
             tipo: x.tipo === 'saida' ? 'SAÍDA' : 'ENTRADA',
             descricao: desc,
             forma: x.forma || '—',
@@ -1511,7 +1518,7 @@ function gerarRelatorioMensalPDF(filtro, mesAnoFixo) {
         nAtend = contarAtendimentosNoMes((typeof carregarMain === 'function') ? carregarMain() : db, ymRel).total;
     }
     var boxAtend =
-        '<div class="resumo"><div class="resumo-box" style="color:#1e3a5f">ATENDIMENTOS NO MÊS (OS + VENDA)<b>' +
+        '<div class="resumo"><div class="resumo-box" style="color:#1e3a5f">ATENDIMENTOS PAGOS NO MÊS (OS + VENDA)<b>' +
         nAtend + '</b></div></div>';
     var titulo = REL_MES_TITULOS[filtro] || REL_MES_TITULOS.geral;
     var html =

@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.3.68';
+var APP_VERSION = '1.3.69';
 
 function rotuloBuildApp() {
     var v = String(APP_VERSION || '');
@@ -57,14 +57,14 @@ var atendimentoNotaAtual = null;
 var canalVendas = 'normal'; /* normal | interno */
 
 var TITULOS = {
-    painelInicio: ['Painel', 'OS e venda rápida contam juntas · ganho nosso e custo das peças no topo'],
+    painelInicio: ['Painel', 'OS e venda pagas entram no caixa · peça avulsa sem abrir OS'],
     painelClientes: ['Cadastrar Cliente', 'Base de clientes Joninha Suspensões'],
     painelListaClientes: ['Clientes Cadastrados', 'Lista e edição rápida'],
     painelVeiculo: ['Ordem de Serviço / Veículo', 'Atendimento com veículo, serviços e valores'],
     painelHistorico: ['Histórico da oficina', 'OS e vendas no mesmo lugar — busque pelo cliente'],
     painelProdutos: ['Cadastro de Produtos', 'Estoque da oficina'],
-    painelOrcamento: ['Venda da oficina', 'Tudo que sai da oficina entra aqui e no histórico'],
-    painelCaixa: ['Caixa / Balcão', 'Clique nos cards para entrar em entradas, saídas, balanço ou oficina'],
+    painelOrcamento: ['Venda da oficina', 'Peça avulsa sem abrir OS · PAGO entra em Entradas (pagas)'],
+    painelCaixa: ['Caixa / Balcão', 'OS e venda pagas entram juntas em Entradas (pagas)'],
     painelCaixaBanco: ['Caixa do Banco', 'PIX · cartões · transferências'],
     painelPendentes: ['Contas a Receber', 'Valores em aberto'],
     painelRelatorioCaixa: ['Relatório Caixa', 'Resumo balcão · banco · pendentes · PDF mensal'],

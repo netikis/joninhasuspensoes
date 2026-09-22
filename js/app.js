@@ -1394,6 +1394,9 @@ function sincronizarPendentesDoAberto(db) {
 
 function atualizarKPIs(db) {
     /* KPIs do painel sempre do balcão oficial (não misturar com interno) */
+    if (typeof sincronizarOficinaNoCaixaEmpresa === 'function') {
+        try { sincronizarOficinaNoCaixaEmpresa(); } catch (eSyncCx) { /* ok */ }
+    }
     db = carregarMain();
     if (typeof sincronizarPendentesDoAberto === 'function' && sincronizarPendentesDoAberto(db)) {
         if (typeof salvarMain === 'function') salvarMain(db);
@@ -1410,7 +1413,7 @@ function atualizarKPIs(db) {
     setTxt('kpiAtend', contMes);
     var subAt = document.getElementById('kpiAtendSub');
     if (subAt && typeof rotuloMesYm === 'function' && typeof ymAtual === 'function') {
-        subAt.textContent = rotuloMesYm(ymAtual()) + ' · toque para ver / zerar';
+        subAt.textContent = rotuloMesYm(ymAtual()) + ' · OS e venda pagas · toque para ver / zerar';
     }
     if (typeof sincronizarArquivoContagemMes === 'function') sincronizarArquivoContagemMes(db);
     if (typeof renderBannerNovoMesAtend === 'function') renderBannerNovoMesAtend(db);
@@ -1474,7 +1477,17 @@ function dataDocAtendimento(a) {
 }
 
 function dataDocVendaContagem(o) {
-    return String((o && (o.dataEmissao || o.criadoEm)) || '').slice(0, 10);
+    return String((o && (o.dataEmissao || o.recebidoEm || o.criadoEm)) || '').slice(0, 10);
+}
+
+function osEstaPaga(a) {
+    return !!(a && String(a.statusPagamento || '').toUpperCase() === 'PAGO');
+}
+
+function vendaOficinaEstaPaga(o) {
+    if (!o) return false;
+    if (String(o.tipo || 'VENDA').toUpperCase() !== 'VENDA') return false;
+    return String(o.statusPagamento || '').toUpperCase() === 'PAGO';
 }
 
 function contarAtendimentosNoMes(db, ym) {
@@ -1482,13 +1495,12 @@ function contarAtendimentosNoMes(db, ym) {
     ym = ym || ymAtual();
     var nOs = 0;
     (db.atendimentos || []).forEach(function (a) {
-        if (a && dataDocAtendimento(a).slice(0, 7) === ym) nOs += 1;
+        if (!osEstaPaga(a)) return;
+        if (dataDocAtendimento(a).slice(0, 7) === ym) nOs += 1;
     });
     var nVd = 0;
     (db.orcamentos || []).forEach(function (o) {
-        if (!o) return;
-        var t = String(o.tipo || 'VENDA').toUpperCase();
-        if (t !== 'VENDA' && t !== 'ORCAMENTO') return;
+        if (!vendaOficinaEstaPaga(o)) return;
         if (dataDocVendaContagem(o).slice(0, 7) === ym) nVd += 1;
     });
     return { os: nOs, vendas: nVd, total: nOs + nVd };
@@ -1532,13 +1544,12 @@ function qtdPainelAtendimentosMes(db) {
         var corte = String(cfg.zeradoEm).slice(0, 10);
         var extra = 0;
         (db.atendimentos || []).forEach(function (a) {
+            if (!osEstaPaga(a)) return;
             var d = dataDocAtendimento(a);
             if (d.slice(0, 7) === ym && d >= corte) extra += 1;
         });
         (db.orcamentos || []).forEach(function (o) {
-            if (!o) return;
-            var t = String(o.tipo || 'VENDA').toUpperCase();
-            if (t !== 'VENDA' && t !== 'ORCAMENTO') return;
+            if (!vendaOficinaEstaPaga(o)) return;
             var d = dataDocVendaContagem(o);
             if (d.slice(0, 7) === ym && d >= corte) extra += 1;
         });
@@ -1604,13 +1615,12 @@ function listarMesesContagemAtend(db) {
     db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
     var set = {};
     (db.atendimentos || []).forEach(function (a) {
+        if (!osEstaPaga(a)) return;
         var ym = dataDocAtendimento(a).slice(0, 7);
         if (/^\d{4}-\d{2}$/.test(ym)) set[ym] = true;
     });
     (db.orcamentos || []).forEach(function (o) {
-        if (!o) return;
-        var t = String(o.tipo || 'VENDA').toUpperCase();
-        if (t !== 'VENDA' && t !== 'ORCAMENTO') return;
+        if (!vendaOficinaEstaPaga(o)) return;
         var ym = dataDocVendaContagem(o).slice(0, 7);
         if (/^\d{4}-\d{2}$/.test(ym)) set[ym] = true;
     });
@@ -1628,8 +1638,8 @@ function renderListaAtendimentosMes() {
     if (agora) {
         agora.innerHTML = '<div>' + esc(rotuloMesYm(ym)) + '</div>' +
             '<div style="font-size:1.6rem;margin-top:4px">' + painel + ' no painel</div>' +
-            '<div class="hint" style="margin:6px 0 0;font-weight:600">Total real do mês: <strong>' + live.total +
-            '</strong> (' + live.os + ' OS + ' + live.vendas + ' vendas) — este total vai para o relatório</div>';
+            '<div class="hint" style="margin:6px 0 0;font-weight:600">Total pago do mês: <strong>' + live.total +
+            '</strong> (' + live.os + ' OS + ' + live.vendas + ' vendas) — OS e venda da oficina entram juntas</div>';
     }
     var lista = document.getElementById('atendMesLista');
     if (!lista) return;
@@ -1806,6 +1816,9 @@ function finalizarEMandarAoCaixa(id) {
 window.finalizarEMandarAoCaixa = finalizarEMandarAoCaixa;
 
 function montarLinhasRelatorioServicos(tipo) {
+    if (typeof sincronizarOficinaNoCaixaEmpresa === 'function') {
+        try { sincronizarOficinaNoCaixaEmpresa(); } catch (eSyncRel) { /* ok */ }
+    }
     var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
     var linhas = [];
     if (tipo === 'andamento') {
@@ -1850,23 +1863,48 @@ function montarLinhasRelatorioServicos(tipo) {
             if (!at && typeof acharAtendimentoPorId === 'function') {
                 at = acharAtendimentoPorId(atId, os.placa || x.descricao);
             }
-            var placa = (os.placa || (at && at.placa) || (typeof placaDeTextoLivre === 'function' ? placaDeTextoLivre(x.descricao) : '') || '—').toUpperCase();
+            var vd = x.vendaResumo || {};
+            var placa = (os.placa || vd.placa || (at && at.placa) || (typeof placaDeTextoLivre === 'function' ? placaDeTextoLivre(x.descricao) : '') || '—').toUpperCase();
             var carro = os.carro || (at && at.carro) || '';
-            var cliente = os.cliente || (at && typeof nomeAtendimento === 'function' ? nomeAtendimento(db, at) : '') || x.descricao || '—';
+            var cliente = os.cliente || vd.cliente || x.clienteNome || (at && typeof nomeAtendimento === 'function' ? nomeAtendimento(db, at) : '') || x.descricao || '—';
+            var idVd = x.orcamentoId || x.vendaId || '';
+            var tipoLinha;
+            if (x.atendimentoId || x.origemOficina || at) tipoLinha = 'OS';
+            else if (idVd || x.origemVenda) {
+                tipoLinha = 'Venda' + (x.numDoc || vd.numero != null ? ' Nº ' + (x.numDoc || vd.numero) : '');
+            } else {
+                tipoLinha = origem || x.forma || 'Entrada';
+            }
             linhas.push({
                 data: x.criadoEm,
-                tipo: (x.atendimentoId || x.origemOficina || at) ? 'OS' : (origem || x.forma || 'Entrada'),
+                tipo: tipoLinha,
                 cliente: cliente,
                 carro: carro,
                 placa: placa,
                 valor: Number(x.valor) || 0,
                 atendimentoId: atId || (at && at.id) || '',
-                vendaId: x.orcamentoId || x.vendaId || ''
+                vendaId: idVd
             });
         });
     }
     addLanc(db.caixa, 'Balcão');
     addLanc(db.caixaBanco, 'Banco');
+    var idsVdRel = {};
+    linhas.forEach(function (l) { if (l.vendaId) idsVdRel[String(l.vendaId)] = true; });
+    (db.orcamentos || []).forEach(function (o) {
+        if (!vendaOficinaEstaPaga(o) || !o.id || idsVdRel[String(o.id)]) return;
+        linhas.push({
+            data: o.dataEmissao || o.recebidoEm || o.criadoEm,
+            tipo: 'Venda' + (o.numero != null ? ' Nº ' + o.numero : ''),
+            cliente: o.clienteNome || '—',
+            carro: '',
+            placa: (o.placa || '—').toUpperCase(),
+            valor: Number(o.valor) || Number(o.valorRecebido) || 0,
+            atendimentoId: '',
+            vendaId: o.id
+        });
+        idsVdRel[String(o.id)] = true;
+    });
     linhas.sort(function (a, b) {
         return String(b.data || '').localeCompare(String(a.data || ''));
     });
@@ -1900,7 +1938,7 @@ function abrirRelatorioServicos(tipo) {
         return;
     }
     var titulos = {
-        entradas: ['Serviços e entradas', 'Clique na linha para abrir a OS ou a venda daquele cliente.'],
+        entradas: ['Entradas pagas', 'OS e venda da oficina (peça avulsa, sem abrir OS). Clique para abrir o documento.'],
         oficina: ['Serviços da oficina', 'OS e vendas pagas do período. Clique para abrir o documento.']
     };
     var t = titulos[tipo] || titulos.entradas;
@@ -4984,12 +5022,12 @@ function atualizarUIVendaPorCanal() {
     if (titulo) {
         titulo.textContent = interno
             ? '🛒 Venda interna — somente para funcionário'
-            : '🛒 Lançar venda — balcão / serviço imediato';
+            : '🛒 Venda da oficina';
     }
     if (hint) {
         hint.innerHTML = interno
             ? 'No modo interno a venda é <strong>só para funcionário cadastrado</strong>. Baixa o estoque unificado; dinheiro → caixa interno; PIX/cartão → banco interno.'
-            : 'Venda baixa estoque; <strong>Dinheiro</strong> → Caixa Balcão; <strong>PIX/Cartão/Boleto</strong> → Caixa do Banco; <strong>Pendente</strong> → Contas a Receber.';
+            : 'Para vender só um amortecedor (ou qualquer peça), use esta tela — <strong>não precisa abrir OS</strong>. Status <strong>PAGO</strong> entra em <strong>Entradas (pagas)</strong> do caixa, junto com as OS. Dinheiro → Balcão; PIX/Cartão → Banco; Pendente → Contas a receber.';
     }
     if (interno) preencherSelectFuncionariosVenda();
 }
@@ -6179,16 +6217,12 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
             }
             splitsPost = splitsPost.filter(function (r) { return (Number(r.valor) || 0) > 0.009; });
         }
+        if (tipo === 'VENDA' && status === 'PAGO' && !splitsPost.length) {
+            var vForceCx = Number(totais.total) || Number(totais.valorRecebido) || 0;
+            if (vForceCx > 0.009) splitsPost = [{ forma: forma || 'Dinheiro', valor: vForceCx }];
+        }
         splitsPost.forEach(function (r) {
-            var lanc = {
-                id: uid(),
-                tipo: 'entrada',
-                descricao: rotuloDoc + ' — ' + clienteNome + ' (' + (r.forma || forma) + ')',
-                valor: Number(r.valor) || 0,
-                forma: r.forma || forma,
-                vendaId: doc.id,
-                criadoEm: isoComDataLocal(doc.dataEmissao)
-            };
+            var lanc = montarLancEntradaVendaOficina(doc, r);
             if (formaPagamentoEhDigital(lanc.forma)) {
                 if (!db.caixaBanco) db.caixaBanco = [];
                 lanc.conta = 'banco';
@@ -6220,6 +6254,9 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
     }
 
     salvar(db);
+    if (!interno && typeof sincronizarOficinaNoCaixaEmpresa === 'function') {
+        try { sincronizarOficinaNoCaixaEmpresa(); } catch (eVdCx) { /* ok */ }
+    }
     var msg;
     if (editando) {
         msg = (tipo === 'ORCAMENTO' ? 'Orçamento' : 'Venda') + ' Nº ' + numero + ' atualizado(a). Estoque não foi alterado na edição.';
@@ -7313,7 +7350,62 @@ function calcularRelatorioOficina(periodo) {
     };
 }
 
-/** Garante que OS pagas entrem no caixa da empresa (Caixa / Balcão oficial) */
+function valorDocumentoVenda(o) {
+    if (!o) return 0;
+    var v = Number(o.valor);
+    if (!(v > 0) && Number(o.valorRecebido) > 0) v = Number(o.valorRecebido);
+    if (!(v > 0) && typeof totaisLucroVendaDoc === 'function') {
+        v = Number(totaisLucroVendaDoc(o).total) || 0;
+    }
+    return v > 0 ? v : 0;
+}
+
+function splitsPagamentoVenda(o) {
+    var recs = (o && o.recebimentos || []).filter(function (r) {
+        return r && (Number(r.valor) || 0) > 0.009;
+    }).map(function (r) {
+        return { forma: r.forma || (o && o.formaPagamento) || 'Dinheiro', valor: Number(r.valor) || 0 };
+    });
+    if (recs.length) return recs;
+    var total = valorDocumentoVenda(o);
+    if (!(total > 0.009)) return [];
+    return [{ forma: (o && o.formaPagamento) || 'Dinheiro', valor: total }];
+}
+
+function montarLancEntradaVendaOficina(o, split) {
+    o = o || {};
+    split = split || {};
+    var nome = o.clienteNome || 'Cliente';
+    var numero = o.numero != null ? o.numero : '';
+    var placa = String(o.placa || '').toUpperCase();
+    var forma = split.forma || o.formaPagamento || 'Dinheiro';
+    var valor = Number(split.valor) || 0;
+    var digital = typeof formaPagamentoEhDigital === 'function' && formaPagamentoEhDigital(forma);
+    var dataRef = o.dataEmissao || o.recebidoEm || o.criadoEm || (typeof hojeISO === 'function' ? hojeISO() : '');
+    var ehVenda = String(o.tipo || 'VENDA').toUpperCase() === 'VENDA';
+    var rotulo = ehVenda ? 'Venda da oficina' : 'Orçamento';
+    return {
+        id: uid(),
+        tipo: 'entrada',
+        descricao: rotulo + ' Nº ' + numero + ' — ' + nome + (placa ? ' · ' + placa : '') + ' (' + forma + ')',
+        valor: valor,
+        forma: forma,
+        conta: digital ? 'banco' : 'balcao',
+        vendaId: o.id,
+        origemVenda: ehVenda,
+        clienteNome: nome,
+        numDoc: String(numero),
+        vendaResumo: {
+            cliente: nome,
+            placa: placa,
+            numero: numero,
+            total: Number(o.valor) || valor
+        },
+        criadoEm: typeof isoComDataLocal === 'function' ? isoComDataLocal(dataRef) : dataRef
+    };
+}
+
+/** Garante que OS pagas e vendas da oficina pagas entrem no caixa da empresa (Entradas pagas) */
 function sincronizarOficinaNoCaixaEmpresa() {
     var main = carregarMain();
     var canalAntes = canalVendas;
@@ -7326,24 +7418,28 @@ function sincronizarOficinaNoCaixaEmpresa() {
     var bloqueadas = (cfg.osBloqueadasCaixa && typeof cfg.osBloqueadasCaixa === 'object')
         ? cfg.osBloqueadasCaixa
         : {};
-    var idsLanc = {};
+    var idsLancOs = {};
+    var idsLancVd = {};
     (db.caixa || []).concat(db.caixaBanco || []).forEach(function (l) {
-        if (l && l.atendimentoId) idsLanc[l.atendimentoId] = true;
+        if (!l) return;
+        if (l.atendimentoId) idsLancOs[String(l.atendimentoId)] = true;
+        if (l.vendaId) idsLancVd[String(l.vendaId)] = true;
+        if (l.orcamentoId) idsLancVd[String(l.orcamentoId)] = true;
     });
     var mudou = false;
     (main.atendimentos || []).forEach(function (a) {
         if (!a || !a.id) return;
         if (String(a.statusPagamento || '').toUpperCase() !== 'PAGO') return;
-        if (idsLanc[a.id]) return;
+        if (idsLancOs[String(a.id)]) return;
         if (bloqueadas[a.id] || bloqueadas[String(a.id)]) return; /* excluída manualmente do caixa */
-        var valor = Number(a.total) || 0;
+        var t = totaisItens(a.itens || []);
+        var valor = Number(a.total) || Number(t.total) || ((Number(t.pecas) || 0) + (Number(t.mao) || 0)) || 0;
         if (!(valor > 0)) return;
         var nome = nomeAtendimento(main, a);
         var placa = (a.placa || '—').toUpperCase();
         var forma = a.formaPagamento || 'Dinheiro';
         var digital = formaPagamentoEhDigital(forma);
         var dataRef = a.recebidoEm || a.atualizadoEm || a.entrada || a.criadoEm || new Date().toISOString();
-        var t = totaisItens(a.itens || []);
         var lanc = {
             id: uid(),
             tipo: 'entrada',
@@ -7366,7 +7462,21 @@ function sincronizarOficinaNoCaixaEmpresa() {
         };
         if (digital) db.caixaBanco.push(lanc);
         else db.caixa.push(lanc);
-        idsLanc[a.id] = true;
+        idsLancOs[String(a.id)] = true;
+        mudou = true;
+    });
+    (main.orcamentos || []).forEach(function (o) {
+        if (!vendaOficinaEstaPaga(o) || !o.id) return;
+        if (idsLancVd[String(o.id)]) return;
+        if (bloqueadas[o.id] || bloqueadas[String(o.id)]) return;
+        var splits = splitsPagamentoVenda(o);
+        if (!splits.length) return;
+        splits.forEach(function (r) {
+            var lancVd = montarLancEntradaVendaOficina(o, r);
+            if (lancVd.conta === 'banco') db.caixaBanco.push(lancVd);
+            else db.caixa.push(lancVd);
+        });
+        idsLancVd[String(o.id)] = true;
         mudou = true;
     });
     if (mudou) salvar(db);
@@ -7380,7 +7490,7 @@ function totaisOficinaNoCaixaHoje(db, hoje) {
     function somar(lista) {
         (lista || []).forEach(function (l) {
             if (l.tipo !== 'entrada') return;
-            if (!l.atendimentoId && !l.origemOficina && !l.vendaId) return;
+            if (!l.atendimentoId && !l.origemOficina && !l.vendaId && !l.origemVenda) return;
             var d = String(l.criadoEm || '').slice(0, 10);
             if (d !== hoje) return;
             total += Number(l.valor) || 0;

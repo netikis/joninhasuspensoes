@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=68">
-    <link rel="stylesheet" href="css/tema-m3.css?v=68">
+    <link rel="stylesheet" href="css/app.css?v=69">
+    <link rel="stylesheet" href="css/tema-m3.css?v=69">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -202,7 +202,7 @@
                 <button type="button" class="card card-atalho card-ent" data-relatorio-servicos="entradas" title="Ver relatório dos serviços e vendas">
                     <div class="k">Entradas</div>
                     <div class="v" id="kpiInicioEntradas">R$ 0</div>
-                    <div class="card-sub">Clique para ver os serviços</div>
+                    <div class="card-sub">OS e venda pagas · clique para ver</div>
                 </button>
                 <button type="button" class="card card-atalho card-sai" data-atalho-pasta="saidas" title="Abrir pasta de saídas">
                     <div class="k">Saídas</div>
@@ -246,7 +246,7 @@
                 <button type="button" class="card card-atalho" data-atend-mes="1" title="Ver atendimentos do mês e zerar o contador">
                     <div class="k">Atendimentos do mês</div>
                     <div class="v" id="kpiAtend">0</div>
-                    <div class="card-sub" id="kpiAtendSub">OS + venda · toque para ver / zerar</div>
+                    <div class="card-sub" id="kpiAtendSub">OS e venda pagas · toque para ver / zerar</div>
                 </button>
                 <button type="button" class="card card-atalho" data-goto="painelProdutos">
                     <div class="k">Produtos</div>
@@ -655,7 +655,7 @@
                 <div class="venda-form">
                     <div class="box">
                         <h2>🛒 Venda da oficina</h2>
-                        <p class="hint">Na Joninha, venda e oficina são a mesma coisa. O que lançar aqui aparece no <strong>Histórico da oficina</strong> e, se tiver mecânico na mão de obra, entra em <strong>Comissões</strong>.</p>
+                        <p class="hint">Para vender só um amortecedor (ou qualquer peça), use esta tela — <strong>não precisa abrir OS</strong>. Status <strong>PAGO</strong> entra em <strong>Entradas (pagas)</strong> do caixa, junto com as ordens de serviço. Histórico e comissão (se houver mecânico) entram automaticamente.</p>
 
                         <div class="row" style="background:#1a252f;padding:12px;border-radius:8px;border:1px solid var(--line)">
                             <div class="col">
@@ -910,7 +910,7 @@
                 <button type="button" class="card card-atalho" style="background:#27ae60" data-cx-atalho="entradas" title="Abrir pasta de entradas">
                     <div class="k">Entradas (pagas)</div>
                     <div class="v" id="cxEntradas">R$ 0</div>
-                    <div class="card-sub">Clique para entrar na pasta</div>
+                    <div class="card-sub">OS + venda da oficina</div>
                 </button>
                 <button type="button" class="card card-atalho" style="background:#e74c3c" data-cx-atalho="saidas" title="Abrir pasta de saídas">
                     <div class="k">Saídas (despesas)</div>
@@ -947,7 +947,7 @@
             </div>
             <div class="box">
                 <h2>Caixa / Balcão</h2>
-                <p class="hint">Dinheiro e lançamentos do balcão. O <strong>Relatório Oficina</strong> (peças + mão de obra das OS pagas) entra automaticamente aqui no caixa da empresa.</p>
+                <p class="hint">Dinheiro e lançamentos do balcão. <strong>OS pagas</strong> e <strong>vendas da oficina</strong> (peça avulsa, sem OS) entram automaticamente em <strong>Entradas (pagas)</strong>.</p>
                 <div class="cx-acoes-bar">
                     <button type="button" class="btn btn-secondary" id="btnCxInicial">💵 Informar / Editar caixa inicial</button>
                     <button type="button" class="btn btn-ok" id="btnCxFocoEntrada">➕ Lançar entrada</button>
@@ -1214,7 +1214,7 @@
                     <div class="item-relatorio-mes">
                         <div>
                             <span class="titulo-relatorio">🧾 Atendimentos do mês</span>
-                            <span class="desc-relatorio">Quantos atendimentos (OS + venda) aquele mês teve — fica salvo mesmo depois de zerar o painel</span>
+                            <span class="desc-relatorio">Quantos atendimentos pagos (OS + venda da oficina) aquele mês teve — fica salvo mesmo depois de zerar o painel</span>
                         </div>
                         <div class="acoes-relatorio-mes">
                             <button type="button" class="btn btn-secondary" id="btnVerAtendMesRel">Ver meses</button>
@@ -1650,7 +1650,7 @@
     <div class="modal-overlay" id="modalAtendimentosMes">
         <div class="modal-box" style="width:min(560px,100%)">
             <h3>Atendimentos por mês</h3>
-            <p class="hint" id="atendMesHint">O painel mostra só o mês atual. Zerar não apaga o histórico — o total de cada mês fica aqui e no relatório mensal.</p>
+            <p class="hint" id="atendMesHint">Conta só o que está <strong>PAGO</strong>: OS e venda da oficina (sem precisar abrir OS). Zerar o painel não apaga o histórico — o total de cada mês fica aqui e no relatório.</p>
             <div class="atend-mes-agora" id="atendMesAgora"></div>
             <div class="row" style="margin-top:10px">
                 <button type="button" class="btn btn-ok" id="btnZerarAtendMesModal">Zerar contador do painel</button>
@@ -1870,17 +1870,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=68"></script>
-    <script src="js/storage.js?v=68"></script>
-    <script src="js/ui.js?v=68"></script>
-    <script src="js/auth.js?v=68"></script>
-    <script src="js/os.js?v=68"></script>
-    <script src="js/nuvem.js?v=68"></script>
-    <script src="js/caixa.js?v=68"></script>
-    <script src="js/comissoes.js?v=68"></script>
-    <script src="js/app.js?v=68"></script>
-    <script src="js/perfil-cliente.js?v=68"></script>
-    <script src="js/navegacao.js?v=68"></script>
+    <script src="js/config.js?v=69"></script>
+    <script src="js/storage.js?v=69"></script>
+    <script src="js/ui.js?v=69"></script>
+    <script src="js/auth.js?v=69"></script>
+    <script src="js/os.js?v=69"></script>
+    <script src="js/nuvem.js?v=69"></script>
+    <script src="js/caixa.js?v=69"></script>
+    <script src="js/comissoes.js?v=69"></script>
+    <script src="js/app.js?v=69"></script>
+    <script src="js/perfil-cliente.js?v=69"></script>
+    <script src="js/navegacao.js?v=69"></script>
 </body>
 </html>
 
