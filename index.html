@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=67">
-    <link rel="stylesheet" href="css/tema-m3.css?v=67">
+    <link rel="stylesheet" href="css/app.css?v=68">
+    <link rel="stylesheet" href="css/tema-m3.css?v=68">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -534,13 +534,15 @@
                         <button type="button" class="btn btn-ok" id="btnWaChecklist">📱 Checklist no WhatsApp</button>
                         <button type="button" class="btn btn-secondary" id="btnWaOrcamento">📱 Orçamento / diagnóstico no WhatsApp</button>
                         <button type="button" class="btn btn-assinar" id="btnAtCopiarLink">🔗 Copiar link</button>
+                    </div>
+                    <div class="wa-actions wa-actions-os">
                         <button type="button" class="btn btn-secondary" id="btnAtImprimir">🖨️ Imprimir</button>
                         <button type="button" class="btn btn-pdf" id="btnAtSalvarPdf">💾 Salvar PDF</button>
                         <button type="button" class="btn btn-ok" id="btnAtMandarCaixa">💰 Mandar ao caixa</button>
                         <button type="button" class="btn btn-primary" id="btnSalvarAt">Salvar Atendimento</button>
-                        <button type="button" class="btn btn-secondary" id="btnLimparAt">Limpar formulário</button>
+                        <button type="button" class="btn btn-secondary" id="btnLimparAt">Nova OS</button>
                     </div>
-                    <p class="hint" style="margin-top:8px;font-weight:600;color:#333">Checklist e Orçamento no WhatsApp geram o link e abrem no número informado acima. Use <strong>Copiar link</strong> se quiser colar em outro chat.</p>
+                    <p class="hint" style="margin-top:8px;font-weight:600;color:#333">Ao salvar, a OS continua nesta tela. <strong>Imprimir</strong> e <strong>Salvar PDF</strong> abrem a escolha (impressora ou arquivo). Use <strong>Nova OS</strong> só quando for começar outro carro.</p>
                 </div>
             </form>
         </section>
@@ -1754,7 +1756,7 @@
     <div class="modal-overlay" id="modalImprimirNota">
         <div class="modal-box" style="width:min(460px,100%)">
             <h3>Imprimir ou salvar</h3>
-            <p class="hint">A nota continua aberta. Escolha o destino:</p>
+            <p class="hint">A OS continua nesta tela. Escolha o destino:</p>
             <div class="modal-acoes" style="flex-direction:column">
                 <button type="button" class="btn btn-pdf" id="btnImpEscolherImprimir" style="width:100%">🖨️ Imprimir — escolher impressora ou Salvar como PDF</button>
                 <button type="button" class="btn btn-ok" id="btnImpEscolherSalvar" style="width:100%">💾 Salvar PDF no computador</button>
@@ -1868,17 +1870,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=67"></script>
-    <script src="js/storage.js?v=67"></script>
-    <script src="js/ui.js?v=67"></script>
-    <script src="js/auth.js?v=67"></script>
-    <script src="js/os.js?v=67"></script>
-    <script src="js/nuvem.js?v=67"></script>
-    <script src="js/caixa.js?v=67"></script>
-    <script src="js/comissoes.js?v=67"></script>
-    <script src="js/app.js?v=67"></script>
-    <script src="js/perfil-cliente.js?v=67"></script>
-    <script src="js/navegacao.js?v=67"></script>
+    <script src="js/config.js?v=68"></script>
+    <script src="js/storage.js?v=68"></script>
+    <script src="js/ui.js?v=68"></script>
+    <script src="js/auth.js?v=68"></script>
+    <script src="js/os.js?v=68"></script>
+    <script src="js/nuvem.js?v=68"></script>
+    <script src="js/caixa.js?v=68"></script>
+    <script src="js/comissoes.js?v=68"></script>
+    <script src="js/app.js?v=68"></script>
+    <script src="js/perfil-cliente.js?v=68"></script>
+    <script src="js/navegacao.js?v=68"></script>
 </body>
 </html>
 

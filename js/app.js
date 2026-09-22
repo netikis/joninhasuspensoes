@@ -6934,21 +6934,27 @@ async function copiarLinkOsEnvio() {
 }
 
 function acaoOsFormImprimir() {
-    var salvo = salvarAtendimentoRapidoParaEnvio();
-    if (!salvo) return;
-    imprimirNotaPdf(salvo.id);
+    if (!prepararNotaOsDoFormulario()) return;
+    if (typeof abrirModalImprimirNota === 'function') abrirModalImprimirNota();
+    else imprimirNotaPdf(atendimentoNotaAtual && atendimentoNotaAtual.id);
 }
 
-async function acaoOsFormSalvarPdf() {
+function acaoOsFormSalvarPdf() {
+    if (!prepararNotaOsDoFormulario()) return;
+    if (typeof abrirModalImprimirNota === 'function') abrirModalImprimirNota();
+    else salvarNotaPdfArquivo();
+}
+
+function prepararNotaOsDoFormulario() {
     var salvo = salvarAtendimentoRapidoParaEnvio();
-    if (!salvo) return;
+    if (!salvo) return null;
     var db = carregar();
     var a = (db.atendimentos || []).find(function (x) { return x && x.id === salvo.id; }) || salvo;
     atendimentoNotaAtual = a;
-    var html = htmlNotaEspelho(db, a, { incluirFotos: false, tituloDoc: 'ORÇAMENTO / DIAGNÓSTICO' });
+    var html = htmlNotaEspelho(db, a, { incluirFotos: false, tituloDoc: 'ESPELHO DE ATENDIMENTO' });
     _htmlNotaImpressaoAtual = html;
     _tituloNotaImpressao = 'OS · ' + (a.placa || '') + ' · ' + (a.clienteNome || '');
-    await salvarNotaPdfArquivo();
+    return a;
 }
 
 function acaoOsFormMandarCaixa() {

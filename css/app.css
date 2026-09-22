@@ -3293,6 +3293,7 @@
         }
         .checklist-joninha input { width: auto; accent-color: var(--blue-soft); }
         .wa-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .wa-actions-os { margin-top: 12px; padding-top: 12px; border-top: 1px solid #d5deea; }
         .cards-oficina .card .k { font-size: 0.78rem; }
         body.modo-funcionario .menu-grupo:not([data-grupo="oficina"]):not([data-grupo="comissoes"]) { display: none !important; }
         body.modo-funcionario .menu-grupo[data-grupo="oficina"],

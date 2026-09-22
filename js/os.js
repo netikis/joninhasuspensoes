@@ -1252,19 +1252,11 @@ async function salvarAtendimentoAtual() {
         toast(
             (id ? 'Atendimento atualizado' : 'Atendimento salvo') +
             (resolvido.clienteAvulso ? ' (cliente avulso). ' : '. ') +
-            'Pode começar outra OS.'
+            'A OS continua aberta — pode imprimir, salvar PDF ou mandar ao caixa.'
         );
-        limparAtendimento();
+        document.getElementById('atId').value = payload.id;
         renderHistorico();
         atualizarKPIs(carregar());
-        if (typeof abrirPainel === 'function') abrirPainel('painelVeiculo');
-        try { window.scrollTo(0, 0); } catch (eScr) { /* ok */ }
-        setTimeout(function () {
-            limparAtendimento();
-            var buscaNova = document.getElementById('atClienteBusca');
-            if (buscaNova) buscaNova.value = '';
-            if (typeof atualizarStatusClienteAt === 'function') atualizarStatusClienteAt();
-        }, 40);
 
         extrasPosSalvarAtendimento(payload, resolvido).then(function (extras) {
             if (extras && extras.length) toast('Sync: ' + extras.join(' · '));
