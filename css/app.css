@@ -1777,6 +1777,16 @@
         #modalNota.modal-overlay {
             z-index: 210;
         }
+        #modalFotosCliente.modal-overlay,
+        #modalImprimirNota.modal-overlay,
+        #modalNomePdf.modal-overlay,
+        #modalExportFotos.modal-overlay,
+        #modalWaEnvio.modal-overlay {
+            z-index: 240;
+        }
+        body.dialogo-impressao .modal-overlay {
+            visibility: hidden !important;
+        }
         #modalNota .modal-box {
             overflow: auto;
             width: min(960px, calc(100vw - 32px));
@@ -1929,7 +1939,7 @@
             line-height: 1.3 !important;
             overflow: visible !important;
         }
-        #modalNomePdf.modal-overlay { z-index: 230; }
+        #modalNomePdf.modal-overlay { z-index: 240; }
         #modalNomePdf .modal-box { width: min(420px, 100%); }
         .modal-link-input {
             width: 100%;

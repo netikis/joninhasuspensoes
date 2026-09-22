@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=64">
-    <link rel="stylesheet" href="css/tema-m3.css?v=64">
+    <link rel="stylesheet" href="css/app.css?v=65">
+    <link rel="stylesheet" href="css/tema-m3.css?v=65">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -1713,6 +1713,18 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modalImprimirNota">
+        <div class="modal-box" style="width:min(460px,100%)">
+            <h3>Imprimir ou salvar</h3>
+            <p class="hint">A nota continua aberta. Escolha o destino:</p>
+            <div class="modal-acoes" style="flex-direction:column">
+                <button type="button" class="btn btn-pdf" id="btnImpEscolherImprimir" style="width:100%">🖨️ Imprimir — escolher impressora ou Salvar como PDF</button>
+                <button type="button" class="btn btn-ok" id="btnImpEscolherSalvar" style="width:100%">💾 Salvar PDF no computador</button>
+                <button type="button" class="btn btn-secondary" id="btnImpEscolherCancelar" style="width:100%">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Viewer PDF em tela cheia (celular) -->
     <div id="viewerPdfNota" aria-hidden="true">
         <div id="viewerPdfBarra">
@@ -1818,17 +1830,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=64"></script>
-    <script src="js/storage.js?v=64"></script>
-    <script src="js/ui.js?v=64"></script>
-    <script src="js/auth.js?v=64"></script>
-    <script src="js/os.js?v=64"></script>
-    <script src="js/nuvem.js?v=64"></script>
-    <script src="js/caixa.js?v=64"></script>
-    <script src="js/comissoes.js?v=64"></script>
-    <script src="js/app.js?v=64"></script>
-    <script src="js/perfil-cliente.js?v=64"></script>
-    <script src="js/navegacao.js?v=64"></script>
+    <script src="js/config.js?v=65"></script>
+    <script src="js/storage.js?v=65"></script>
+    <script src="js/ui.js?v=65"></script>
+    <script src="js/auth.js?v=65"></script>
+    <script src="js/os.js?v=65"></script>
+    <script src="js/nuvem.js?v=65"></script>
+    <script src="js/caixa.js?v=65"></script>
+    <script src="js/comissoes.js?v=65"></script>
+    <script src="js/app.js?v=65"></script>
+    <script src="js/perfil-cliente.js?v=65"></script>
+    <script src="js/navegacao.js?v=65"></script>
 </body>
 </html>
 

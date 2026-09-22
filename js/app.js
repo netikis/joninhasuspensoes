@@ -241,12 +241,118 @@ function montarHtmlDocumentoImpressao(htmlCorpo) {
 
 function limparAposImpressao() {
     document.body.classList.remove('imprimindo');
+    document.body.classList.remove('dialogo-impressao');
     var el = document.getElementById('printNota');
     if (el) el.innerHTML = '';
     if (_printCleanupTimer) {
         clearTimeout(_printCleanupTimer);
         _printCleanupTimer = null;
     }
+}
+
+var _printDialogoTimer = null;
+function iniciarDialogoImpressao() {
+    document.body.classList.add('dialogo-impressao');
+    if (_printDialogoTimer) clearTimeout(_printDialogoTimer);
+    _printDialogoTimer = setTimeout(encerrarDialogoImpressao, 120000);
+}
+function encerrarDialogoImpressao() {
+    document.body.classList.remove('dialogo-impressao');
+    if (_printDialogoTimer) {
+        clearTimeout(_printDialogoTimer);
+        _printDialogoTimer = null;
+    }
+}
+
+function executarImpressaoHtml(html) {
+    _htmlNotaImpressaoAtual = html || '';
+    var docHtml = montarHtmlDocumentoImpressao(html);
+
+    function ligarFimImpressao(win) {
+        iniciarDialogoImpressao();
+        var feito = false;
+        function fim() {
+            if (feito) return;
+            feito = true;
+            try { if (win) win.removeEventListener('afterprint', fim); } catch (e1) { /* ok */ }
+            try { window.removeEventListener('afterprint', fim); } catch (e2) { /* ok */ }
+            encerrarDialogoImpressao();
+        }
+        try { if (win) win.addEventListener('afterprint', fim); } catch (e3) { /* ok */ }
+        window.addEventListener('afterprint', fim);
+        setTimeout(fim, 120000);
+        return fim;
+    }
+
+    /* Celular: nova aba/janela evita tela branca no Android/iOS */
+    if (ehCelular()) {
+        var w = window.open('', '_blank');
+        if (!w) {
+            toast('Permita pop-ups para gerar o PDF.');
+            return;
+        }
+        w.document.open();
+        w.document.write(docHtml);
+        w.document.close();
+        aguardarImagensDoc(w.document, function () {
+            try {
+                ligarFimImpressao(w);
+                w.focus();
+                w.print();
+            } catch (e) {
+                encerrarDialogoImpressao();
+                toast('Toque em Compartilhar / Imprimir na barra do navegador.');
+            }
+        });
+        return;
+    }
+
+    var iframe = document.getElementById('printFrame');
+    if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'printFrame';
+        iframe.title = 'Impressão';
+        document.body.appendChild(iframe);
+    }
+    /* Precisa ter tamanho real — iframe 0×0 gera PDF em branco no Chrome */
+    iframe.style.cssText = 'position:fixed;left:0;top:0;width:210mm;min-width:210mm;height:297mm;min-height:297mm;border:0;z-index:1;opacity:0.01;pointer-events:none;background:#fff;';
+
+    var idoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+    if (!idoc) {
+        var w2 = window.open('', '_blank');
+        if (!w2) {
+            toast('Permita pop-ups para gerar o PDF.');
+            return;
+        }
+        w2.document.open();
+        w2.document.write(docHtml);
+        w2.document.close();
+        aguardarImagensDoc(w2.document, function () {
+            try {
+                ligarFimImpressao(w2);
+                w2.focus();
+                w2.print();
+            } catch (e) {
+                encerrarDialogoImpressao();
+            }
+        });
+        return;
+    }
+
+    idoc.open();
+    idoc.write(docHtml);
+    idoc.close();
+
+    aguardarImagensDoc(idoc, function () {
+        try {
+            ligarFimImpressao(iframe.contentWindow);
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        } catch (e) {
+            encerrarDialogoImpressao();
+            toast('Não foi possível abrir a impressão. Tente novamente.');
+        }
+    });
 }
 
 function aguardarImagensDoc(doc, cb) {
@@ -277,71 +383,6 @@ function aguardarImagensDoc(doc, cb) {
             cb();
         }
     }, 4000);
-}
-
-function executarImpressaoHtml(html) {
-    _htmlNotaImpressaoAtual = html || '';
-    var docHtml = montarHtmlDocumentoImpressao(html);
-
-    /* Celular: nova aba/janela evita tela branca no Android/iOS */
-    if (ehCelular()) {
-        var w = window.open('', '_blank');
-        if (!w) {
-            toast('Permita pop-ups para gerar o PDF.');
-            return;
-        }
-        w.document.open();
-        w.document.write(docHtml);
-        w.document.close();
-        aguardarImagensDoc(w.document, function () {
-            try {
-                w.focus();
-                w.print();
-            } catch (e) {
-                toast('Toque em Compartilhar / Imprimir na barra do navegador.');
-            }
-        });
-        return;
-    }
-
-    var iframe = document.getElementById('printFrame');
-    if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'printFrame';
-        iframe.title = 'Impressão';
-        document.body.appendChild(iframe);
-    }
-    /* Precisa ter tamanho real — iframe 0×0 gera PDF em branco no Chrome */
-    iframe.style.cssText = 'position:fixed;left:0;top:0;width:210mm;min-width:210mm;height:297mm;min-height:297mm;border:0;z-index:-1;opacity:0;pointer-events:none;background:#fff;';
-
-    var idoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
-    if (!idoc) {
-        var w2 = window.open('', '_blank');
-        if (!w2) {
-            toast('Permita pop-ups para gerar o PDF.');
-            return;
-        }
-        w2.document.open();
-        w2.document.write(docHtml);
-        w2.document.close();
-        aguardarImagensDoc(w2.document, function () {
-            try { w2.focus(); w2.print(); } catch (e) { /* ignore */ }
-        });
-        return;
-    }
-
-    idoc.open();
-    idoc.write(docHtml);
-    idoc.close();
-
-    aguardarImagensDoc(idoc, function () {
-        try {
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-        } catch (e) {
-            toast('Não foi possível abrir a impressão. Tente novamente.');
-        }
-    });
 }
 
 function abrirViewerPdf(html, titulo) {
@@ -3810,7 +3851,41 @@ document.getElementById('modalNota').addEventListener('click', function (e) {
     if (e.target.id === 'modalNota') fecharNota();
 });
 document.getElementById('btnNotaPdf').addEventListener('click', function () {
-    if (atendimentoNotaAtual) imprimirNotaPdf(atendimentoNotaAtual.id);
+    abrirModalImprimirNota();
+});
+function abrirModalImprimirNota() {
+    var html = obterHtmlNotaAtual();
+    if (!html) {
+        toast('Abra a nota antes de imprimir.');
+        return;
+    }
+    var modal = document.getElementById('modalImprimirNota');
+    if (!modal) {
+        executarImpressaoHtml(html);
+        return;
+    }
+    modal.classList.add('aberto');
+}
+function fecharModalImprimirNota() {
+    var modal = document.getElementById('modalImprimirNota');
+    if (modal) modal.classList.remove('aberto');
+}
+document.getElementById('btnImpEscolherImprimir').addEventListener('click', function () {
+    var html = obterHtmlNotaAtual();
+    fecharModalImprimirNota();
+    if (!html) {
+        toast('Documento não encontrado.');
+        return;
+    }
+    setTimeout(function () { executarImpressaoHtml(html); }, 60);
+});
+document.getElementById('btnImpEscolherSalvar').addEventListener('click', function () {
+    fecharModalImprimirNota();
+    salvarNotaPdfArquivo();
+});
+document.getElementById('btnImpEscolherCancelar').addEventListener('click', fecharModalImprimirNota);
+document.getElementById('modalImprimirNota').addEventListener('click', function (e) {
+    if (e.target.id === 'modalImprimirNota') fecharModalImprimirNota();
 });
 document.getElementById('btnNotaEncaminhar').addEventListener('click', function () {
     if (!atendimentoNotaAtual) {
