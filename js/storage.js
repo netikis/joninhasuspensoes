@@ -267,6 +267,7 @@ function migrarProdutosInternoParaEstoqueUnificado() {
         }
         if (!m.nome) m.nome = L.nome || n.nome || '';
         if (!m.codigo) m.codigo = L.codigo || n.codigo || '';
+        if (!m.codigoPeca) m.codigoPeca = L.codigoPeca || n.codigoPeca || L.codPeca || n.codPeca || '';
         if (!m.unidade) m.unidade = L.unidade || n.unidade || 'un';
         m.atualizadoEm = new Date().toISOString();
         registrar(m);

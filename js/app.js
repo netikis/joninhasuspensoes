@@ -1683,7 +1683,7 @@ function preencherListaProdutosVenda(db) {
     lista.innerHTML = '';
     (db.produtos || []).forEach(function (p) {
         var opt = document.createElement('option');
-        opt.value = p.nome + (p.codigo ? ' [' + p.codigo + ']' : '');
+        opt.value = p.nome + (codigoPecaDe(p) ? ' [' + codigoPecaDe(p) + ']' : (p.codigo ? ' [' + p.codigo + ']' : ''));
         lista.appendChild(opt);
     });
 }
@@ -3995,6 +3995,8 @@ function preencherFormProd(p, manterFocoNome) {
     document.getElementById('prodNome').value = p.nome || '';
     document.getElementById('prodCat').value = p.categoria || '';
     document.getElementById('prodCod').value = p.codigo || '';
+    var elCodPeca = document.getElementById('prodCodPeca');
+    if (elCodPeca) elCodPeca.value = (typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : (p.codigoPeca || ''));
     document.getElementById('prodCusto').value = p.custo || 0;
     document.getElementById('prodVenda').value = p.venda || 0;
     document.getElementById('prodQtd').value = p.qtd || 0;
@@ -4013,7 +4015,9 @@ function processarCodigoBipado(codigo) {
     document.getElementById('prodCod').value = cod;
     var db = carregar();
     var achado = db.produtos.find(function (p) {
-        return normalizarCodigo(p.codigo).toLowerCase() === cod.toLowerCase();
+        var barras = normalizarCodigo(p.codigo).toLowerCase() === cod.toLowerCase();
+        var peca = (typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : (p.codigoPeca || '')).toLowerCase() === cod.toLowerCase();
+        return barras || peca;
     });
     if (achado) {
         preencherFormProd(achado, true);
@@ -4050,7 +4054,9 @@ document.getElementById('buscaProd').addEventListener('keydown', function (e) {
     if (!cod) return;
     var db = carregar();
     var achado = db.produtos.find(function (p) {
-        return normalizarCodigo(p.codigo).toLowerCase() === cod.toLowerCase();
+        var barras = normalizarCodigo(p.codigo).toLowerCase() === cod.toLowerCase();
+        var peca = (typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : (p.codigoPeca || '')).toLowerCase() === cod.toLowerCase();
+        return barras || peca;
     });
     if (achado) {
         e.preventDefault();
@@ -4065,6 +4071,7 @@ document.getElementById('formProduto').addEventListener('submit', function (e) {
     var db = carregar();
     var id = document.getElementById('prodId').value;
     var codigo = normalizarCodigo(document.getElementById('prodCod').value);
+    var codigoPeca = normalizarCodigo(document.getElementById('prodCodPeca') && document.getElementById('prodCodPeca').value);
     if (codigo) {
         var duplicado = db.produtos.find(function (p) {
             return normalizarCodigo(p.codigo).toLowerCase() === codigo.toLowerCase() && p.id !== id;
@@ -4072,6 +4079,18 @@ document.getElementById('formProduto').addEventListener('submit', function (e) {
         if (duplicado) {
             toast('Já existe produto com este código de barras: ' + (duplicado.nome || ''));
             focarLeitor();
+            return;
+        }
+    }
+    if (codigoPeca) {
+        var duplicadoPeca = db.produtos.find(function (p) {
+            var c = (typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : (p.codigoPeca || '')).toLowerCase();
+            return c && c === codigoPeca.toLowerCase() && p.id !== id;
+        });
+        if (duplicadoPeca) {
+            toast('Já existe produto com este código da peça: ' + (duplicadoPeca.nome || ''));
+            var elPeca = document.getElementById('prodCodPeca');
+            if (elPeca) { elPeca.focus(); elPeca.select(); }
             return;
         }
     }
@@ -4083,6 +4102,7 @@ document.getElementById('formProduto').addEventListener('submit', function (e) {
         nome: document.getElementById('prodNome').value.trim(),
         categoria: document.getElementById('prodCat').value.trim(),
         codigo: codigo,
+        codigoPeca: codigoPeca,
         tipo: ehServ ? 'servico' : 'produto',
         custo: Number(document.getElementById('prodCusto').value) || 0,
         venda: Number(document.getElementById('prodVenda').value) || 0,
@@ -4161,7 +4181,7 @@ function renderProdutos() {
     var q = (document.getElementById('buscaProd').value || '').toLowerCase().trim();
     var lista = db.produtos.filter(function (p) {
         if (!q) return true;
-        return [p.nome, p.codigo, p.categoria].join(' ').toLowerCase().indexOf(q) > -1;
+        return [p.nome, p.codigo, (typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : p.codigoPeca), p.categoria].join(' ').toLowerCase().indexOf(q) > -1;
     });
     var dir = ordemProdutos.dir === 'desc' ? -1 : 1;
     lista.sort(function (a, b) {
@@ -4193,7 +4213,7 @@ function renderProdutos() {
         }
     }
     if (!lista.length) {
-        tb.innerHTML = '<tr><td colspan="7" class="muted">Nenhum produto.</td></tr>';
+        tb.innerHTML = '<tr><td colspan="8" class="muted">Nenhum produto.</td></tr>';
         return;
     }
     lista.forEach(function (p) {
@@ -4215,6 +4235,7 @@ function renderProdutos() {
             ' data-venda="' + esc(String(vendaNum)) + '">' +
             '</td>' +
             '<td>' + esc(p.codigo || '—') + '</td>' +
+            '<td>' + esc((typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : p.codigoPeca) || '—') + '</td>' +
             '<td>' + esc(p.nome) +
             (estoqueBaixo ? ' <span class="badge-estoque-baixo">ESTOQUE BAIXO</span>' : '') +
             '</td>' +
@@ -4644,13 +4665,17 @@ function encontrarProdutoPorBusca(texto) {
     }
     if (entreColchetes) {
         var porCol = lista.find(function (p) {
-            return p.codigo && normCod(p.codigo) === normCod(entreColchetes);
+            var peca = typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : (p.codigoPeca || '');
+            return (p.codigo && normCod(p.codigo) === normCod(entreColchetes)) ||
+                (peca && normCod(peca) === normCod(entreColchetes));
         });
         if (porCol) return porCol;
     }
     var porCod = lista.find(function (p) {
-        if (!p.codigo) return false;
-        return normCod(p.codigo) === normCod(t) || (soDig(t).length >= 4 && soDig(p.codigo) === soDig(t));
+        var peca = typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : (p.codigoPeca || '');
+        var matchBarras = p.codigo && (normCod(p.codigo) === normCod(t) || (soDig(t).length >= 4 && soDig(p.codigo) === soDig(t)));
+        var matchPeca = peca && (normCod(peca) === normCod(t) || (soDig(t).length >= 4 && soDig(peca) === soDig(t)));
+        return matchBarras || matchPeca;
     });
     if (porCod) return porCod;
     var nome = tLow.replace(/\s*\[.*$/, '').trim();
@@ -4737,7 +4762,8 @@ function atualizarResumoEstoqueVenda() {
         ': <strong style="color:#f1c40f;font-size:1.05em">' + esc(fmtQtdEstoque(livre, un)) + '</strong>';
     html += '<br><span style="opacity:0.9">No cadastro: <strong>' + esc(fmtQtdEstoque(disp.cadastro, un)) +
         '</strong> · No carrinho: <strong>' + esc(fmtQtdEstoque(disp.reservado, un)) + '</strong>';
-    if (p.codigo) html += ' · Cód: <strong>' + esc(p.codigo) + '</strong>';
+    if (codigoPecaDe(p)) html += ' · Cód. peça: <strong>' + esc(codigoPecaDe(p)) + '</strong>';
+    if (p.codigo) html += ' · Barras: <strong>' + esc(p.codigo) + '</strong>';
     html += '</span>';
 
     if (tipoDoc === 'ORCAMENTO') {
@@ -5186,6 +5212,7 @@ document.getElementById('btnVdAddEstoque').addEventListener('click', function ()
         origem: 'estoque',
         produtoId: p.id,
         codigo: p.codigo || '',
+        codigoPeca: codigoPecaDe(p),
         desc: p.nome,
         qtd: qtd,
         unidade: un,

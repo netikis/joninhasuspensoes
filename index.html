@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=63">
-    <link rel="stylesheet" href="css/tema-m3.css?v=63">
+    <link rel="stylesheet" href="css/app.css?v=64">
+    <link rel="stylesheet" href="css/tema-m3.css?v=64">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -580,13 +580,17 @@
         <section id="painelProdutos" class="panel">
             <div class="box">
                 <h2 id="tituloFormProd">Cadastro de Produto / Serviço</h2>
-                <p class="hint">Estoque <strong>unificado</strong>: o que cadastrar aqui aparece no balcão oficial e no modo interno. Use leitor USB em <strong>Cód. Barras</strong> (bipar + Enter). Se o código já existir, abre para edição. <strong>Alinhamento</strong> e outros serviços: escolha <strong>Tipo de serviço</strong> — não precisa de unidade nem estoque.</p>
+                <p class="hint">Estoque <strong>unificado</strong>: o que cadastrar aqui aparece no balcão oficial e no modo interno. Use leitor USB em <strong>Cód. Barras</strong> (bipar + Enter). <strong>Código da peça</strong> é o código interno / do fabricante (pode digitar). Se o código de barras já existir, abre para edição. <strong>Alinhamento</strong> e outros serviços: escolha <strong>Tipo de serviço</strong> — não precisa de unidade nem estoque.</p>
                 <form id="formProduto" onsubmit="return false;">
                     <input type="hidden" id="prodId">
                     <div class="row">
                         <div class="col" style="flex:1.2">
                             <label for="prodCod">Cód. Barras (leitor)</label>
                             <input id="prodCod" autocomplete="off" spellcheck="false" placeholder="Bipar código aqui..." inputmode="none">
+                        </div>
+                        <div class="col" style="flex:1.1">
+                            <label for="prodCodPeca">Código da peça</label>
+                            <input id="prodCodPeca" autocomplete="off" spellcheck="false" placeholder="Ex.: COFAP 31116">
                         </div>
                         <div class="col" style="flex:2"><label>Nome</label><input id="prodNome" required></div>
                         <div class="col"><label>Categoria</label><input id="prodCat" placeholder="Peças, Funilaria..."></div>
@@ -620,7 +624,7 @@
             <div class="box">
                 <h2>Estoque / Lista</h2>
                 <div class="toolbar">
-                    <input type="search" id="buscaProd" class="search" placeholder="Buscar nome ou bipar código...">
+                    <input type="search" id="buscaProd" class="search" placeholder="Buscar nome, código da peça ou bipar...">
                     <button type="button" class="btn btn-secondary" id="btnImprimirEtiquetas" style="border:2px solid #fff;font-weight:700;text-transform:uppercase;font-size:0.78rem">🖨️ Imprimir Etiquetas</button>
                 </div>
                 <p class="hint" style="margin-top:8px;color:#ff8a80">Marque as caixinhas na tabela para imprimir as etiquetas (Elgin L42 Pro — 2 por linha, 50×30 mm). Estoque abaixo de 2 fica em vermelho.</p>
@@ -630,6 +634,7 @@
                         <tr>
                             <th style="width:36px;text-align:center"><input type="checkbox" id="chkTodasEtiquetas" title="Selecionar todos"></th>
                             <th>Cód. Barras</th>
+                            <th>Cód. Peça</th>
                             <th class="th-ordena" data-ordena-prod="nome" title="Clique para ordenar A→Z / Z→A">Nome <span class="seta-ord" id="setaOrdNome"></span></th>
                             <th>Categoria</th>
                             <th class="th-ordena" data-ordena-prod="qtd" title="Clique para ordenar por quantidade">Qtd <span class="seta-ord" id="setaOrdQtd"></span></th>
@@ -1813,17 +1818,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=63"></script>
-    <script src="js/storage.js?v=63"></script>
-    <script src="js/ui.js?v=63"></script>
-    <script src="js/auth.js?v=63"></script>
-    <script src="js/os.js?v=63"></script>
-    <script src="js/nuvem.js?v=63"></script>
-    <script src="js/caixa.js?v=63"></script>
-    <script src="js/comissoes.js?v=63"></script>
-    <script src="js/app.js?v=63"></script>
-    <script src="js/perfil-cliente.js?v=63"></script>
-    <script src="js/navegacao.js?v=63"></script>
+    <script src="js/config.js?v=64"></script>
+    <script src="js/storage.js?v=64"></script>
+    <script src="js/ui.js?v=64"></script>
+    <script src="js/auth.js?v=64"></script>
+    <script src="js/os.js?v=64"></script>
+    <script src="js/nuvem.js?v=64"></script>
+    <script src="js/caixa.js?v=64"></script>
+    <script src="js/comissoes.js?v=64"></script>
+    <script src="js/app.js?v=64"></script>
+    <script src="js/perfil-cliente.js?v=64"></script>
+    <script src="js/navegacao.js?v=64"></script>
 </body>
 </html>
 

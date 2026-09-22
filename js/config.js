@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.3.63';
+var APP_VERSION = '1.3.64';
 
 function rotuloBuildApp() {
     var v = String(APP_VERSION || '');
@@ -17,6 +17,10 @@ function produtoEhServico(p) {
     if (!p) return false;
     if (String(p.tipo || '').toLowerCase() === 'servico') return true;
     return String(p.unidade || '') === 'serv';
+}
+
+function codigoPecaDe(p) {
+    return String((p && (p.codigoPeca || p.codPeca)) || '').trim();
 }
 
 function rotuloUnidade(un) {

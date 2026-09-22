@@ -1606,12 +1606,16 @@ function produtoQueryEhExata(query, p) {
     if (!q) return false;
     var nome = textoBuscaNormCat(p.nome);
     var cod = textoBuscaNormCat(p.codigo);
+    var peca = textoBuscaNormCat(typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : p.codigoPeca);
     var semCol = q.replace(/\s*\[.*$/, '').trim();
     if (nome && (q === nome || semCol === nome)) return true;
     if (cod && (q === cod || semCol === cod)) return true;
+    if (peca && (q === peca || semCol === peca)) return true;
     var soDigQ = String(query || '').replace(/\D/g, '');
     var soDigC = String(p.codigo || '').replace(/\D/g, '');
+    var soDigP = String((typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : p.codigoPeca) || '').replace(/\D/g, '');
     if (soDigQ.length >= 4 && soDigC && soDigQ === soDigC) return true;
+    if (soDigQ.length >= 4 && soDigP && soDigQ === soDigP) return true;
     return false;
 }
 
@@ -1620,7 +1624,7 @@ function buscarProdutosCatalogo(query, limite) {
     if (q.length < 1) return [];
     var lista = listarProdutosParaCatalogo();
     return lista.filter(function (p) {
-        var blob = [p.nome, p.codigo].join(' ');
+        var blob = [p.nome, p.codigo, (typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : p.codigoPeca)].join(' ');
         return combinaBuscaCatalogo(blob, q);
     }).sort(function (a, b) {
         var ea = produtoQueryEhExata(q, a) ? 0 : 1;
@@ -1694,7 +1698,10 @@ function aplicarProdutoNoOrcamentoOs(p) {
     var desc = document.getElementById('itemDesc');
     var custo = document.getElementById('itemCusto');
     var venda = document.getElementById('itemValor');
-    if (desc) desc.value = p.nome || '';
+    if (desc) {
+        var peca = typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : (p.codigoPeca || '');
+        desc.value = (p.nome || '') + (peca ? ' [' + peca + ']' : '');
+    }
     if (custo) custo.value = typeof fmtNumOs === 'function' ? fmtNumOs(p.custo) : String(p.custo || '');
     if (venda) venda.value = typeof fmtNumOs === 'function' ? fmtNumOs(p.venda) : String(p.venda || '');
     if (venda) {
@@ -1739,7 +1746,10 @@ function aplicarProdutoNoOrcamentoVenda(p, destino) {
     }
     produtoVendaSelecionado = p;
     var busca = document.getElementById('vdProdBusca');
-    if (busca) busca.value = (p.nome || '') + (p.codigo ? ' [' + p.codigo + ']' : '');
+    if (busca) {
+        var pecaVd = typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : (p.codigoPeca || '');
+        busca.value = (p.nome || '') + (pecaVd ? ' [' + pecaVd + ']' : (p.codigo ? ' [' + p.codigo + ']' : ''));
+    }
     var elC = document.getElementById('vdProdCusto');
     var elV = document.getElementById('vdProdVenda');
     var elM = document.getElementById('vdProdMargem');
@@ -1873,7 +1883,8 @@ function rotuloPrecoCatalogo(custo, venda) {
         return buscarProdutosCatalogo(q).map(function (p) {
             var qtd = (p.qtd != null && Number(p.qtd) === Number(p.qtd)) ? Number(p.qtd) : null;
             var extra = [
-                p.codigo ? 'cód. ' + p.codigo : '',
+                (typeof codigoPecaDe === 'function' && codigoPecaDe(p)) ? 'peça ' + codigoPecaDe(p) : '',
+                p.codigo ? 'barras ' + p.codigo : '',
                 (typeof produtoEhServico === 'function' && produtoEhServico(p))
                     ? 'tipo de serviço'
                     : (qtd != null ? 'estoque ' + qtd : ''),
