@@ -10,6 +10,10 @@ function getCaixaConfig(db) {
         basePainelSaidas: 0,
         basePainelEntradasBanco: 0,
         basePainelSaidasBanco: 0,
+        baseOficinaMes: '',
+        baseOficinaPecas: 0,
+        baseOficinaGanho: 0,
+        baseOficinaMao: 0,
         atualizadoEm: '',
         zeradoEm: '',
         fechadoEm: '',
@@ -151,6 +155,10 @@ function mesclarCaixaConfig(localCfg, nuvemCfg) {
             basePainelSaidas: Number(L.basePainelSaidas) || Number(N.basePainelSaidas) || 0,
             basePainelEntradasBanco: Number(L.basePainelEntradasBanco) || Number(N.basePainelEntradasBanco) || 0,
             basePainelSaidasBanco: Number(L.basePainelSaidasBanco) || Number(N.basePainelSaidasBanco) || 0,
+            baseOficinaMes: L.baseOficinaMes || N.baseOficinaMes || '',
+            baseOficinaPecas: Math.max(Number(L.baseOficinaPecas) || 0, Number(N.baseOficinaPecas) || 0),
+            baseOficinaGanho: Math.max(Number(L.baseOficinaGanho) || 0, Number(N.baseOficinaGanho) || 0),
+            baseOficinaMao: Math.max(Number(L.baseOficinaMao) || 0, Number(N.baseOficinaMao) || 0),
             zeradoEm: L.zeradoEm || N.zeradoEm || '',
             fechadoEm: L.fechadoEm || N.fechadoEm || '',
             atualizadoEm: L.atualizadoEm || N.atualizadoEm || new Date().toISOString()
@@ -222,10 +230,122 @@ function aplicarZerarPaineisCaixa(db) {
     cfg.basePainelSaidas = somarLista(db.caixa, 'saida');
     cfg.basePainelEntradasBanco = somarLista(db.caixaBanco, 'entrada');
     cfg.basePainelSaidasBanco = somarLista(db.caixaBanco, 'saida');
+    var hoje = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
+    var ym = String(hoje).slice(0, 7);
+    if (typeof calcularRelatorioOficina === 'function') {
+        var ofLive = calcularRelatorioOficina({ inicio: ym + '-01', fim: hoje, label: ym });
+        cfg.baseOficinaMes = ym;
+        cfg.baseOficinaPecas = Number(ofLive.pecas) || 0;
+        cfg.baseOficinaGanho = Number(ofLive.ganho) || 0;
+        cfg.baseOficinaMao = Number(ofLive.mao) || 0;
+    }
     cfg.zeradoEm = new Date().toISOString();
     cfg.fechadoEm = cfg.zeradoEm;
     return cfg;
 }
+
+function lancamentoEhFechamento(x) {
+    return !!(x && (x.tipo === 'fechamento' || x.origemFechamento || x.fechamentoId));
+}
+
+function totaisOficinaPainel(db) {
+    var hoje = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
+    var ym = String(hoje).slice(0, 7);
+    var live = { pecas: 0, ganho: 0, mao: 0, despesas: 0, resultado: 0, maoCasa: 0 };
+    if (typeof calcularRelatorioOficina === 'function') {
+        live = calcularRelatorioOficina({ inicio: ym + '-01', fim: hoje, label: ym });
+    }
+    var cfg = getCaixaConfig(db);
+    var mesmaMes = String(cfg.baseOficinaMes || '') === ym;
+    var pecas = Math.max(0, (Number(live.pecas) || 0) - (mesmaMes ? (Number(cfg.baseOficinaPecas) || 0) : 0));
+    var ganho = Math.max(0, (Number(live.ganho) || 0) - (mesmaMes ? (Number(cfg.baseOficinaGanho) || 0) : 0));
+    var mao = Math.max(0, (Number(live.mao) || 0) - (mesmaMes ? (Number(cfg.baseOficinaMao) || 0) : 0));
+    return {
+        pecas: pecas,
+        ganho: ganho,
+        mao: mao,
+        moGanho: mao + ganho,
+        despesas: Number(live.despesas) || 0,
+        resultado: Number(live.resultado) || 0,
+        live: live,
+        ym: ym
+    };
+}
+
+function montarLancamentoFechamentoCaixa(f) {
+    var ini = Number(f.inicialBalcao != null ? f.inicialBalcao : f.inicial) || 0;
+    var ent = Number(f.entradasBalcao != null ? f.entradasBalcao : f.entradas) || 0;
+    var sai = Number(f.saidasBalcao != null ? f.saidasBalcao : f.saidas) || 0;
+    var sal = Number(f.saldoBalcao != null ? f.saldoBalcao : f.saldo) || 0;
+    var dataRef = String(f.data || f.criadoEm || ((typeof hojeISO === 'function') ? hojeISO() : '')).slice(0, 10);
+    var parts = dataRef.split('-');
+    var numDoc = 'FECH' + (parts.length === 3 ? (parts[2] + parts[1] + String(parts[0]).slice(2)) : '');
+    return {
+        id: 'fech_' + f.id,
+        tipo: 'fechamento',
+        origemFechamento: true,
+        fechamentoId: f.id,
+        numDoc: numDoc,
+        clienteNome: 'Fechamento caixa — inicial ' + moeda(ini) +
+            ' · entradas ' + moeda(ent) +
+            ' · saídas ' + moeda(sai) +
+            ' · balanço ' + moeda(sal),
+        descricao: 'Fechamento de caixa',
+        valor: Number(f.saldo != null ? f.saldo : sal) || 0,
+        forma: '',
+        conta: 'balcao',
+        vencimento: dataRef,
+        fechamento: f,
+        criadoEm: f.criadoEm || (dataRef + 'T23:59:59.000Z')
+    };
+}
+
+function garantirLancamentosFechamento(db) {
+    if (!db) return false;
+    if (!db.caixa) db.caixa = [];
+    var ids = {};
+    var exCx = (typeof garantirExcluidos === 'function') ? (garantirExcluidos(db).caixa || {}) : {};
+    db.caixa.forEach(function (l) {
+        if (!l) return;
+        if (l.fechamentoId) ids[String(l.fechamentoId)] = true;
+        if (l.origemFechamento && l.id) ids[String(l.id).replace(/^fech_/, '')] = true;
+    });
+    var mudou = false;
+    (db.fechamentosCaixa || []).forEach(function (f) {
+        if (!f || !f.id || ids[String(f.id)]) return;
+        var lancId = 'fech_' + f.id;
+        if (exCx[lancId] || exCx[String(f.id)]) return;
+        db.caixa.push(montarLancamentoFechamentoCaixa(f));
+        ids[String(f.id)] = true;
+        mudou = true;
+    });
+    return mudou;
+}
+
+function fechamentoPorId(id, db) {
+    if (!id) return null;
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
+    var hit = (db.fechamentosCaixa || []).find(function (f) { return f && String(f.id) === String(id); });
+    if (hit) return hit;
+    var lanc = lancamentoCaixaPorId(id);
+    if (lanc && lanc.fechamento && lanc.fechamento.id) return lanc.fechamento;
+    if (lanc && lanc.fechamentoId) {
+        return (db.fechamentosCaixa || []).find(function (f) {
+            return f && String(f.id) === String(lanc.fechamentoId);
+        }) || lanc.fechamento || null;
+    }
+    return null;
+}
+
+function abrirRelatorioFechamento(id) {
+    var f = fechamentoPorId(id);
+    if (!f) {
+        toast('Fechamento não encontrado.');
+        return;
+    }
+    imprimirFechamentoDia(f);
+}
+window.abrirRelatorioFechamento = abrirRelatorioFechamento;
 
 function zerarPainelCaixa() {
     if (!confirm(
@@ -434,6 +554,7 @@ function classificarTipoCaixaFh(x) {
 }
 
 function numDocCaixaFh(x) {
+    if (lancamentoEhFechamento(x) && x.numDoc) return String(x.numDoc);
     if (x.osResumo && x.osResumo.placa) return String(x.osResumo.placa).toUpperCase();
     if (x.vendaResumo && x.vendaResumo.numero != null && String(x.vendaResumo.numero) !== '') {
         return String(x.vendaResumo.numero);
@@ -443,6 +564,9 @@ function numDocCaixaFh(x) {
 }
 
 function clienteCaixaFh(x) {
+    if (lancamentoEhFechamento(x)) {
+        return x.clienteNome || x.descricao || 'Fechamento de caixa';
+    }
     if (x.osResumo && x.osResumo.cliente) return x.osResumo.cliente;
     if (x.vendaResumo && x.vendaResumo.cliente) return x.vendaResumo.cliente;
     if (x.clienteNome) return x.clienteNome;
@@ -453,6 +577,10 @@ function renderCaixa() {
     sincronizarOficinaNoCaixaEmpresa();
     /* Sempre lê o caixa oficial da empresa (não o banco interno) */
     var db = carregarMain();
+    if (garantirLancamentosFechamento(db)) {
+        salvarMain(db);
+        if (typeof agendarSyncAutomatico === 'function') agendarSyncAutomatico('salvar');
+    }
     var cfg = getCaixaConfig(db);
     var exCx = garantirExcluidos(db).caixa || {};
     var lista = aplicarExcluidosNaLista(db.caixa || [], exCx);
@@ -468,16 +596,7 @@ function renderCaixa() {
     document.getElementById('cxSaidas').textContent = moeda(painelCx.saidas);
     document.getElementById('cxSaldo').textContent = moeda(painelCx.saldo);
 
-    var hoje = hojeISO();
-    var iniMes = hoje.slice(0, 7) + '-01';
-    var of = calcularRelatorioOficina({ inicio: iniMes, fim: hoje, label: iniMes });
-    if (!((of.mao + of.ganho + of.pecas) > 0.009)) {
-        var dBack = new Date(hoje + 'T12:00:00');
-        dBack.setMonth(dBack.getMonth() - 2);
-        dBack.setDate(1);
-        var iniBack = dBack.getFullYear() + '-' + String(dBack.getMonth() + 1).padStart(2, '0') + '-01';
-        of = calcularRelatorioOficina({ inicio: iniBack, fim: hoje, label: iniBack });
-    }
+    var of = totaisOficinaPainel(db);
     var elPecas = document.getElementById('cxOfPecas');
     var elG = document.getElementById('cxOfGanho');
     var elM = document.getElementById('cxOfMao');
@@ -486,7 +605,7 @@ function renderCaixa() {
     if (elPecas) elPecas.textContent = moeda(of.pecas);
     if (elG) elG.textContent = moeda(of.ganho);
     if (elM) elM.textContent = moeda(of.mao);
-    if (elN) elN.textContent = moeda((Number(of.mao) || 0) + (Number(of.ganho) || 0));
+    if (elN) elN.textContent = moeda(of.moGanho);
     if (elSomaSub) elSomaSub.textContent = 'Mão de obra + ganho em peças';
 
     var tb = document.getElementById('tabelaCaixa');
@@ -543,10 +662,12 @@ function renderCaixa() {
         var cli = clienteCaixaFh(x);
         var dataLanc = fmtData(x.criadoEm);
         var venc = x.vencimento ? fmtData(x.vencimento) : dataLanc;
-        var valorCor = tip.cls === 'despesas' ? '#e74c3c' : '#2ecc71';
+        var valorCor = tip.cls === 'despesas' ? '#e74c3c' : (tip.cls === 'fech' ? '#f39c12' : '#2ecc71');
         var forma = (x.forma || '').toUpperCase();
         var statusHtml;
-        if (tip.cls === 'despesas' || tip.cls === 'fech') {
+        if (tip.cls === 'fech') {
+            statusHtml = '<span class="badge-cx fech">FECHADO</span>';
+        } else if (tip.cls === 'despesas') {
             statusHtml = '—';
         } else {
             statusHtml = '<span class="badge-cx pago">✅ PAGO' + (forma ? ' - ' + esc(forma) : '') + '</span>';
@@ -556,7 +677,11 @@ function renderCaixa() {
         var tr = document.createElement('tr');
         var idsRow = resolverDocCaixa(x);
         if (x.id) tr.setAttribute('data-cx-lanc', String(x.id));
-        if (idsRow.idVd) {
+        if (lancamentoEhFechamento(x)) {
+            tr.setAttribute('data-cx-abrir-fech', String(x.fechamentoId || x.id));
+            tr.style.cursor = 'pointer';
+            tr.title = 'Clique para ver o relatório do fechamento';
+        } else if (idsRow.idVd) {
             tr.setAttribute('data-cx-abrir-vd', idsRow.idVd);
             tr.style.cursor = 'pointer';
             tr.title = 'Clique para abrir a venda';
@@ -607,8 +732,13 @@ function renderCaixa() {
             }
             if (tratarCliqueAcoesDocumentoCaixa(e)) return;
             if (!e.target.closest('button') && !e.target.closest('a')) {
-                var trAbrir = e.target.closest('tr[data-cx-abrir-vd], tr[data-cx-abrir-os], tr[data-cx-lanc]');
+                var trAbrir = e.target.closest('tr[data-cx-abrir-fech], tr[data-cx-abrir-vd], tr[data-cx-abrir-os], tr[data-cx-lanc]');
                 if (trAbrir) {
+                    var idFech = trAbrir.getAttribute('data-cx-abrir-fech');
+                    if (idFech) {
+                        abrirRelatorioFechamento(idFech);
+                        return;
+                    }
                     var lanc = lancamentoCaixaPorId(trAbrir.getAttribute('data-cx-lanc'));
                     if (lanc && abrirDocumentoDoLancamentoCaixa(lanc)) return;
                     var idVd = trAbrir.getAttribute('data-cx-abrir-vd');
@@ -706,6 +836,7 @@ function acharAtendimentoPorLancamentoCaixa(x, db) {
 }
 
 function resolverDocCaixa(x) {
+    if (lancamentoEhFechamento(x)) return { idOs: '', idVd: '' };
     var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
     var at = acharAtendimentoPorLancamentoCaixa(x, db);
     var idOs = at && at.id ? String(at.id) : (x && x.atendimentoId ? String(x.atendimentoId) : '');
@@ -737,6 +868,10 @@ function lancamentoCaixaPorId(id) {
 
 function abrirDocumentoDoLancamentoCaixa(x) {
     if (!x) return false;
+    if (lancamentoEhFechamento(x)) {
+        abrirRelatorioFechamento(x.fechamentoId || (x.fechamento && x.fechamento.id) || x.id);
+        return true;
+    }
     var ids = resolverDocCaixa(x);
     if (ids.idVd && typeof editarDocumentoVenda === 'function') {
         editarDocumentoVenda(ids.idVd);
@@ -750,6 +885,7 @@ function abrirDocumentoDoLancamentoCaixa(x) {
 }
 
 function htmlAssinaturaCaixa(db, x) {
+    if (lancamentoEhFechamento(x)) return '—';
     var ids = resolverDocCaixa(x);
     if (ids.idOs) {
         var at = (db.atendimentos || []).find(function (a) { return a && String(a.id) === ids.idOs; });
@@ -794,6 +930,12 @@ function compactarAcoesOpcoesNota(wrap) {
 
 function montarAcoesDocumentoCaixa(wrap, x) {
     if (!wrap || !x) return;
+    if (lancamentoEhFechamento(x)) {
+        var fid = String(x.fechamentoId || (x.fechamento && x.fechamento.id) || x.id);
+        appendBtnIconeCaixa(wrap, 'btn-secondary', '👁️', 'Ver', 'data-cx-fech', fid, 'Ver relatório do fechamento');
+        appendBtnIconeCaixa(wrap, 'btn-pdf', '📄', 'PDF', 'data-cx-fech-pdf', fid, 'Imprimir / salvar PDF do fechamento');
+        return;
+    }
     var ids = resolverDocCaixa(x);
     if (ids.idOs) {
         appendBtnIconeCaixa(wrap, 'btn-secondary', '🖨️', 'Imprimir', 'data-cx-imp', ids.idOs, 'Imprimir nota');
@@ -865,6 +1007,12 @@ function tratarCliqueAcoesDocumentoCaixa(e) {
         if (typeof abrirLinkAssinaturaVenda === 'function') {
             abrirLinkAssinaturaVenda(b.getAttribute('data-cx-link-vd'));
         }
+        return true;
+    }
+    b = e.target.closest('[data-cx-fech], [data-cx-fech-pdf]');
+    if (b) {
+        hit();
+        abrirRelatorioFechamento(b.getAttribute('data-cx-fech') || b.getAttribute('data-cx-fech-pdf'));
         return true;
     }
     b = e.target.closest('[data-cx-edit-vd]');
@@ -1418,6 +1566,7 @@ function coletarItensRelatorioMensal(db, filtro, mesAno) {
 
     function pushLanc(x, canal) {
         if (!x) return;
+        if (x.tipo === 'fechamento' || x.origemFechamento) return;
         var ma = mesAnoDeIso(x.criadoEm);
         if (ma !== mesAno) return;
         var desc = x.descricao || '';
@@ -1623,6 +1772,7 @@ function montarArvoreCaixaDados(db) {
     }
 
     (db.caixa || []).forEach(function (x) {
+        if (!x || x.tipo === 'fechamento' || x.origemFechamento) return;
         addDoc(x.criadoEm, {
             data: fmtData(x.criadoEm),
             descricao: x.descricao || '—',
@@ -2673,23 +2823,26 @@ function fecharCaixaDoDia() {
     var cfg = painel.cfg;
     var corte = String(cfg.zeradoEm || cfg.fechadoEm || '').slice(0, 10);
     var iniOf = /^\d{4}-\d{2}-\d{2}$/.test(corte) ? corte : (hoje.slice(0, 7) + '-01');
-    var of = (typeof calcularRelatorioOficina === 'function')
-        ? calcularRelatorioOficina({ inicio: iniOf, fim: hoje, label: iniOf })
-        : { pecas: 0, ganho: 0, mao: 0, despesas: 0, resultado: 0 };
+    var of = totaisOficinaPainel(db);
     if (!confirm(
-        'Fechar o caixa com o saldo da TELA e zerar balcão + digital?\n\n' +
+        'Fechar o caixa com o saldo da TELA e zerar balcão + digital + oficina?\n\n' +
         '(Se não fechou os dias anteriores, fecha tudo que está aberto agora.)\n\n' +
         'BALCÃO\n' +
         'Inicial: ' + moeda(bal.inicial) + '\nEntradas: ' + moeda(bal.entradas) +
-        '\nSaídas: ' + moeda(bal.saidas) + '\nSaldo: ' + moeda(bal.saldo) + '\n\n' +
+        '\nSaídas: ' + moeda(bal.saidas) + '\nBalanço: ' + moeda(bal.saldo) + '\n\n' +
         'DIGITAL / BANCO\n' +
         'Inicial: ' + moeda(ban.inicial) + '\nEntradas: ' + moeda(ban.entradas) +
         '\nSaídas: ' + moeda(ban.saidas) + '\nSaldo: ' + moeda(ban.saldo) + '\n\n' +
-        'Oficina no período: ganho peças ' + moeda(of.ganho) + ' · MO ' + moeda(of.mao) + '\n\n' +
-        'Os documentos continuam no Relatório Caixa (mês). Os cards voltam para R$ 0,00.'
+        'OFICINA NA TELA\n' +
+        'Peças (venda): ' + moeda(of.pecas) +
+        '\nGanho peças: ' + moeda(of.ganho) +
+        '\nMão de obra: ' + moeda(of.mao) +
+        '\nMO + ganho peças: ' + moeda(of.moGanho) + '\n\n' +
+        'O fechamento entra na tabela. Os documentos continuam no Relatório Caixa (mês). Os cards voltam para R$ 0,00.'
     )) return;
 
     if (!db.fechamentosCaixa) db.fechamentosCaixa = [];
+    if (!db.caixa) db.caixa = [];
     var rec = {
         id: uid(),
         data: hoje,
@@ -2710,16 +2863,18 @@ function fecharCaixaDoDia() {
         pecasBruto: of.pecas,
         ganhoPecas: of.ganho,
         maoObra: of.mao,
+        moGanho: of.moGanho,
         despesas: of.despesas,
         resultado: of.resultado,
         criadoEm: new Date().toISOString()
     };
     db.fechamentosCaixa.push(rec);
+    db.caixa.push(montarLancamentoFechamentoCaixa(rec));
     db.caixaConfig = aplicarZerarPaineisCaixa(db);
     db.caixaConfig.atualizadoEm = rec.criadoEm;
     salvarMain(db);
     if (typeof agendarSyncAutomatico === 'function') agendarSyncAutomatico('salvar');
-    toast('Caixa fechado no saldo da tela. Balcão e digital zerados.');
+    toast('Caixa fechado. Linha FECH.CAIXA gravada. Cards do caixa e da oficina zerados.');
     renderCaixa();
     renderCaixaBanco();
     if (typeof renderRelatorioCaixa === 'function') renderRelatorioCaixa();
@@ -2728,35 +2883,74 @@ function fecharCaixaDoDia() {
 }
 window.fecharCaixaDoDia = fecharCaixaDoDia;
 
-function imprimirFechamentoDia(f) {
-    var emp = getEmpresa();
-    var html = '<html><head><title>Fechamento ' + esc(f.data) + '</title><style>body{font-family:Segoe UI,sans-serif;padding:24px} h1{margin:0 0 8px} .l{margin:6px 0} h3{margin:16px 0 6px}</style></head><body>';
-    html += '<h1>' + esc(emp.nome || 'Joninha Suspensões') + '</h1>';
-    html += '<h2>Fechamento de caixa — ' + esc(fmtData(f.data)) + '</h2>';
-    if (f.periodoDe && f.periodoAte) {
-        html += '<p>Período aberto: ' + esc(fmtData(f.periodoDe)) + ' a ' + esc(fmtData(f.periodoAte)) + '</p>';
+function htmlCorpoFechamentoCaixa(f) {
+    if (!f) return '';
+    var iniB = f.inicialBalcao != null ? f.inicialBalcao : f.inicial;
+    var entB = f.entradasBalcao != null ? f.entradasBalcao : f.entradas;
+    var saiB = f.saidasBalcao != null ? f.saidasBalcao : f.saidas;
+    var salB = f.saldoBalcao != null ? f.saldoBalcao : f.saldo;
+    var moGanho = f.moGanho != null ? f.moGanho : ((Number(f.maoObra) || 0) + (Number(f.ganhoPecas) || 0));
+    function bloco(titulo, pares) {
+        return '<h3 style="margin:16px 0 8px;border-bottom:2px solid #0d3b66;padding-bottom:4px">' + titulo + '</h3>' +
+            pares.map(function (p) {
+                return '<div class="l" style="display:flex;justify-content:space-between;gap:16px;margin:6px 0">' +
+                    '<span>' + p[0] + '</span><b>' + moeda(p[1]) + '</b></div>';
+            }).join('');
     }
-    html += '<h3>Balcão</h3>';
-    html += '<div class="l">Caixa inicial: <b>' + moeda(f.inicialBalcao) + '</b></div>';
-    html += '<div class="l">Entradas: <b>' + moeda(f.entradasBalcao != null ? f.entradasBalcao : f.entradas) + '</b></div>';
-    html += '<div class="l">Saídas: <b>' + moeda(f.saidasBalcao != null ? f.saidasBalcao : f.saidas) + '</b></div>';
-    html += '<div class="l">Saldo: <b>' + moeda(f.saldoBalcao != null ? f.saldoBalcao : f.saldo) + '</b></div>';
-    html += '<h3>Digital / Banco</h3>';
-    html += '<div class="l">Saldo inicial: <b>' + moeda(f.inicialBanco || 0) + '</b></div>';
-    html += '<div class="l">Entradas: <b>' + moeda(f.entradasBanco || 0) + '</b></div>';
-    html += '<div class="l">Saídas: <b>' + moeda(f.saidasBanco || 0) + '</b></div>';
-    html += '<div class="l">Saldo: <b>' + moeda(f.saldoBanco || 0) + '</b></div>';
-    html += '<h3>Total fechado</h3>';
-    html += '<div class="l">Entradas: <b>' + moeda(f.entradas) + '</b></div>';
-    html += '<div class="l">Saídas: <b>' + moeda(f.saidas) + '</b></div>';
-    html += '<div class="l">Saldo final: <b>' + moeda(f.saldo) + '</b></div><hr>';
-    html += '<div class="l">Peças (venda): <b>' + moeda(f.pecasBruto) + '</b></div>';
-    html += '<div class="l">Ganho em peças: <b>' + moeda(f.ganhoPecas) + '</b></div>';
-    html += '<div class="l">Mão de obra: <b>' + moeda(f.maoObra) + '</b></div>';
-    html += '<div class="l">Despesas: <b>' + moeda(f.despesas) + '</b></div>';
-    html += '<div class="l">Resultado estimado: <b>' + moeda(f.resultado) + '</b></div>';
-    html += '<p style="margin-top:18px;color:#666;font-size:12px">Gerado em ' + esc(new Date().toLocaleString('pt-BR')) +
-        ' · Os documentos do mês ficam no Relatório Caixa.</p></body></html>';
+    var html = '';
+    if (f.periodoDe && f.periodoAte) {
+        html += '<p>Período aberto: <b>' + esc(fmtData(f.periodoDe)) + '</b> a <b>' + esc(fmtData(f.periodoAte)) + '</b></p>';
+    }
+    html += bloco('Caixa / Balcão', [
+        ['Caixa inicial', iniB],
+        ['Entradas', entB],
+        ['Saídas', saiB],
+        ['Balanço do dia', salB]
+    ]);
+    html += bloco('Digital / Banco', [
+        ['Saldo inicial', f.inicialBanco || 0],
+        ['Entradas', f.entradasBanco || 0],
+        ['Saídas', f.saidasBanco || 0],
+        ['Saldo', f.saldoBanco || 0]
+    ]);
+    html += bloco('Total fechado', [
+        ['Entradas', f.entradas],
+        ['Saídas', f.saidas],
+        ['Balanço do dia', f.saldo]
+    ]);
+    html += bloco('Oficina no fechamento', [
+        ['Peças (venda)', f.pecasBruto],
+        ['Ganho em peças', f.ganhoPecas],
+        ['Mão de obra', f.maoObra],
+        ['MO + ganho peças', moGanho],
+        ['Despesas', f.despesas],
+        ['Resultado estimado', f.resultado]
+    ]);
+    html += '<p style="margin-top:18px;color:#666;font-size:12px">Gerado em ' +
+        esc(new Date().toLocaleString('pt-BR')) +
+        ' · Os documentos do mês ficam no Relatório Caixa.</p>';
+    return html;
+}
+
+function imprimirFechamentoDia(f) {
+    if (!f) return;
+    var emp = (typeof getEmpresa === 'function') ? getEmpresa() : {};
+    if (typeof executarImpressaoHtml === 'function' && typeof htmlCabecalhoNotaEmpresa === 'function') {
+        executarImpressaoHtml(
+            '<div class="nota-espelho">' +
+            htmlCabecalhoNotaEmpresa(emp,
+                '<div class="nota-sub nota-titulo-espelho">Fechamento de caixa · ' + esc(fmtData(f.data)) + '</div>'
+            ) +
+            htmlCorpoFechamentoCaixa(f) +
+            '</div>'
+        );
+        return;
+    }
+    var html = '<html><head><title>Fechamento ' + esc(f.data) + '</title><style>body{font-family:Segoe UI,sans-serif;padding:24px} h1{margin:0 0 8px} .l{margin:6px 0} h3{margin:16px 0 6px}</style></head><body>';
+    html += '<h1>' + esc((emp && emp.nome) || 'Joninha Suspensões') + '</h1>';
+    html += '<h2>Fechamento de caixa — ' + esc(fmtData(f.data)) + '</h2>';
+    html += htmlCorpoFechamentoCaixa(f);
+    html += '</body></html>';
     var w = window.open('', '_blank');
     if (!w) return;
     w.document.write(html);
