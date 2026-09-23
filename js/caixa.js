@@ -230,7 +230,7 @@ function aplicarZerarPaineisCaixa(db) {
 function zerarPainelCaixa() {
     if (!confirm(
         '⚠️ ATENÇÃO: Zerar o painel do Caixa / Balcão e do Caixa digital?\n\n' +
-        'Os cards voltam para R$ 0,00 (igual ao FH Control).\n' +
+        'Os cards voltam para R$ 0,00.\n' +
         'Os documentos NÃO são apagados — Relatório Caixa e as pastas do mês continuam com tudo.'
     )) return;
     var db = carregarMain();
@@ -2678,7 +2678,7 @@ function fecharCaixaDoDia() {
         : { pecas: 0, ganho: 0, mao: 0, despesas: 0, resultado: 0 };
     if (!confirm(
         'Fechar o caixa com o saldo da TELA e zerar balcão + digital?\n\n' +
-        '(Se não fechou os dias anteriores, fecha tudo que está aberto agora — igual FH Control.)\n\n' +
+        '(Se não fechou os dias anteriores, fecha tudo que está aberto agora.)\n\n' +
         'BALCÃO\n' +
         'Inicial: ' + moeda(bal.inicial) + '\nEntradas: ' + moeda(bal.entradas) +
         '\nSaídas: ' + moeda(bal.saidas) + '\nSaldo: ' + moeda(bal.saldo) + '\n\n' +
