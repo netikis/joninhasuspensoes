@@ -7556,6 +7556,45 @@ function renderRelatorioOficina() {
     }
 }
 
+function focarDetalheRelatorioOficina() {
+    var box = document.getElementById('rofConteudo') || document.getElementById('rofDetalhe');
+    if (!box) return;
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    box.classList.add('cx-atalho-foco');
+    setTimeout(function () { box.classList.remove('cx-atalho-foco'); }, 1800);
+}
+
+function irDestinoRelatorioOficina(tipo) {
+    tipo = String(tipo || '');
+    if (tipo === 'comissao') {
+        var mes = '';
+        try { mes = String(periodoOficina().inicio || '').slice(0, 7); } catch (eM) { mes = ''; }
+        var mesEl = document.getElementById('comMes');
+        if (mesEl && /^\d{4}-\d{2}$/.test(mes)) mesEl.value = mes;
+        abrirPainel('painelComissoes');
+        if (typeof renderComissoes === 'function') renderComissoes();
+        return;
+    }
+    if (tipo === 'despesas') {
+        if (typeof irParaPastaInicio === 'function') irParaPastaInicio('saidas');
+        else abrirPainel('painelCaixa');
+        return;
+    }
+    focarDetalheRelatorioOficina();
+}
+window.irDestinoRelatorioOficina = irDestinoRelatorioOficina;
+
+(function ligarCardsRelatorioOficina() {
+    var wrap = document.querySelector('#painelRelatorioOficina .cards-oficina');
+    if (!wrap || wrap._rofIr) return;
+    wrap._rofIr = true;
+    wrap.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-rof-ir]');
+        if (!btn) return;
+        irDestinoRelatorioOficina(btn.getAttribute('data-rof-ir'));
+    });
+})();
+
 function imprimirRelatorioOficina() {
     renderRelatorioOficina();
     var per = periodoOficina();

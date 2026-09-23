@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=70">
-    <link rel="stylesheet" href="css/tema-m3.css?v=70">
+    <link rel="stylesheet" href="css/app.css?v=71">
+    <link rel="stylesheet" href="css/tema-m3.css?v=71">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -1252,7 +1252,7 @@
         <section id="painelRelatorioOficina" class="panel">
             <div class="box">
                 <h2>📊 Relatório Oficina — Lucro da casa</h2>
-                <p class="hint">Só entra o que está <strong>PAGO</strong> (OS + vendas do balcão). <strong>Clique na linha</strong> para abrir a OS ou a venda. Data de corte = data do pagamento no caixa; se não houver, usa a data da OS/venda. Lucro da casa = lucro peças + MO da casa − despesas. Comissão do funcionário fica separada.</p>
+                <p class="hint">Só entra o que está <strong>PAGO</strong> (OS + vendas do balcão). <strong>Clique no card</strong> para ir ao que ele representa (comissão abre Comissões, despesa abre saídas). <strong>Clique na linha</strong> para abrir a OS ou a venda.</p>
                 <div class="row" style="margin-bottom:12px">
                     <div class="col"><label>Período</label>
                         <select id="rofPeriodo">
@@ -1271,13 +1271,41 @@
                 </div>
             </div>
             <div class="cards cards-oficina" style="margin-bottom:14px">
-                <div class="card" style="background:#34495e"><div class="k">Peças — venda (bruto)</div><div class="v" id="rofPecasBruto">R$ 0</div></div>
-                <div class="card" style="background:#16a085"><div class="k">Lucro em peças</div><div class="v" id="rofPecasLucro">R$ 0</div></div>
-                <div class="card" style="background:#2980b9"><div class="k">MO bruta (cliente)</div><div class="v" id="rofMaoBruta">R$ 0</div></div>
-                <div class="card" style="background:#c0392b"><div class="k">Comissão funcionários</div><div class="v" id="rofComissao">R$ 0</div></div>
-                <div class="card" style="background:#8e44ad"><div class="k">MO da casa</div><div class="v" id="rofMaoLiq">R$ 0</div></div>
-                <div class="card" style="background:#e74c3c"><div class="k">Despesas</div><div class="v" id="rofDespesas">R$ 0</div></div>
-                <div class="card" style="background:#27ae60"><div class="k">Lucro do período (casa)</div><div class="v" id="rofResultado">R$ 0</div></div>
+                <button type="button" class="card card-atalho" data-rof-ir="pecas" title="Ver peças no detalhe" style="background:#34495e">
+                    <div class="k">Peças — venda (bruto)</div>
+                    <div class="v" id="rofPecasBruto">R$ 0</div>
+                    <div class="card-sub">Toque para ver no detalhe</div>
+                </button>
+                <button type="button" class="card card-atalho" data-rof-ir="lucroPecas" title="Ver lucro em peças no detalhe" style="background:#16a085">
+                    <div class="k">Lucro em peças</div>
+                    <div class="v" id="rofPecasLucro">R$ 0</div>
+                    <div class="card-sub">Toque para ver no detalhe</div>
+                </button>
+                <button type="button" class="card card-atalho" data-rof-ir="mao" title="Ver mão de obra no detalhe" style="background:#2980b9">
+                    <div class="k">MO bruta (cliente)</div>
+                    <div class="v" id="rofMaoBruta">R$ 0</div>
+                    <div class="card-sub">Toque para ver no detalhe</div>
+                </button>
+                <button type="button" class="card card-atalho" data-rof-ir="comissao" title="Abrir comissões dos funcionários" style="background:#c0392b">
+                    <div class="k">Comissão funcionários</div>
+                    <div class="v" id="rofComissao">R$ 0</div>
+                    <div class="card-sub">Toque para abrir comissões</div>
+                </button>
+                <button type="button" class="card card-atalho" data-rof-ir="maoCasa" title="Ver MO da casa no detalhe" style="background:#8e44ad">
+                    <div class="k">MO da casa</div>
+                    <div class="v" id="rofMaoLiq">R$ 0</div>
+                    <div class="card-sub">Toque para ver no detalhe</div>
+                </button>
+                <button type="button" class="card card-atalho" data-rof-ir="despesas" title="Abrir saídas do caixa" style="background:#e74c3c">
+                    <div class="k">Despesas</div>
+                    <div class="v" id="rofDespesas">R$ 0</div>
+                    <div class="card-sub">Toque para abrir saídas</div>
+                </button>
+                <button type="button" class="card card-atalho" data-rof-ir="lucro" title="Ver lucro da casa no detalhe" style="background:#27ae60">
+                    <div class="k">Lucro do período (casa)</div>
+                    <div class="v" id="rofResultado">R$ 0</div>
+                    <div class="card-sub">Toque para ver o detalhe</div>
+                </button>
             </div>
             <div class="box" id="rofConteudo">
                 <h2>Detalhamento</h2>
@@ -1877,17 +1905,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=70"></script>
-    <script src="js/storage.js?v=70"></script>
-    <script src="js/ui.js?v=70"></script>
-    <script src="js/auth.js?v=70"></script>
-    <script src="js/os.js?v=70"></script>
-    <script src="js/nuvem.js?v=70"></script>
-    <script src="js/caixa.js?v=70"></script>
-    <script src="js/comissoes.js?v=70"></script>
-    <script src="js/app.js?v=70"></script>
-    <script src="js/perfil-cliente.js?v=70"></script>
-    <script src="js/navegacao.js?v=70"></script>
+    <script src="js/config.js?v=71"></script>
+    <script src="js/storage.js?v=71"></script>
+    <script src="js/ui.js?v=71"></script>
+    <script src="js/auth.js?v=71"></script>
+    <script src="js/os.js?v=71"></script>
+    <script src="js/nuvem.js?v=71"></script>
+    <script src="js/caixa.js?v=71"></script>
+    <script src="js/comissoes.js?v=71"></script>
+    <script src="js/app.js?v=71"></script>
+    <script src="js/perfil-cliente.js?v=71"></script>
+    <script src="js/navegacao.js?v=71"></script>
 </body>
 </html>
 
