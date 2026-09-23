@@ -1197,6 +1197,29 @@ function atualizarSugestoesClienteAt() {
 /* ui nav: ver js/ui.js */
 
 /* ---------- KPIs / selects ---------- */
+function chavesExclusaoPendente(p) {
+    var keys = [];
+    if (p && p.id) keys.push(String(p.id));
+    if (p && p.atendimentoId) keys.push('os:' + String(p.atendimentoId));
+    if (p && p.vendaId) keys.push('vd:' + String(p.vendaId));
+    return keys;
+}
+
+function marcarPendenteExcluido(db, p) {
+    if (!db || typeof marcarExcluido !== 'function') return;
+    chavesExclusaoPendente(p).forEach(function (k) {
+        marcarExcluido(db, 'pendentes', k);
+    });
+}
+window.marcarPendenteExcluido = marcarPendenteExcluido;
+
+function pendenteDocOculto(db, tipo, id) {
+    if (!id) return false;
+    var ex = (typeof garantirExcluidos === 'function') ? (garantirExcluidos(db).pendentes || {}) : {};
+    var prefix = tipo === 'atendimentoId' ? 'os:' : 'vd:';
+    return !!ex[prefix + String(id)];
+}
+
 function sincronizarPendentesDoAberto(db) {
     if (!db) return false;
     if (!Array.isArray(db.pendentes)) db.pendentes = [];
@@ -1325,6 +1348,12 @@ function sincronizarPendentesDoAberto(db) {
             });
             return;
         }
+        if (pendenteDocOculto(db, 'atendimentoId', a.id)) {
+            db.pendentes.forEach(function (x) {
+                if (x && String(x.atendimentoId || '') === String(a.id)) marcarFora(x);
+            });
+            return;
+        }
         var nome = a.clienteNome || (typeof nomeAtendimento === 'function' ? nomeAtendimento(db, a) : '') || '—';
         var rec = {
             cliente: nome,
@@ -1358,6 +1387,12 @@ function sincronizarPendentesDoAberto(db) {
             return num && numDaDesc(x.descricao) === num;
         });
         if (!vale) {
+            db.pendentes.forEach(function (x) {
+                if (x && String(x.vendaId || '') === String(o.id)) marcarFora(x);
+            });
+            return;
+        }
+        if (pendenteDocOculto(db, 'vendaId', o.id)) {
             db.pendentes.forEach(function (x) {
                 if (x && String(x.vendaId || '') === String(o.id)) marcarFora(x);
             });

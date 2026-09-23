@@ -1450,16 +1450,59 @@ function receberPendente(id, destino) {
     atualizarKPIs(db);
 }
 
+function excluirPendenteDaLista(id) {
+    id = String(id || '').trim();
+    if (!id) return;
+    if (!confirm('Excluir esta pendência da lista de contas a receber?\n\nA OS ou a venda continua no sistema. Só some daqui.')) return;
+    var db2 = carregar();
+    var p = (db2.pendentes || []).find(function (x) { return x && String(x.id) === id; });
+    if (typeof marcarPendenteExcluido === 'function' && p) {
+        marcarPendenteExcluido(db2, p);
+    } else if (typeof marcarExcluido === 'function' && canalVendas !== 'interno') {
+        marcarExcluido(db2, 'pendentes', id);
+        if (p && p.atendimentoId) marcarExcluido(db2, 'pendentes', 'os:' + String(p.atendimentoId));
+        if (p && p.vendaId) marcarExcluido(db2, 'pendentes', 'vd:' + String(p.vendaId));
+    }
+    db2.pendentes = (db2.pendentes || []).filter(function (x) { return String(x && x.id) !== id; });
+    salvar(db2);
+    toast('Pendente excluída da lista.');
+    renderPendentes();
+    if (typeof atualizarKPIs === 'function') {
+        atualizarKPIs(typeof carregarMain === 'function' ? carregarMain() : db2);
+    }
+}
+window.excluirPendenteDaLista = excluirPendenteDaLista;
+
 function renderPendentes() {
     var db = carregar();
     if (typeof sincronizarPendentesDoAberto === 'function' && sincronizarPendentesDoAberto(db)) {
         salvar(db);
     }
-    var lista = (db.pendentes || []).filter(function (p) { return p.status !== 'pago'; });
+    var exPd = (typeof garantirExcluidos === 'function') ? (garantirExcluidos(db).pendentes || {}) : {};
+    var lista = (typeof aplicarExcluidosNaLista === 'function'
+        ? aplicarExcluidosNaLista(db.pendentes || [], exPd)
+        : (db.pendentes || [])).filter(function (p) {
+        if (!p || p.status === 'pago') return false;
+        if (p.atendimentoId && exPd['os:' + String(p.atendimentoId)]) return false;
+        if (p.vendaId && exPd['vd:' + String(p.vendaId)]) return false;
+        return true;
+    });
     var total = lista.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
     document.getElementById('pdTotal').textContent = moeda(total);
     document.getElementById('pdQtd').textContent = String(lista.length);
     var tb = document.getElementById('tabelaPendentes');
+    if (!tb._pdDocClickLigado) {
+        tb._pdDocClickLigado = true;
+        tb.addEventListener('click', function (e) {
+            if (tratarCliqueAcoesDocumentoCaixa(e)) return;
+            var bEx = e.target.closest('[data-ex]');
+            if (bEx && tb.contains(bEx)) {
+                e.preventDefault();
+                e.stopPropagation();
+                excluirPendenteDaLista(bEx.getAttribute('data-ex'));
+            }
+        });
+    }
     tb.innerHTML = '';
     if (typeof gerarArvorePastasCaixa === 'function') {
         gerarArvorePastasCaixa({ elId: 'arvorePastasPendentes', filtro: 'pendentes', idPrefix: 'pasta_pen' });
@@ -1519,32 +1562,15 @@ function renderPendentes() {
             '</div></td>' +
             '<td>' + moeda(p.valor) + '</td>' +
             '<td class="actions"><div class="cx-acoes-fh">' + acoesDoc + recAvulso +
-            '<button type="button" class="btn btn-danger" data-ex="' + p.id + '">Excluir</button>' +
+            '<button type="button" class="btn btn-danger" data-ex="' + esc(p.id) + '">Excluir</button>' +
             '</div></td>';
         tb.appendChild(tr);
     });
-    if (!tb._pdDocClickLigado) {
-        tb._pdDocClickLigado = true;
-        tb.addEventListener('click', function (e) {
-            tratarCliqueAcoesDocumentoCaixa(e);
-        });
-    }
     tb.querySelectorAll('[data-rec-b]').forEach(function (b) {
         b.addEventListener('click', function () { receberPendente(b.getAttribute('data-rec-b'), 'balcao'); });
     });
     tb.querySelectorAll('[data-rec-k]').forEach(function (b) {
         b.addEventListener('click', function () { receberPendente(b.getAttribute('data-rec-k'), 'banco'); });
-    });
-    tb.querySelectorAll('[data-ex]').forEach(function (b) {
-        b.addEventListener('click', function () {
-            if (!confirm('Excluir pendente?')) return;
-            var db2 = carregar();
-            var idEx = b.getAttribute('data-ex');
-            if (canalVendas !== 'interno') marcarExcluido(db2, 'pendentes', idEx);
-            db2.pendentes = (db2.pendentes || []).filter(function (x) { return x.id !== idEx; });
-            salvar(db2);
-            renderPendentes();
-        });
     });
     tb.querySelectorAll('[data-pd-edit-venc]').forEach(function (b) {
         b.addEventListener('click', function () {
