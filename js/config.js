@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.3.69';
+var APP_VERSION = '1.3.70';
 
 function rotuloBuildApp() {
     var v = String(APP_VERSION || '');
@@ -64,10 +64,10 @@ var TITULOS = {
     painelHistorico: ['Histórico da oficina', 'OS e vendas no mesmo lugar — busque pelo cliente'],
     painelProdutos: ['Cadastro de Produtos', 'Estoque da oficina'],
     painelOrcamento: ['Venda da oficina', 'Peça avulsa sem abrir OS · PAGO entra em Entradas (pagas)'],
-    painelCaixa: ['Caixa / Balcão', 'OS e venda pagas entram juntas em Entradas (pagas)'],
-    painelCaixaBanco: ['Caixa do Banco', 'PIX · cartões · transferências'],
+    painelCaixa: ['Caixa / Balcão', 'Fecha o saldo da tela e zera · o mês fica no relatório'],
+    painelCaixaBanco: ['Caixa do Banco', 'PIX · cartões · fecha e zera junto com o balcão'],
     painelPendentes: ['Contas a Receber', 'Valores em aberto'],
-    painelRelatorioCaixa: ['Relatório Caixa', 'Resumo balcão · banco · pendentes · PDF mensal'],
+    painelRelatorioCaixa: ['Relatório Caixa', 'Mês completo · fechamentos · PDF'],
     painelFuncionarios: ['Cadastro de Funcionários', 'Comissão % · PIN · modo interno'],
     painelListaFuncionarios: ['Funcionários Cadastrados', 'Ver · editar · excluir'],
     painelPagFuncionarios: ['Pagamento funcionários', 'Controle semanal interno · sem impressão'],

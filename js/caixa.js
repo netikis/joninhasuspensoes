@@ -8,7 +8,11 @@ function getCaixaConfig(db) {
         inicialBanco: 0,
         basePainelEntradas: 0,
         basePainelSaidas: 0,
+        basePainelEntradasBanco: 0,
+        basePainelSaidasBanco: 0,
         atualizadoEm: '',
+        zeradoEm: '',
+        fechadoEm: '',
         osBloqueadasCaixa: {}
     }, (db && db.caixaConfig) || {});
 }
@@ -41,11 +45,18 @@ function renderResumoCaixaHoje() {
     var tbody = document.getElementById('tabelaResumoPgto');
     if (!tbody) return;
     var db = carregarMain();
-    var hoje = hojeISO();
+    var cfg = getCaixaConfig(db);
+    var corte = cfg.zeradoEm || cfg.fechadoEm || '';
     var resumo = {};
     var resumoDigital = {};
     var qtdDespesas = 0;
     var totalDespesas = 0;
+
+    function noCaixaAberto(x) {
+        if (!x) return false;
+        if (!corte) return true;
+        return String(x.criadoEm || '') >= corte;
+    }
 
     function addEntrada(mapa, forma, valor, icone) {
         var chave = forma || 'Outros';
@@ -55,7 +66,7 @@ function renderResumoCaixaHoje() {
     }
 
     (db.caixa || []).forEach(function (x) {
-        if (dataLancISO(x) !== hoje) return;
+        if (!noCaixaAberto(x)) return;
         var valor = Number(x.valor) || 0;
         if (x.tipo === 'saida') {
             qtdDespesas++;
@@ -68,7 +79,7 @@ function renderResumoCaixaHoje() {
         else addEntrada(resumo, forma, valor, '💰');
     });
     (db.caixaBanco || []).forEach(function (x) {
-        if (dataLancISO(x) !== hoje) return;
+        if (!noCaixaAberto(x)) return;
         var valor = Number(x.valor) || 0;
         if (x.tipo === 'saida') {
             qtdDespesas++;
@@ -102,7 +113,7 @@ function renderResumoCaixaHoje() {
         '<td style="text-align:right;color:#e74c3c;font-weight:800">- ' + moeda(totalDespesas) + '</td>' +
         '<td style="text-align:center"><span class="badge-cx despesas">SAÍDA</span></td></tr>';
     if (!Object.keys(resumo).length && !Object.keys(resumoDigital).length && !qtdDespesas) {
-        html = '<tr><td colspan="4" class="muted" style="text-align:center">Sem movimentação hoje.</td></tr>';
+        html = '<tr><td colspan="4" class="muted" style="text-align:center">Sem movimentação no caixa aberto. Feche o caixa para zerar os cards — o mês continua no Relatório Caixa.</td></tr>';
     }
     tbody.innerHTML = html;
 }
@@ -138,7 +149,10 @@ function mesclarCaixaConfig(localCfg, nuvemCfg) {
             inicialBanco: Math.max(Number(L.inicialBanco) || 0, Number(N.inicialBanco) || 0),
             basePainelEntradas: Number(L.basePainelEntradas) || Number(N.basePainelEntradas) || 0,
             basePainelSaidas: Number(L.basePainelSaidas) || Number(N.basePainelSaidas) || 0,
+            basePainelEntradasBanco: Number(L.basePainelEntradasBanco) || Number(N.basePainelEntradasBanco) || 0,
+            basePainelSaidasBanco: Number(L.basePainelSaidasBanco) || Number(N.basePainelSaidasBanco) || 0,
             zeradoEm: L.zeradoEm || N.zeradoEm || '',
+            fechadoEm: L.fechadoEm || N.fechadoEm || '',
             atualizadoEm: L.atualizadoEm || N.atualizadoEm || new Date().toISOString()
         };
     } else {
@@ -163,23 +177,68 @@ function somarLista(lista, tipo) {
         .reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
 }
 
+function somarListaPeriodo(lista, tipo, ini, fim) {
+    return (lista || []).filter(function (x) {
+        if (!x || x.tipo !== tipo) return false;
+        var d = String(x.criadoEm || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+        if (ini && d < ini) return false;
+        if (fim && d > fim) return false;
+        return true;
+    }).reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
+}
+
+function totaisPainelLista(lista, baseEnt, baseSai, inicial) {
+    var brutasE = somarLista(lista, 'entrada');
+    var brutasS = somarLista(lista, 'saida');
+    var entradas = Math.max(0, brutasE - (Number(baseEnt) || 0));
+    var saidas = Math.max(0, brutasS - (Number(baseSai) || 0));
+    var ini = Number(inicial) || 0;
+    return {
+        brutasE: brutasE,
+        brutasS: brutasS,
+        inicial: ini,
+        entradas: entradas,
+        saidas: saidas,
+        saldo: ini + entradas - saidas
+    };
+}
+
+function totaisPainelCaixa(db) {
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
+    var cfg = getCaixaConfig(db);
+    return {
+        cfg: cfg,
+        balcao: totaisPainelLista(db.caixa, cfg.basePainelEntradas, cfg.basePainelSaidas, cfg.inicialBalcao),
+        banco: totaisPainelLista(db.caixaBanco, cfg.basePainelEntradasBanco, cfg.basePainelSaidasBanco, cfg.inicialBanco)
+    };
+}
+
+function aplicarZerarPaineisCaixa(db) {
+    var cfg = getCaixaConfig(db);
+    cfg.inicialBalcao = 0;
+    cfg.inicialBanco = 0;
+    cfg.basePainelEntradas = somarLista(db.caixa, 'entrada');
+    cfg.basePainelSaidas = somarLista(db.caixa, 'saida');
+    cfg.basePainelEntradasBanco = somarLista(db.caixaBanco, 'entrada');
+    cfg.basePainelSaidasBanco = somarLista(db.caixaBanco, 'saida');
+    cfg.zeradoEm = new Date().toISOString();
+    cfg.fechadoEm = cfg.zeradoEm;
+    return cfg;
+}
+
 function zerarPainelCaixa() {
     if (!confirm(
-        '⚠️ ATENÇÃO: Zerar o painel do Caixa / Balcão?\n\n' +
-        'Entradas, saídas e o caixa inicial do painel voltam para R$ 0,00.\n' +
-        '(Os documentos da tabela NÃO são apagados — só o resumo numérico é limpo.)'
+        '⚠️ ATENÇÃO: Zerar o painel do Caixa / Balcão e do Caixa digital?\n\n' +
+        'Os cards voltam para R$ 0,00 (igual ao FH Control).\n' +
+        'Os documentos NÃO são apagados — Relatório Caixa e as pastas do mês continuam com tudo.'
     )) return;
     var db = carregarMain();
-    var cfg = getCaixaConfig(db);
-    var lista = db.caixa || [];
-    cfg.inicialBalcao = 0;
-    cfg.basePainelEntradas = somarLista(lista, 'entrada');
-    cfg.basePainelSaidas = somarLista(lista, 'saida');
-    cfg.zeradoEm = new Date().toISOString();
-    salvarCaixaConfigOficial(cfg);
+    salvarCaixaConfigOficial(aplicarZerarPaineisCaixa(db));
     renderCaixa();
+    renderCaixaBanco();
     atualizarKPIs(carregarMain());
-    toast('Painel do caixa zerado.');
+    toast('Painel do caixa zerado (balcão + digital).');
 }
 
 function sincronizarPainelCaixa() {
@@ -402,16 +461,12 @@ function renderCaixa() {
         db.caixa = lista;
         salvarMain(db);
     }
-    var entradasBrutas = somarLista(lista, 'entrada');
-    var saidasBrutas = somarLista(lista, 'saida');
-    var entradas = Math.max(0, entradasBrutas - (Number(cfg.basePainelEntradas) || 0));
-    var saidas = Math.max(0, saidasBrutas - (Number(cfg.basePainelSaidas) || 0));
-    var inicial = Number(cfg.inicialBalcao) || 0;
+    var painelCx = totaisPainelLista(lista, cfg.basePainelEntradas, cfg.basePainelSaidas, cfg.inicialBalcao);
     var elIni = document.getElementById('cxInicial');
-    if (elIni) elIni.textContent = moeda(inicial);
-    document.getElementById('cxEntradas').textContent = moeda(entradas);
-    document.getElementById('cxSaidas').textContent = moeda(saidas);
-    document.getElementById('cxSaldo').textContent = moeda(inicial + entradas - saidas);
+    if (elIni) elIni.textContent = moeda(painelCx.inicial);
+    document.getElementById('cxEntradas').textContent = moeda(painelCx.entradas);
+    document.getElementById('cxSaidas').textContent = moeda(painelCx.saidas);
+    document.getElementById('cxSaldo').textContent = moeda(painelCx.saldo);
 
     var hoje = hojeISO();
     var iniMes = hoje.slice(0, 7) + '-01';
@@ -872,6 +927,9 @@ document.getElementById('btnBkInicial').addEventListener('click', function () {
     atualizarKPIs(carregarMain());
 });
 
+var btnFecharBk = document.getElementById('btnFecharCaixaBanco');
+if (btnFecharBk) btnFecharBk.addEventListener('click', function () { fecharCaixaDoDia(); });
+
 document.getElementById('formBanco').addEventListener('submit', function (e) {
     e.preventDefault();
     var db = carregar();
@@ -914,13 +972,12 @@ function renderCaixaBanco() {
         db.caixaBanco = lista;
         salvarMain(db);
     }
-    var entradas = somarLista(lista, 'entrada');
-    var saidas = somarLista(lista, 'saida');
-    var inicial = Number(cfg.inicialBanco) || 0;
-    document.getElementById('bkInicial').textContent = moeda(inicial);
-    document.getElementById('bkEntradas').textContent = moeda(entradas);
-    document.getElementById('bkSaidas').textContent = moeda(saidas);
-    document.getElementById('bkSaldo').textContent = moeda(inicial + entradas - saidas);
+    var painelBk = totaisPainelLista(lista, cfg.basePainelEntradasBanco, cfg.basePainelSaidasBanco, cfg.inicialBanco);
+    var elBkIni = document.getElementById('bkInicial');
+    if (elBkIni) elBkIni.textContent = moeda(painelBk.inicial);
+    document.getElementById('bkEntradas').textContent = moeda(painelBk.entradas);
+    document.getElementById('bkSaidas').textContent = moeda(painelBk.saidas);
+    document.getElementById('bkSaldo').textContent = moeda(painelBk.saldo);
 
     var tb = document.getElementById('tabelaBanco');
     tb.innerHTML = '';
@@ -2454,14 +2511,16 @@ async function arquivarMesDespesasOsPastaPC(mesAnoFixo) {
 
 function renderRelatorioCaixa() {
     var db = carregar();
-    var cfg = getCaixaConfig(db);
-    var balEnt = somarLista(db.caixa, 'entrada');
-    var balSai = somarLista(db.caixa, 'saida');
-    var banEnt = somarLista(db.caixaBanco, 'entrada');
-    var banSai = somarLista(db.caixaBanco, 'saida');
-    var pend = (db.pendentes || []).reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
-    var salBal = (Number(cfg.inicialBalcao) || 0) + balEnt - balSai;
-    var salBan = (Number(cfg.inicialBanco) || 0) + banEnt - banSai;
+    var hoje = hojeISO();
+    var iniMes = hoje.slice(0, 7) + '-01';
+    var balEnt = somarListaPeriodo(db.caixa, 'entrada', iniMes, hoje);
+    var balSai = somarListaPeriodo(db.caixa, 'saida', iniMes, hoje);
+    var banEnt = somarListaPeriodo(db.caixaBanco, 'entrada', iniMes, hoje);
+    var banSai = somarListaPeriodo(db.caixaBanco, 'saida', iniMes, hoje);
+    var pend = (db.pendentes || []).filter(function (p) { return p && p.status !== 'pago'; })
+        .reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
+    var salBal = balEnt - balSai;
+    var salBan = banEnt - banSai;
     document.getElementById('relCxBalcao').textContent = moeda(salBal);
     document.getElementById('relCxBanco').textContent = moeda(salBan);
     document.getElementById('relCxPend').textContent = moeda(pend);
@@ -2469,6 +2528,8 @@ function renderRelatorioCaixa() {
 
     var mapa = {};
     function acum(origem, item) {
+        var d = String(item.criadoEm || '').slice(0, 10);
+        if (d < iniMes || d > hoje) return;
         var k = origem + '|' + (item.forma || '—') + '|' + (item.tipo || '—');
         if (!mapa[k]) mapa[k] = { origem: origem, forma: item.forma || '—', tipo: item.tipo || '—', qtd: 0, total: 0 };
         mapa[k].qtd++;
@@ -2542,6 +2603,33 @@ function renderRelatorioCaixa() {
     }
 
     gerarArvorePastasCaixa({ elId: 'arvorePastasCaixa', filtro: 'geral', idPrefix: 'pasta_cx' });
+
+    var boxF = document.getElementById('relCxFechamentos');
+    if (boxF) {
+        var listaF = (db.fechamentosCaixa || []).slice().sort(function (a, b) {
+            return String(b.data || b.criadoEm || '').localeCompare(String(a.data || a.criadoEm || ''));
+        });
+        if (!listaF.length) {
+            boxF.innerHTML = '<p class="muted">Ainda não há fechamento gravado. Ao fechar o caixa, o saldo da tela entra aqui e os cards zeram.</p>';
+        } else {
+            boxF.innerHTML = '<table><thead><tr><th>Data</th><th>Balcão</th><th>Digital</th><th>Total</th><th></th></tr></thead><tbody>' +
+                listaF.map(function (f) {
+                    var sb = f.saldoBalcao != null ? f.saldoBalcao : f.saldo;
+                    var sd = Number(f.saldoBanco) || 0;
+                    return '<tr><td>' + esc(fmtData(f.data)) + '</td><td>' + moeda(sb) +
+                        '</td><td>' + moeda(sd) + '</td><td><strong>' + moeda(f.saldo) +
+                        '</strong></td><td><button type="button" class="btn btn-secondary" data-imp-fech="' +
+                        esc(f.id) + '">Ver / imprimir</button></td></tr>';
+                }).join('') + '</tbody></table>';
+            boxF.querySelectorAll('[data-imp-fech]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var id = b.getAttribute('data-imp-fech');
+                    var hit = listaF.find(function (x) { return String(x.id) === String(id); });
+                    if (hit) imprimirFechamentoDia(hit);
+                });
+            });
+        }
+    }
 }
 
 document.getElementById('btnAtualizarRelCx').addEventListener('click', function () {
@@ -2574,49 +2662,91 @@ document.querySelectorAll('[data-rel-mes]').forEach(function (b) {
 /* Pastas Ano→Mês removidas da UI (1.3.1) — listeners desligados de propósito */
 
 function fecharCaixaDoDia() {
-    var db = carregar();
+    if (typeof sincronizarOficinaNoCaixaEmpresa === 'function') {
+        try { sincronizarOficinaNoCaixaEmpresa(); } catch (eSyncF) { /* ok */ }
+    }
+    var db = carregarMain();
     var hoje = hojeISO();
-    var cfg = db.caixaConfig || { inicialBalcao: 0, inicialBanco: 0 };
-    var ent = 0, sai = 0;
-    (db.caixa || []).forEach(function (l) {
-        if (String(l.criadoEm || '').slice(0, 10) !== hoje) return;
-        if (l.tipo === 'entrada') ent += Number(l.valor) || 0;
-        if (l.tipo === 'saida') sai += Number(l.valor) || 0;
-    });
-    var inicial = Number(cfg.inicialBalcao) || 0;
-    var saldo = inicial + ent - sai;
-    var of = calcularRelatorioOficina({ inicio: hoje, fim: hoje, label: hoje });
+    var painel = totaisPainelCaixa(db);
+    var bal = painel.balcao;
+    var ban = painel.banco;
+    var cfg = painel.cfg;
+    var corte = String(cfg.zeradoEm || cfg.fechadoEm || '').slice(0, 10);
+    var iniOf = /^\d{4}-\d{2}-\d{2}$/.test(corte) ? corte : (hoje.slice(0, 7) + '-01');
+    var of = (typeof calcularRelatorioOficina === 'function')
+        ? calcularRelatorioOficina({ inicio: iniOf, fim: hoje, label: iniOf })
+        : { pecas: 0, ganho: 0, mao: 0, despesas: 0, resultado: 0 };
     if (!confirm(
-        'Fechar o caixa do dia ' + fmtData(hoje) + '?\n\n' +
-        'Inicial: ' + moeda(inicial) + '\nEntradas: ' + moeda(ent) + '\nSaídas: ' + moeda(sai) + '\nSaldo: ' + moeda(saldo) + '\n\n' +
-        'Oficina — ganho peças: ' + moeda(of.ganho) + ' · MO: ' + moeda(of.mao)
+        'Fechar o caixa com o saldo da TELA e zerar balcão + digital?\n\n' +
+        '(Se não fechou os dias anteriores, fecha tudo que está aberto agora — igual FH Control.)\n\n' +
+        'BALCÃO\n' +
+        'Inicial: ' + moeda(bal.inicial) + '\nEntradas: ' + moeda(bal.entradas) +
+        '\nSaídas: ' + moeda(bal.saidas) + '\nSaldo: ' + moeda(bal.saldo) + '\n\n' +
+        'DIGITAL / BANCO\n' +
+        'Inicial: ' + moeda(ban.inicial) + '\nEntradas: ' + moeda(ban.entradas) +
+        '\nSaídas: ' + moeda(ban.saidas) + '\nSaldo: ' + moeda(ban.saldo) + '\n\n' +
+        'Oficina no período: ganho peças ' + moeda(of.ganho) + ' · MO ' + moeda(of.mao) + '\n\n' +
+        'Os documentos continuam no Relatório Caixa (mês). Os cards voltam para R$ 0,00.'
     )) return;
+
     if (!db.fechamentosCaixa) db.fechamentosCaixa = [];
-    db.fechamentosCaixa.push({
+    var rec = {
         id: uid(),
         data: hoje,
-        inicialBalcao: inicial,
-        entradas: ent,
-        saidas: sai,
-        saldo: saldo,
+        periodoDe: iniOf,
+        periodoAte: hoje,
+        inicialBalcao: bal.inicial,
+        entradasBalcao: bal.entradas,
+        saidasBalcao: bal.saidas,
+        saldoBalcao: bal.saldo,
+        inicialBanco: ban.inicial,
+        entradasBanco: ban.entradas,
+        saidasBanco: ban.saidas,
+        saldoBanco: ban.saldo,
+        inicial: bal.inicial,
+        entradas: bal.entradas + ban.entradas,
+        saidas: bal.saidas + ban.saidas,
+        saldo: bal.saldo + ban.saldo,
         pecasBruto: of.pecas,
         ganhoPecas: of.ganho,
         maoObra: of.mao,
         despesas: of.despesas,
         resultado: of.resultado,
         criadoEm: new Date().toISOString()
-    });
-    salvar(db);
-    toast('Caixa do dia fechado e salvo no histórico.');
-    imprimirFechamentoDia(db.fechamentosCaixa[db.fechamentosCaixa.length - 1]);
+    };
+    db.fechamentosCaixa.push(rec);
+    db.caixaConfig = aplicarZerarPaineisCaixa(db);
+    db.caixaConfig.atualizadoEm = rec.criadoEm;
+    salvarMain(db);
+    if (typeof agendarSyncAutomatico === 'function') agendarSyncAutomatico('salvar');
+    toast('Caixa fechado no saldo da tela. Balcão e digital zerados.');
+    renderCaixa();
+    renderCaixaBanco();
+    if (typeof renderRelatorioCaixa === 'function') renderRelatorioCaixa();
+    atualizarKPIs(carregarMain());
+    imprimirFechamentoDia(rec);
 }
+window.fecharCaixaDoDia = fecharCaixaDoDia;
 
 function imprimirFechamentoDia(f) {
     var emp = getEmpresa();
-    var html = '<html><head><title>Fechamento ' + esc(f.data) + '</title><style>body{font-family:Segoe UI,sans-serif;padding:24px} h1{margin:0 0 8px} .l{margin:6px 0}</style></head><body>';
+    var html = '<html><head><title>Fechamento ' + esc(f.data) + '</title><style>body{font-family:Segoe UI,sans-serif;padding:24px} h1{margin:0 0 8px} .l{margin:6px 0} h3{margin:16px 0 6px}</style></head><body>';
     html += '<h1>' + esc(emp.nome || 'Joninha Suspensões') + '</h1>';
     html += '<h2>Fechamento de caixa — ' + esc(fmtData(f.data)) + '</h2>';
+    if (f.periodoDe && f.periodoAte) {
+        html += '<p>Período aberto: ' + esc(fmtData(f.periodoDe)) + ' a ' + esc(fmtData(f.periodoAte)) + '</p>';
+    }
+    html += '<h3>Balcão</h3>';
     html += '<div class="l">Caixa inicial: <b>' + moeda(f.inicialBalcao) + '</b></div>';
+    html += '<div class="l">Entradas: <b>' + moeda(f.entradasBalcao != null ? f.entradasBalcao : f.entradas) + '</b></div>';
+    html += '<div class="l">Saídas: <b>' + moeda(f.saidasBalcao != null ? f.saidasBalcao : f.saidas) + '</b></div>';
+    html += '<div class="l">Saldo: <b>' + moeda(f.saldoBalcao != null ? f.saldoBalcao : f.saldo) + '</b></div>';
+    html += '<h3>Digital / Banco</h3>';
+    html += '<div class="l">Saldo inicial: <b>' + moeda(f.inicialBanco || 0) + '</b></div>';
+    html += '<div class="l">Entradas: <b>' + moeda(f.entradasBanco || 0) + '</b></div>';
+    html += '<div class="l">Saídas: <b>' + moeda(f.saidasBanco || 0) + '</b></div>';
+    html += '<div class="l">Saldo: <b>' + moeda(f.saldoBanco || 0) + '</b></div>';
+    html += '<h3>Total fechado</h3>';
     html += '<div class="l">Entradas: <b>' + moeda(f.entradas) + '</b></div>';
     html += '<div class="l">Saídas: <b>' + moeda(f.saidas) + '</b></div>';
     html += '<div class="l">Saldo final: <b>' + moeda(f.saldo) + '</b></div><hr>';
@@ -2625,7 +2755,8 @@ function imprimirFechamentoDia(f) {
     html += '<div class="l">Mão de obra: <b>' + moeda(f.maoObra) + '</b></div>';
     html += '<div class="l">Despesas: <b>' + moeda(f.despesas) + '</b></div>';
     html += '<div class="l">Resultado estimado: <b>' + moeda(f.resultado) + '</b></div>';
-    html += '<p style="margin-top:18px;color:#666;font-size:12px">Gerado em ' + esc(new Date().toLocaleString('pt-BR')) + '</p></body></html>';
+    html += '<p style="margin-top:18px;color:#666;font-size:12px">Gerado em ' + esc(new Date().toLocaleString('pt-BR')) +
+        ' · Os documentos do mês ficam no Relatório Caixa.</p></body></html>';
     var w = window.open('', '_blank');
     if (!w) return;
     w.document.write(html);

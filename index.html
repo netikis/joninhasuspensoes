@@ -31,8 +31,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=69">
-    <link rel="stylesheet" href="css/tema-m3.css?v=69">
+    <link rel="stylesheet" href="css/app.css?v=70">
+    <link rel="stylesheet" href="css/tema-m3.css?v=70">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -947,19 +947,19 @@
             </div>
             <div class="box">
                 <h2>Caixa / Balcão</h2>
-                <p class="hint">Dinheiro e lançamentos do balcão. <strong>OS pagas</strong> e <strong>vendas da oficina</strong> (peça avulsa, sem OS) entram automaticamente em <strong>Entradas (pagas)</strong>.</p>
+                <p class="hint">Dinheiro e lançamentos do balcão. <strong>OS pagas</strong> e <strong>vendas da oficina</strong> entram em Entradas (pagas). <strong>Fechar caixa</strong> usa o saldo da tela (mesmo sem fechar os dias anteriores), grava o relatório e zera balcão + digital — o mês continua no Relatório Caixa.</p>
                 <div class="cx-acoes-bar">
                     <button type="button" class="btn btn-secondary" id="btnCxInicial">💵 Informar / Editar caixa inicial</button>
                     <button type="button" class="btn btn-ok" id="btnCxFocoEntrada">➕ Lançar entrada</button>
                     <button type="button" class="btn btn-danger" id="btnCxFocoDespesa">➖ Lançar despesa</button>
-                    <button type="button" class="btn btn-primary" id="btnFecharCaixaDia">🔒 Fechar caixa do dia</button>
+                    <button type="button" class="btn btn-primary" id="btnFecharCaixaDia">🔒 Fechar caixa</button>
                     <button type="button" class="btn btn-danger" id="btnZerarCaixa" style="background:#c0392b">⚠️ Zerar caixa</button>
                     <button type="button" class="btn btn-ok" id="btnSincronizarPainelCaixa">🔄 Sincronizar painel</button>
                     <button type="button" class="btn btn-pdf" id="btnRelatorioDiaOficina">📄 Relatório do dia (peça/MO)</button>
                 </div>
                 <div class="box resumo-caixa-hoje" style="margin:14px 0">
-                    <h2>Resumo do caixa de hoje (entradas e saídas)</h2>
-                    <p class="hint">Igual ao ERP PDV Balcão: dinheiro na gaveta, digitais no banco e despesas do dia.</p>
+                    <h2>Resumo do caixa aberto</h2>
+                    <p class="hint">Tudo desde o último fechamento (não só o dia de hoje). Ao fechar, os cards zeram; o mês fica no Relatório Caixa.</p>
                     <div class="table-wrap">
                         <table class="tabela-caixa-fh">
                             <thead>
@@ -1037,9 +1037,10 @@
             </div>
             <div class="box" style="border-color:rgba(52,152,219,0.45)">
                 <h2 style="color:#7ec8ff">Caixa do Banco (Digital / PIX / Cartões)</h2>
-                <p class="hint">PIX, cartões e transferências — separado do balcão em dinheiro.</p>
+                <p class="hint">PIX, cartões e transferências — separado do balcão em dinheiro. Fechar caixa zera estes cards também; o mês continua no Relatório Caixa.</p>
                 <div class="row" style="margin-bottom:12px">
                     <button type="button" class="btn btn-secondary" id="btnBkInicial">🏦 Inf. saldo inicial</button>
+                    <button type="button" class="btn btn-primary" id="btnFecharCaixaBanco">🔒 Fechar caixa</button>
                 </div>
                 <form id="formBanco">
                     <div class="row">
@@ -1142,7 +1143,7 @@
         <section id="painelRelatorioCaixa" class="panel">
             <div class="box">
                 <h2>Relatório Caixa</h2>
-                <p class="hint">Resumo unificado do balcão + banco + pendentes. Use os PDFs mensais abaixo quando precisar imprimir o período.</p>
+                <p class="hint">Resumo do <strong>mês atual</strong> (não zera no fechamento). Os cards do Caixa / Balcão e do Caixa digital voltam para R$ 0,00 depois de fechar.</p>
                 <div class="row" style="margin-bottom:12px">
                     <button type="button" class="btn btn-secondary" id="btnAtualizarRelCx">🔄 Atualizar resumo</button>
                     <button type="button" class="btn btn-pdf" id="btnImprimirRelCx">🖨️ Imprimir resumo</button>
@@ -1152,12 +1153,12 @@
                 <button type="button" class="card card-atalho" data-goto="painelCaixa" title="Abrir caixa / balcão">
                     <div class="k">Total balcão</div>
                     <div class="v" id="relCxBalcao">R$ 0</div>
-                    <div class="card-sub">Clique para entrar</div>
+                    <div class="card-sub">Mês atual · não zera no fechamento</div>
                 </button>
                 <button type="button" class="card card-atalho" data-goto="painelCaixaBanco" title="Abrir caixa do banco">
                     <div class="k">Total banco</div>
                     <div class="v" id="relCxBanco">R$ 0</div>
-                    <div class="card-sub">Clique para entrar</div>
+                    <div class="card-sub">Mês atual · não zera no fechamento</div>
                 </button>
                 <button type="button" class="card card-atalho" data-atalho-pasta="pendentes" title="Abrir contas a receber">
                     <div class="k">Pendentes</div>
@@ -1169,6 +1170,12 @@
                     <div class="v" id="relCxGeral">R$ 0</div>
                     <div class="card-sub">Clique para ver as pastas</div>
                 </button>
+            </div>
+
+            <div class="box">
+                <h2>Fechamentos gravados</h2>
+                <p class="hint">Cada vez que você fecha o caixa, o saldo da tela fica aqui. Pode imprimir de novo.</p>
+                <div id="relCxFechamentos"></div>
             </div>
 
             <div class="box">
@@ -1870,17 +1877,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=69"></script>
-    <script src="js/storage.js?v=69"></script>
-    <script src="js/ui.js?v=69"></script>
-    <script src="js/auth.js?v=69"></script>
-    <script src="js/os.js?v=69"></script>
-    <script src="js/nuvem.js?v=69"></script>
-    <script src="js/caixa.js?v=69"></script>
-    <script src="js/comissoes.js?v=69"></script>
-    <script src="js/app.js?v=69"></script>
-    <script src="js/perfil-cliente.js?v=69"></script>
-    <script src="js/navegacao.js?v=69"></script>
+    <script src="js/config.js?v=70"></script>
+    <script src="js/storage.js?v=70"></script>
+    <script src="js/ui.js?v=70"></script>
+    <script src="js/auth.js?v=70"></script>
+    <script src="js/os.js?v=70"></script>
+    <script src="js/nuvem.js?v=70"></script>
+    <script src="js/caixa.js?v=70"></script>
+    <script src="js/comissoes.js?v=70"></script>
+    <script src="js/app.js?v=70"></script>
+    <script src="js/perfil-cliente.js?v=70"></script>
+    <script src="js/navegacao.js?v=70"></script>
 </body>
 </html>
 

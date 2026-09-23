@@ -1419,21 +1419,30 @@ function atualizarKPIs(db) {
     if (typeof renderBannerNovoMesAtend === 'function') renderBannerNovoMesAtend(db);
     setTxt('kpiProd', db.produtos.length);
     var cfg = db.caixaConfig || { inicialBalcao: 0, inicialBanco: 0 };
-    var entradas = (db.caixa || []).filter(function (x) { return x.tipo === 'entrada'; })
-        .reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
-    var saidas = (db.caixa || []).filter(function (x) { return x.tipo === 'saida'; })
-        .reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
-    var entBanco = (db.caixaBanco || []).filter(function (x) { return x.tipo === 'entrada'; })
-        .reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
-    var saiBanco = (db.caixaBanco || []).filter(function (x) { return x.tipo === 'saida'; })
-        .reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
+    var hojeKpi = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
+    var iniMesKpi = hojeKpi.slice(0, 7) + '-01';
+    var somarMes = (typeof somarListaPeriodo === 'function')
+        ? function (lista, tipo) { return somarListaPeriodo(lista, tipo, iniMesKpi, hojeKpi); }
+        : function (lista, tipo) {
+            return (lista || []).filter(function (x) { return x && x.tipo === tipo; })
+                .reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
+        };
+    var entradas = somarMes(db.caixa, 'entrada');
+    var saidas = somarMes(db.caixa, 'saida');
+    var entBanco = somarMes(db.caixaBanco, 'entrada');
+    var saiBanco = somarMes(db.caixaBanco, 'saida');
     var pendentes = (db.pendentes || []).filter(function (p) { return p.status !== 'pago'; });
     var totPend = pendentes.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
     setTxt('kpiInicioEntradas', moeda(entradas + entBanco));
     setTxt('kpiInicioSaidas', moeda(saidas + saiBanco));
     setTxt('kpiInicioPendentes', moeda(totPend));
     setTxt('kpiInicioQtdPend', pendentes.length);
-    setTxt('kpiCaixa', moeda((Number(cfg.inicialBalcao) || 0) + entradas + (Number(cfg.inicialBanco) || 0) + entBanco - saidas - saiBanco));
+    var painelKpi = (typeof totaisPainelCaixa === 'function') ? totaisPainelCaixa(db) : null;
+    if (painelKpi) {
+        setTxt('kpiCaixa', moeda(painelKpi.balcao.saldo + painelKpi.banco.saldo));
+    } else {
+        setTxt('kpiCaixa', moeda((Number(cfg.inicialBalcao) || 0) + entradas + (Number(cfg.inicialBanco) || 0) + entBanco - saidas - saiBanco));
+    }
     if (typeof calcularRelatorioOficina === 'function') {
         var hojePainel = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
         var ofPainel = calcularRelatorioOficina({ inicio: '2000-01-01', fim: hojePainel, label: 'tudo' });
