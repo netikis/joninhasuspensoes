@@ -11,6 +11,7 @@ function getCaixaConfig(db) {
         basePainelEntradasBanco: 0,
         basePainelSaidasBanco: 0,
         baseOficinaMes: '',
+        baseOficinaInicio: '',
         baseOficinaPecas: 0,
         baseOficinaGanho: 0,
         baseOficinaMao: 0,
@@ -156,6 +157,7 @@ function mesclarCaixaConfig(localCfg, nuvemCfg) {
             basePainelEntradasBanco: Number(L.basePainelEntradasBanco) || Number(N.basePainelEntradasBanco) || 0,
             basePainelSaidasBanco: Number(L.basePainelSaidasBanco) || Number(N.basePainelSaidasBanco) || 0,
             baseOficinaMes: L.baseOficinaMes || N.baseOficinaMes || '',
+            baseOficinaInicio: L.baseOficinaInicio || N.baseOficinaInicio || '',
             baseOficinaPecas: Math.max(Number(L.baseOficinaPecas) || 0, Number(N.baseOficinaPecas) || 0),
             baseOficinaGanho: Math.max(Number(L.baseOficinaGanho) || 0, Number(N.baseOficinaGanho) || 0),
             baseOficinaMao: Math.max(Number(L.baseOficinaMao) || 0, Number(N.baseOficinaMao) || 0),
@@ -235,6 +237,7 @@ function aplicarZerarPaineisCaixa(db) {
     if (typeof calcularRelatorioOficina === 'function') {
         var ofLive = calcularRelatorioOficina({ inicio: ym + '-01', fim: hoje, label: ym });
         cfg.baseOficinaMes = ym;
+        cfg.baseOficinaInicio = hoje;
         cfg.baseOficinaPecas = Number(ofLive.pecas) || 0;
         cfg.baseOficinaGanho = Number(ofLive.ganho) || 0;
         cfg.baseOficinaMao = Number(ofLive.mao) || 0;
@@ -249,9 +252,10 @@ function lancamentoEhFechamento(x) {
 }
 
 function totaisOficinaPainel(db) {
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : null);
     var hoje = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
     var ym = String(hoje).slice(0, 7);
-    var live = { pecas: 0, ganho: 0, mao: 0, despesas: 0, resultado: 0, maoCasa: 0 };
+    var live = { pecas: 0, ganho: 0, mao: 0, despesas: 0, resultado: 0, maoCasa: 0, comissao: 0, linhas: [] };
     if (typeof calcularRelatorioOficina === 'function') {
         live = calcularRelatorioOficina({ inicio: ym + '-01', fim: hoje, label: ym });
     }
@@ -264,12 +268,94 @@ function totaisOficinaPainel(db) {
         pecas: pecas,
         ganho: ganho,
         mao: mao,
+        totalOficina: pecas + mao,
         moGanho: mao + ganho,
         despesas: Number(live.despesas) || 0,
         resultado: Number(live.resultado) || 0,
         live: live,
+        ini: ym + '-01',
+        fim: hoje,
         ym: ym
     };
+}
+
+function snapshotDiscricaoFechamento(db, ini, fim, corteIso) {
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : (typeof carregar === 'function' ? carregar() : {}));
+    var of = { pecas: 0, ganho: 0, mao: 0, despesas: 0, resultado: 0, comissao: 0, maoCasa: 0, linhas: [] };
+    if (typeof calcularRelatorioOficina === 'function') {
+        of = calcularRelatorioOficina({ inicio: ini, fim: fim, label: ini });
+    }
+    var linhasOficina = (of.linhas || []).map(function (l) {
+        var pecas = Number(l.pecas) || 0;
+        var mao = Number(l.mao) || 0;
+        var tot = Number(l.total);
+        return {
+            origem: l.origem || '',
+            data: l.data || '',
+            cliente: l.cliente || '',
+            placa: l.placa || '',
+            numero: l.numero || '',
+            pecas: pecas,
+            mao: mao,
+            ganho: Number(l.ganho) || 0,
+            total: tot > 0 ? tot : (pecas + mao)
+        };
+    });
+    var corte = corteIso || (ini ? (String(ini) + 'T00:00:00.000') : '');
+    var entOf = [];
+    var entOut = [];
+    function walk(lista, canal) {
+        (lista || []).forEach(function (x) {
+            if (!x || lancamentoEhFechamento(x) || x.tipo !== 'entrada') return;
+            if (corte && String(x.criadoEm || '') < corte) return;
+            var item = {
+                data: String(x.criadoEm || '').slice(0, 10),
+                desc: String(x.clienteNome || x.descricao || 'Entrada'),
+                canal: canal,
+                forma: x.forma || '',
+                valor: Number(x.valor) || 0
+            };
+            if (x.atendimentoId || x.origemOficina || x.origemVenda || x.vendaId || x.orcamentoId) {
+                entOf.push(item);
+            } else {
+                entOut.push(item);
+            }
+        });
+    }
+    walk(db.caixa, 'Balcão');
+    walk(db.caixaBanco, 'Banco');
+    return {
+        pecas: Number(of.pecas) || 0,
+        ganho: Number(of.ganho) || 0,
+        mao: Number(of.mao) || 0,
+        despesas: Number(of.despesas) || 0,
+        resultado: Number(of.resultado) || 0,
+        comissao: Number(of.comissao) || 0,
+        maoCasa: Number(of.maoCasa) || 0,
+        totalOficina: (Number(of.pecas) || 0) + (Number(of.mao) || 0),
+        linhasOficina: linhasOficina,
+        entradasCaixaOficina: entOf,
+        entradasCaixaOutras: entOut
+    };
+}
+
+function enriquecerFechamentoParaRelatorio(f) {
+    if (!f) return f;
+    if (f.linhasOficina && f.linhasOficina.length) return f;
+    var ini = f.periodoDe || f.data;
+    var fim = f.periodoAte || f.data;
+    if (!ini || !fim) return f;
+    try {
+        var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+        var snap = snapshotDiscricaoFechamento(db, ini, fim, ini ? (String(ini) + 'T00:00:00.000') : '');
+        f.linhasOficina = snap.linhasOficina;
+        f.entradasCaixaOficina = snap.entradasCaixaOficina;
+        f.entradasCaixaOutras = snap.entradasCaixaOutras;
+        if (f.totalOficina == null) f.totalOficina = snap.totalOficina;
+        if (f.comissao == null) f.comissao = snap.comissao;
+        if (f.maoCasa == null) f.maoCasa = snap.maoCasa;
+    } catch (eEnr) { /* ok */ }
+    return f;
 }
 
 function montarLancamentoFechamentoCaixa(f) {
@@ -2821,9 +2907,11 @@ function fecharCaixaDoDia() {
     var bal = painel.balcao;
     var ban = painel.banco;
     var cfg = painel.cfg;
-    var corte = String(cfg.zeradoEm || cfg.fechadoEm || '').slice(0, 10);
-    var iniOf = /^\d{4}-\d{2}-\d{2}$/.test(corte) ? corte : (hoje.slice(0, 7) + '-01');
+    var corte = String(cfg.zeradoEm || cfg.fechadoEm || '');
+    var iniOf = /^\d{4}-\d{2}-\d{2}$/.test(corte.slice(0, 10)) ? corte.slice(0, 10) : (hoje.slice(0, 7) + '-01');
     var of = totaisOficinaPainel(db);
+    var snap = snapshotDiscricaoFechamento(db, iniOf, hoje, corte);
+    var totalOficina = snap.totalOficina != null ? snap.totalOficina : ((Number(of.pecas) || 0) + (Number(of.mao) || 0));
     if (!confirm(
         'Fechar o caixa com o saldo da TELA e zerar balcão + digital + oficina?\n\n' +
         '(Se não fechou os dias anteriores, fecha tudo que está aberto agora.)\n\n' +
@@ -2833,12 +2921,12 @@ function fecharCaixaDoDia() {
         'DIGITAL / BANCO\n' +
         'Inicial: ' + moeda(ban.inicial) + '\nEntradas: ' + moeda(ban.entradas) +
         '\nSaídas: ' + moeda(ban.saidas) + '\nSaldo: ' + moeda(ban.saldo) + '\n\n' +
-        'OFICINA NA TELA\n' +
-        'Peças (venda): ' + moeda(of.pecas) +
-        '\nGanho peças: ' + moeda(of.ganho) +
-        '\nMão de obra: ' + moeda(of.mao) +
-        '\nMO + ganho peças: ' + moeda(of.moGanho) + '\n\n' +
-        'O fechamento entra na tabela. Os documentos continuam no Relatório Caixa (mês). Os cards voltam para R$ 0,00.'
+        'OFICINA (peças + mão de obra = cobrado)\n' +
+        'Peças (venda): ' + moeda(snap.pecas) +
+        '\nMão de obra: ' + moeda(snap.mao) +
+        '\nTotal oficina: ' + moeda(totalOficina) +
+        '\nGanho em peças (já está nas peças): ' + moeda(snap.ganho) + '\n\n' +
+        'O fechamento entra na tabela com a discriminação. Os cards voltam para R$ 0,00.'
     )) return;
 
     if (!db.fechamentosCaixa) db.fechamentosCaixa = [];
@@ -2860,12 +2948,17 @@ function fecharCaixaDoDia() {
         entradas: bal.entradas + ban.entradas,
         saidas: bal.saidas + ban.saidas,
         saldo: bal.saldo + ban.saldo,
-        pecasBruto: of.pecas,
-        ganhoPecas: of.ganho,
-        maoObra: of.mao,
-        moGanho: of.moGanho,
-        despesas: of.despesas,
-        resultado: of.resultado,
+        pecasBruto: snap.pecas,
+        ganhoPecas: snap.ganho,
+        maoObra: snap.mao,
+        totalOficina: totalOficina,
+        comissao: snap.comissao,
+        maoCasa: snap.maoCasa,
+        despesas: snap.despesas,
+        resultado: snap.resultado,
+        linhasOficina: snap.linhasOficina,
+        entradasCaixaOficina: snap.entradasCaixaOficina,
+        entradasCaixaOutras: snap.entradasCaixaOutras,
         criadoEm: new Date().toISOString()
     };
     db.fechamentosCaixa.push(rec);
@@ -2885,18 +2978,83 @@ window.fecharCaixaDoDia = fecharCaixaDoDia;
 
 function htmlCorpoFechamentoCaixa(f) {
     if (!f) return '';
+    f = enriquecerFechamentoParaRelatorio(f);
     var iniB = f.inicialBalcao != null ? f.inicialBalcao : f.inicial;
     var entB = f.entradasBalcao != null ? f.entradasBalcao : f.entradas;
     var saiB = f.saidasBalcao != null ? f.saidasBalcao : f.saidas;
     var salB = f.saldoBalcao != null ? f.saldoBalcao : f.saldo;
-    var moGanho = f.moGanho != null ? f.moGanho : ((Number(f.maoObra) || 0) + (Number(f.ganhoPecas) || 0));
-    function bloco(titulo, pares) {
-        return '<h3 style="margin:16px 0 8px;border-bottom:2px solid #0d3b66;padding-bottom:4px">' + titulo + '</h3>' +
-            pares.map(function (p) {
-                return '<div class="l" style="display:flex;justify-content:space-between;gap:16px;margin:6px 0">' +
-                    '<span>' + p[0] + '</span><b>' + moeda(p[1]) + '</b></div>';
-            }).join('');
+    var pecas = Number(f.pecasBruto) || 0;
+    var mao = Number(f.maoObra) || 0;
+    var ganho = Number(f.ganhoPecas) || 0;
+    var totOf = f.totalOficina != null ? Number(f.totalOficina) : (pecas + mao);
+    var linhas = f.linhasOficina || [];
+    if (linhas.length) {
+        pecas = 0; mao = 0; ganho = 0; totOf = 0;
+        linhas.forEach(function (l) {
+            pecas += Number(l.pecas) || 0;
+            mao += Number(l.mao) || 0;
+            ganho += Number(l.ganho) || 0;
+            totOf += Number(l.total) || ((Number(l.pecas) || 0) + (Number(l.mao) || 0));
+        });
     }
+    var entCxOf = f.entradasCaixaOficina || [];
+    var entCxOut = f.entradasCaixaOutras || [];
+    var somaEntOf = entCxOf.reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
+    var somaEntOut = entCxOut.reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
+    var totEnt = Number(f.entradas) || 0;
+    var dif = totEnt - totOf;
+
+    function bloco(titulo, pares) {
+        var h = titulo
+            ? '<h3 style="margin:16px 0 8px;border-bottom:2px solid #0d3b66;padding-bottom:4px">' + titulo + '</h3>'
+            : '';
+        return h + pares.map(function (p) {
+            return '<div class="l" style="display:flex;justify-content:space-between;gap:16px;margin:6px 0;' +
+                (p[2] ? 'font-weight:800;font-size:1.05em' : '') + '">' +
+                '<span>' + p[0] + '</span><b>' + moeda(p[1]) + '</b></div>';
+        }).join('');
+    }
+    function tabela(cols, rows, rodape) {
+        if (!rows || !rows.length) {
+            return '<p class="muted" style="margin:6px 0 12px">Nenhum item neste período.</p>';
+        }
+        var h = '<table style="width:100%;border-collapse:collapse;font-size:9pt;margin:6px 0 14px">';
+        h += '<thead><tr>';
+        cols.forEach(function (c) {
+            h += '<th style="text-align:' + (c.num ? 'right' : 'left') +
+                ';border-bottom:2px solid #0d3b66;padding:4px 6px">' + c.t + '</th>';
+        });
+        h += '</tr></thead><tbody>';
+        rows.forEach(function (r) {
+            h += '<tr>';
+            cols.forEach(function (c) {
+                var v = r[c.k];
+                h += '<td style="text-align:' + (c.num ? 'right' : 'left') +
+                    ';border-bottom:1px solid #ddd;padding:3px 6px">' +
+                    (c.num ? moeda(v) : esc(v == null || v === '' ? '—' : String(v))) + '</td>';
+            });
+            h += '</tr>';
+        });
+        h += '</tbody>';
+        if (rodape && rodape.length) {
+            h += '<tfoot>';
+            rodape.forEach(function (r) {
+                h += '<tr>';
+                cols.forEach(function (c, i) {
+                    var v = r[c.k];
+                    h += '<td style="text-align:' + (c.num ? 'right' : 'left') +
+                        ';border-top:2px solid #0d3b66;padding:4px 6px;font-weight:800">' +
+                        (i === 0 && r.label != null ? esc(r.label) : (c.num ? moeda(v || 0) : '')) +
+                        '</td>';
+                });
+                h += '</tr>';
+            });
+            h += '</tfoot>';
+        }
+        h += '</table>';
+        return h;
+    }
+
     var html = '';
     if (f.periodoDe && f.periodoAte) {
         html += '<p>Período aberto: <b>' + esc(fmtData(f.periodoDe)) + '</b> a <b>' + esc(fmtData(f.periodoAte)) + '</b></p>';
@@ -2905,27 +3063,95 @@ function htmlCorpoFechamentoCaixa(f) {
         ['Caixa inicial', iniB],
         ['Entradas', entB],
         ['Saídas', saiB],
-        ['Balanço do dia', salB]
+        ['Balanço do dia', salB, true]
     ]);
     html += bloco('Digital / Banco', [
         ['Saldo inicial', f.inicialBanco || 0],
         ['Entradas', f.entradasBanco || 0],
         ['Saídas', f.saidasBanco || 0],
-        ['Saldo', f.saldoBanco || 0]
+        ['Saldo', f.saldoBanco || 0, true]
     ]);
     html += bloco('Total fechado', [
-        ['Entradas', f.entradas],
+        ['Entradas', totEnt, true],
         ['Saídas', f.saidas],
-        ['Balanço do dia', f.saldo]
+        ['Balanço do dia', f.saldo, true]
     ]);
-    html += bloco('Oficina no fechamento', [
-        ['Peças (venda)', f.pecasBruto],
-        ['Ganho em peças', f.ganhoPecas],
-        ['Mão de obra', f.maoObra],
-        ['MO + ganho peças', moGanho],
-        ['Despesas', f.despesas],
-        ['Resultado estimado', f.resultado]
+
+    html += '<h3 style="margin:16px 0 8px;border-bottom:2px solid #0d3b66;padding-bottom:4px">Oficina no fechamento</h3>';
+    html += '<p style="margin:0 0 8px;font-size:9.5pt;color:#444">Peças + mão de obra é o que a oficina cobrou. ' +
+        '<b>Ganho em peças</b> é lucro (já está dentro do valor das peças — não soma de novo nas entradas).</p>';
+    html += bloco('', [
+        ['Peças (venda)', pecas],
+        ['Mão de obra', mao],
+        ['Total oficina (peças + mão de obra)', totOf, true],
+        ['Ganho em peças (lucro, já incluso nas peças)', ganho]
     ]);
+
+    html += '<h3 style="margin:16px 0 8px;border-bottom:2px solid #0d3b66;padding-bottom:4px">Discriminação da oficina (OS e vendas pagas)</h3>';
+    html += tabela(
+        [
+            { k: 'dataFmt', t: 'Data' },
+            { k: 'doc', t: 'Doc' },
+            { k: 'cliente', t: 'Cliente' },
+            { k: 'pecas', t: 'Peças', num: true },
+            { k: 'mao', t: 'Mão de obra', num: true },
+            { k: 'ganho', t: 'Ganho peças', num: true },
+            { k: 'total', t: 'Total cobrado', num: true }
+        ],
+        linhas.map(function (l) {
+            var doc = l.origem === 'VENDA'
+                ? ('Venda' + (l.numero != null && l.numero !== '' ? ' Nº ' + l.numero : ''))
+                : ('OS' + (l.placa ? ' ' + String(l.placa).toUpperCase() : ''));
+            return {
+                dataFmt: fmtData(l.data) || l.data || '—',
+                doc: doc,
+                cliente: l.cliente || '—',
+                pecas: l.pecas,
+                mao: l.mao,
+                ganho: l.ganho,
+                total: l.total
+            };
+        }),
+        [{ label: 'TOTAL OFICINA', pecas: pecas, mao: mao, ganho: ganho, total: totOf }]
+    );
+
+    html += '<h3 style="margin:16px 0 8px;border-bottom:2px solid #0d3b66;padding-bottom:4px">Conferência com as entradas</h3>';
+    html += bloco('', [
+        ['Total oficina (peças + mão de obra)', totOf, true],
+        ['Entradas de OS/venda no caixa', somaEntOf],
+        ['Outras entradas (não OS/venda)', somaEntOut],
+        ['Total de entradas do caixa', totEnt, true],
+        ['Diferença (entradas − oficina)', dif]
+    ]);
+    if (Math.abs(dif) > 0.05) {
+        html += '<p style="margin:0 0 10px;font-size:9.5pt;color:#444">A diferença são outras entradas, desconto, entrada parcial ou lançamento que não é OS/venda. Veja a lista abaixo.</p>';
+    } else {
+        html += '<p style="margin:0 0 10px;font-size:9.5pt;color:#1e7a3a"><b>Oficina bate com as entradas.</b></p>';
+    }
+
+    if (entCxOut.length) {
+        html += '<h3 style="margin:16px 0 8px;border-bottom:2px solid #0d3b66;padding-bottom:4px">Outras entradas (não OS/venda)</h3>';
+        html += tabela(
+            [
+                { k: 'dataFmt', t: 'Data' },
+                { k: 'canal', t: 'Canal' },
+                { k: 'desc', t: 'Descrição' },
+                { k: 'forma', t: 'Forma' },
+                { k: 'valor', t: 'Valor', num: true }
+            ],
+            entCxOut.map(function (x) {
+                return {
+                    dataFmt: fmtData(x.data) || x.data || '—',
+                    canal: x.canal || '—',
+                    desc: x.desc || '—',
+                    forma: x.forma || '—',
+                    valor: x.valor
+                };
+            }),
+            [{ label: 'TOTAL OUTRAS', valor: somaEntOut }]
+        );
+    }
+
     html += '<p style="margin-top:18px;color:#666;font-size:12px">Gerado em ' +
         esc(new Date().toLocaleString('pt-BR')) +
         ' · Os documentos do mês ficam no Relatório Caixa.</p>';
