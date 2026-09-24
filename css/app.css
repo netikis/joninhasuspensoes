@@ -341,6 +341,45 @@
             flex: 1;
         }
 
+        .btn-voltar-pagina {
+            appearance: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            flex-shrink: 0;
+            min-height: 40px;
+            min-width: 40px;
+            padding: 6px 12px;
+            border-radius: 10px;
+            border: 1px solid #c5cdd8;
+            background: #fff;
+            color: #152642;
+            font-weight: 800;
+            font-size: 0.88rem;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-voltar-pagina .btn-voltar-seta {
+            font-size: 1.15rem;
+            line-height: 1;
+            font-weight: 900;
+        }
+        .btn-voltar-pagina:disabled {
+            opacity: 0.38;
+            cursor: default;
+        }
+        .cad-maiusculo {
+            text-transform: uppercase;
+        }
+        .box-cli-rapido-os {
+            margin-top: 8px;
+            padding: 10px 12px;
+            border: 1px dashed #94a3b8;
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+
         .pagination-caixa {
             display: flex;
             align-items: center;
@@ -2960,8 +2999,12 @@
                 max-width: 100%;
             }
             .box {
+                overflow: visible;
+            }
+            .table-wrap {
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
+                max-width: 100%;
             }
 
             th, td { padding: 8px 6px; font-size: 0.8rem; }

@@ -223,9 +223,8 @@ img, video, canvas, svg, iframe {
 }
 
 /* Teclado virtual: não esconder o campo focado */
-body.tela-celular .main,
 body.tela-celular .conteudo {
-    padding-bottom: calc(20px + var(--safe-bottom) + var(--kb-inset));
+    padding-bottom: calc(96px + var(--safe-bottom) + var(--kb-inset));
 }
 
 body.tela-celular .tela-login {
@@ -257,6 +256,28 @@ body.tela-celular .main {
     width: 100%;
     max-width: 100%;
     height: var(--vh-real, 100dvh);
+    max-height: var(--vh-real, 100dvh);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+body.tela-celular .conteudo {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    padding-bottom: calc(96px + var(--safe-bottom) + var(--kb-inset));
+}
+
+html.tela-celular,
+body.tela-celular {
+    height: var(--vh-real, 100dvh);
+    max-height: var(--vh-real, 100dvh);
+    overflow: hidden;
 }
 
 @media (min-width: 901px) {

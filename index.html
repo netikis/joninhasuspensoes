@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=77">
-    <link rel="stylesheet" href="css/tema-m3.css?v=77">
-    <link rel="stylesheet" href="css/telas.css?v=77">
+    <link rel="stylesheet" href="css/app.css?v=78">
+    <link rel="stylesheet" href="css/tema-m3.css?v=78">
+    <link rel="stylesheet" href="css/telas.css?v=78">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -167,6 +167,10 @@
                 <button type="button" class="btn-menu" id="btnAbrirMenu" aria-label="Abrir menu">
                     <span class="burger" aria-hidden="true"><span></span><span></span><span></span></span>
                 </button>
+                <button type="button" class="btn-voltar-pagina" id="btnVoltarPagina" aria-label="Voltar" title="Voltar" disabled>
+                    <span class="btn-voltar-seta" aria-hidden="true">←</span>
+                    <span class="btn-voltar-txt">Voltar</span>
+                </button>
                 <div class="topbar-titles">
                     <h1 id="tituloPainel">Painel</h1>
                     <p id="subtituloPainel" class="sub">Sistema Joninha Suspensões — banco local exclusivo</p>
@@ -281,19 +285,19 @@
                 <form id="formCliente">
                     <input type="hidden" id="cliId">
                     <div class="row">
-                        <div class="col" style="flex:2"><label>Nome / Razão Social</label><input id="cliNome" required></div>
-                        <div class="col"><label>Apelido</label><input id="cliApelido" placeholder="Como é conhecido" maxlength="40"></div>
+                        <div class="col" style="flex:2"><label>Nome / Razão Social</label><input id="cliNome" class="cad-maiusculo" required></div>
+                        <div class="col"><label>Apelido</label><input id="cliApelido" class="cad-maiusculo" placeholder="Como é conhecido" maxlength="40"></div>
                         <div class="col"><label>CPF</label><input id="cliCpf" maxlength="14" placeholder="000.000.000-00"></div>
                         <div class="col"><label>CNPJ</label><input id="cliCnpj" maxlength="18" placeholder="00.000.000/0000-00"></div>
                     </div>
                     <div class="row" style="margin-top:10px">
                         <div class="col"><label>Telefone / WhatsApp</label><input id="cliTel" required placeholder="(00) 00000-0000"></div>
                         <div class="col"><label>E-mail</label><input id="cliEmail" type="email"></div>
-                        <div class="col"><label>Cidade / UF</label><input id="cliCidade" placeholder="Ex: Ibaiti / PR"></div>
+                        <div class="col"><label>Cidade / UF</label><input id="cliCidade" class="cad-maiusculo" placeholder="Ex: Ibaiti / PR"></div>
                     </div>
                     <div class="row" style="margin-top:10px">
                         <div class="col"><label>CEP</label><input id="cliCep" maxlength="9"></div>
-                        <div class="col" style="flex:2"><label>Endereço</label><input id="cliEndereco"></div>
+                        <div class="col" style="flex:2"><label>Endereço</label><input id="cliEndereco" class="cad-maiusculo"></div>
                         <div class="col"><label>Número</label><input id="cliNumero"></div>
                     </div>
                     <div class="row" style="margin-top:14px">
@@ -334,18 +338,26 @@
                             <label for="atClienteBusca">Buscar cadastrado (nome ou telefone) ou digitar nome avulso</label>
                             <input type="hidden" id="atClienteId" value="">
                             <div class="busca-cli-os-wrap">
-                                <input id="atClienteBusca" name="joninha-os-cliente" autocomplete="off" placeholder="Digite o nome ou o telefone cadastrado...">
+                                <input id="atClienteBusca" class="cad-maiusculo" name="joninha-os-cliente" autocomplete="off" placeholder="Digite o nome ou o telefone cadastrado...">
                                 <div id="sugestoesClienteAt" class="sugestoes-cliente-at" hidden></div>
                             </div>
                         </div>
                     </div>
                     <p class="hint" style="margin-top:10px" id="atClienteStatus">Digite o nome ou o telefone aqui neste campo. O cadastro aparece embaixo para você clicar e puxar para o serviço.</p>
                     <div id="atClienteCard" class="cliente-card-os" style="display:none"></div>
+                    <div class="box-cli-rapido-os" id="boxCliRapidoOs">
+                        <p class="hint" style="margin:12px 0 8px;font-weight:700;color:#1e3a5f">Cliente novo (1ª vez)? Cadastre só o nome e o telefone:</p>
+                        <div class="row" style="align-items:flex-end">
+                            <div class="col"><label>Nome</label><input id="osCliRapidoNome" class="cad-maiusculo" placeholder="NOME DO CLIENTE" autocomplete="off"></div>
+                            <div class="col"><label>Telefone / WhatsApp</label><input id="osCliRapidoTel" type="tel" inputmode="tel" placeholder="(00) 00000-0000" autocomplete="tel"></div>
+                            <div class="col" style="flex:0.85;align-self:end"><button type="button" class="btn btn-ok" id="btnCliRapidoOs" style="width:100%">Cadastrar cliente</button></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="box">
                     <h2>Responsável</h2>
                     <label>Responsável pelo serviço</label>
-                    <input id="atResponsavel" placeholder="Quem vai executar o serviço?">
+                    <input id="atResponsavel" class="cad-maiusculo" placeholder="Quem vai executar o serviço?">
                 </div>
             </div>
 
@@ -353,9 +365,9 @@
                 <div class="box">
                     <h2>Especificações do Veículo</h2>
                     <div class="row">
-                        <div class="col" style="flex:2"><label>Carro (Modelo / Marca)</label><input id="atCarro" placeholder="Ex: Chevrolet Onix (opcional)"></div>
+                        <div class="col" style="flex:2"><label>Carro (Modelo / Marca)</label><input id="atCarro" class="cad-maiusculo" placeholder="Ex: Chevrolet Onix (opcional)"></div>
                         <div class="col"><label>Placa</label><input id="atPlaca" maxlength="7" placeholder="ABC1D23 (opcional)" style="text-transform:uppercase"></div>
-                        <div class="col"><label>Cidade / UF (placa)</label><input id="atCidadePlaca" placeholder="Ibaiti / PR (opcional)"></div>
+                        <div class="col"><label>Cidade / UF (placa)</label><input id="atCidadePlaca" class="cad-maiusculo" placeholder="Ibaiti / PR (opcional)"></div>
                     </div>
                     <div class="plate-preview">
                         <div class="ph"><span>★★★★★</span><span>BRASIL</span><span style="width:10px;height:7px;background:#009c3b;border:0.5px solid #fff;display:inline-block"></span></div>
@@ -365,7 +377,7 @@
                         </div>
                     </div>
                     <div class="row" style="margin-top:10px">
-                        <div class="col"><label>Cor</label><input id="atCor"></div>
+                        <div class="col"><label>Cor</label><input id="atCor" class="cad-maiusculo"></div>
                         <div class="col"><label>Ano de fabricação</label><input id="atAnoFabricacao" inputmode="numeric" maxlength="4" placeholder="Ex: 2018"></div>
                         <div class="col"><label>Ano do modelo</label><input id="atAnoModelo" inputmode="numeric" maxlength="4" placeholder="Ex: 2019"></div>
                         <div class="col"><label>Chassi</label><input id="atChassi"></div>
@@ -415,12 +427,12 @@
                     <div class="box">
                         <h2>Diagnóstico / orçamento</h2>
                         <label>O que está acontecendo no carro</label>
-                        <textarea id="atDiagnostico" placeholder="Ex: barulho na suspensão dianteira, luz ABS acesa..."></textarea>
+                        <textarea id="atDiagnostico" class="cad-maiusculo" placeholder="Ex: barulho na suspensão dianteira, luz ABS acesa..."></textarea>
                     </div>
                     <div class="box">
                         <h2>Serviços</h2>
                         <label>Serviços realizados ou a realizar</label>
-                        <textarea id="atServicos" placeholder="Troca amortecedor, alinhamento, peças..."></textarea>
+                        <textarea id="atServicos" class="cad-maiusculo" placeholder="Troca amortecedor, alinhamento, peças..."></textarea>
                     </div>
                 </div>
 
@@ -441,15 +453,19 @@
 
                 <div class="box">
                     <h2>Valores — Peças e Mão de Obra</h2>
-                    <p class="hint">Peça: digite o nome (ex.: <strong>amortecedor gol</strong>) e escolha o produto cadastrado — custo e venda entram sozinhos. Se o funcionário fez o amortecedor, escolha ele e o tipo da comissão na peça. Mão de obra: digite <strong>alinhamento</strong>, amortecedor etc. Na lista dá para <strong>editar os valores</strong> e a quantidade.</p>
+                    <p class="hint">Peça: escolha o produto (ex.: <strong>AMORTECEDOR TRASEIRO</strong>) e, se quiser, coloque a <strong>descrição</strong> (ex.: <strong>FIAT PALIO</strong>). Na nota sai: PEÇA — AMORTECEDOR TRASEIRO — FIAT PALIO. Custo e venda entram do cadastro. Na lista dá para <strong>editar os valores</strong> e a quantidade.</p>
                     <div class="os-bloco-valores">
                         <div class="os-bloco-valores-cab">Peças</div>
                         <div class="os-bloco-valores-corpo">
                             <div class="row">
                                 <div class="col autocomplete-wrap" style="flex:2">
-                                    <label>Descrição peça</label>
-                                    <input id="itemDesc" placeholder="Ex: Amortecedor gol..." autocomplete="off">
+                                    <label>Peça</label>
+                                    <input id="itemDesc" class="cad-maiusculo" placeholder="Ex: AMORTECEDOR TRASEIRO" autocomplete="off">
                                     <div id="sugestoesItemDesc" class="sugestoes-catalogo" hidden></div>
+                                </div>
+                                <div class="col" style="flex:1.6">
+                                    <label>Descrição (aplicação)</label>
+                                    <input id="itemAplicacao" class="cad-maiusculo" placeholder="Ex: FIAT PALIO" autocomplete="off">
                                 </div>
                                 <div class="col"><label>Custo unit. (R$)</label><input id="itemCusto" inputmode="decimal" placeholder="55,00"></div>
                                 <div class="col"><label>Venda unit. (R$)</label><input id="itemValor" inputmode="decimal" placeholder="60,00"></div>
@@ -482,7 +498,7 @@
                             <div class="row">
                                 <div class="col autocomplete-wrap" style="flex:1.4">
                                     <label>Descrição mão de obra</label>
-                                    <input id="maoDesc" placeholder="Ex: Alinhamento, troca amortecedor..." autocomplete="off">
+                                    <input id="maoDesc" class="cad-maiusculo" placeholder="Ex: ALINHAMENTO, TROCA AMORTECEDOR..." autocomplete="off">
                                     <div id="sugestoesMaoDesc" class="sugestoes-catalogo" hidden></div>
                                 </div>
                                 <div class="col"><label>Funcionário</label>
@@ -595,10 +611,10 @@
                         </div>
                         <div class="col" style="flex:1.1">
                             <label for="prodCodPeca">Código da peça</label>
-                            <input id="prodCodPeca" autocomplete="off" spellcheck="false" placeholder="Ex.: COFAP 31116">
+                            <input id="prodCodPeca" class="cad-maiusculo" autocomplete="off" spellcheck="false" placeholder="Ex.: COFAP 31116">
                         </div>
-                        <div class="col" style="flex:2"><label>Nome</label><input id="prodNome" required></div>
-                        <div class="col"><label>Categoria</label><input id="prodCat" placeholder="Peças, Funilaria..."></div>
+                        <div class="col" style="flex:2"><label>Nome</label><input id="prodNome" class="cad-maiusculo" required></div>
+                        <div class="col"><label>Categoria</label><input id="prodCat" class="cad-maiusculo" placeholder="Peças, Funilaria..."></div>
                     </div>
                     <div class="row" style="margin-top:10px">
                         <div class="col">
@@ -617,6 +633,12 @@
                                 <option value="m">Metro</option>
                                 <option value="kg">Kg</option>
                             </select>
+                        </div>
+                    </div>
+                    <div class="row" style="margin-top:10px">
+                        <div class="col">
+                            <label>Descrição / aplicação</label>
+                            <input id="prodDescricao" class="cad-maiusculo" placeholder="Ex.: FIAT PALIO, GOL G5..." autocomplete="off">
                         </div>
                     </div>
                     <div class="row" style="margin-top:14px">
@@ -693,7 +715,7 @@
                         <div class="row" style="margin-top:12px" id="wrapVdClienteNormal">
                             <div class="col" style="flex:2">
                                 <label>1. Buscar cliente (ou digite nome avulso)</label>
-                                <input id="vdCliente" list="listaClientesVenda" placeholder="Cliente registrado ou avulso..." autocomplete="off">
+                                <input id="vdCliente" class="cad-maiusculo" list="listaClientesVenda" placeholder="Cliente registrado ou avulso..." autocomplete="off">
                                 <datalist id="listaClientesVenda"></datalist>
                             </div>
                             <div class="col"><label>Placa (opcional)</label><input id="vdPlaca" maxlength="7" style="text-transform:uppercase"></div>
@@ -733,8 +755,12 @@
                         <div class="row">
                             <div class="col autocomplete-wrap" style="flex:2">
                                 <label>Produto cadastrado</label>
-                                <input id="vdProdBusca" placeholder="Digite o nome ou bipe o código do cadastro..." autocomplete="off">
+                                <input id="vdProdBusca" class="cad-maiusculo" placeholder="Digite o nome ou bipe o código do cadastro..." autocomplete="off">
                                 <div id="sugestoesVdProd" class="sugestoes-catalogo" hidden></div>
+                            </div>
+                            <div class="col" style="flex:1.4">
+                                <label>Descrição (aplicação)</label>
+                                <input id="vdProdAplicacao" class="cad-maiusculo" placeholder="Ex: FIAT PALIO" autocomplete="off">
                             </div>
                         </div>
                         <div id="vdEstoqueInfo" class="estoque-resumo" aria-live="polite"></div>
@@ -778,7 +804,7 @@
                     <div class="box box-item-avulso" style="border:2px solid #e61e25;background:#ffe5e8;box-shadow:0 0 0 1px rgba(230,30,37,0.25)">
                         <h3 style="color:#111;font-weight:800">3. Adicionar item avulso</h3>
                         <div class="row">
-                            <div class="col" style="flex:2"><label style="color:#111;font-weight:800">Descrição</label><input id="vdAvNome" placeholder="Item avulso (não precisa estar no cadastro)..." autocomplete="off"></div>
+                            <div class="col" style="flex:2"><label style="color:#111;font-weight:800">Descrição</label><input id="vdAvNome" class="cad-maiusculo" placeholder="Item avulso (não precisa estar no cadastro)..." autocomplete="off"></div>
                         </div>
                         <div class="row" style="margin-top:8px;align-items:flex-end">
                             <div class="col" style="flex:0.7"><label style="color:#111;font-weight:800">Unid.</label>
@@ -820,7 +846,7 @@
                         <h3>4. Mão de obra / serviço</h3>
                         <p class="hint">Amortecedor feito na venda: pode lançar a peça no estoque com comissão, ou a mão de obra aqui. Escolha o funcionário e o tipo (Amortecedor % ou original R$).</p>
                         <div class="row" style="align-items:flex-end">
-                            <div class="col autocomplete-wrap" style="flex:1.6"><label>Descrição</label><input id="vdMaoDesc" placeholder="Ex: Alinhamento, funilaria..." autocomplete="off"><div id="sugestoesVdMao" class="sugestoes-catalogo" hidden></div></div>
+                            <div class="col autocomplete-wrap" style="flex:1.6"><label>Descrição</label><input id="vdMaoDesc" class="cad-maiusculo" placeholder="Ex: Alinhamento, funilaria..." autocomplete="off"><div id="sugestoesVdMao" class="sugestoes-catalogo" hidden></div></div>
                             <div class="col">
                                 <label>Funcionário desta linha</label>
                                 <select id="vdMaoFuncId">
@@ -1353,7 +1379,7 @@
                 <form id="formFuncionario">
                     <input type="hidden" id="pfFuncEditId">
                     <div class="row">
-                        <div class="col" style="flex:2"><label>Nome</label><input id="pfNomeFunc" required placeholder="Ex: João, Pedro..."></div>
+                        <div class="col" style="flex:2"><label>Nome</label><input id="pfNomeFunc" class="cad-maiusculo" required placeholder="Ex: João, Pedro..."></div>
                         <div class="col"><label>Telefone / WhatsApp</label><input id="pfTelFunc" placeholder="(00) 00000-0000"></div>
                         <div class="col"><label>Cargo / função</label><input id="pfCargoFunc" placeholder="Mecânico, ajudante..."></div>
                     </div>
@@ -1907,17 +1933,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=77"></script>
-    <script src="js/storage.js?v=77"></script>
-    <script src="js/ui.js?v=77"></script>
-    <script src="js/auth.js?v=77"></script>
-    <script src="js/os.js?v=77"></script>
-    <script src="js/nuvem.js?v=77"></script>
-    <script src="js/caixa.js?v=77"></script>
-    <script src="js/comissoes.js?v=77"></script>
-    <script src="js/app.js?v=77"></script>
-    <script src="js/perfil-cliente.js?v=77"></script>
-    <script src="js/navegacao.js?v=77"></script>
+    <script src="js/config.js?v=78"></script>
+    <script src="js/storage.js?v=78"></script>
+    <script src="js/ui.js?v=78"></script>
+    <script src="js/auth.js?v=78"></script>
+    <script src="js/os.js?v=78"></script>
+    <script src="js/nuvem.js?v=78"></script>
+    <script src="js/caixa.js?v=78"></script>
+    <script src="js/comissoes.js?v=78"></script>
+    <script src="js/app.js?v=78"></script>
+    <script src="js/perfil-cliente.js?v=78"></script>
+    <script src="js/navegacao.js?v=78"></script>
 </body>
 </html>
 

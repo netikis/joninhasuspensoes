@@ -79,6 +79,22 @@ function toast(msg) {
     toast._t = setTimeout(function () { el.classList.remove('show'); }, 2600);
 }
 
+document.addEventListener('input', function (e) {
+    var el = e.target;
+    if (!el || !el.classList || !el.classList.contains('cad-maiusculo')) return;
+    if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
+    var start = el.selectionStart;
+    var end = el.selectionEnd;
+    var up = typeof textoMaiusculoCadastro === 'function'
+        ? textoMaiusculoCadastro(el.value)
+        : String(el.value || '').toLocaleUpperCase('pt-BR');
+    if (el.value === up) return;
+    el.value = up;
+    if (typeof start === 'number') {
+        try { el.setSelectionRange(start, end); } catch (err) { /* ok */ }
+    }
+});
+
 
 /* ---------- Navegação ---------- */
 function abrirGrupoMenu(nomeGrupo, exclusivo) {
@@ -209,6 +225,13 @@ function abrirPainel(id, btn, opcoes) {
         renderLoginsFuncCfg();
     }
     fecharMenuMobile();
+    try {
+        var sc = document.querySelector('.conteudo');
+        if (sc) sc.scrollTop = 0;
+        var mn = document.querySelector('.main');
+        if (mn) mn.scrollTop = 0;
+        window.scrollTo(0, 0);
+    } catch (eScr) { /* ok */ }
     if (estadoAntes && typeof window._navRegistrarDepoisNavegacao === 'function') {
         window._navRegistrarDepoisNavegacao(estadoAntes);
     }

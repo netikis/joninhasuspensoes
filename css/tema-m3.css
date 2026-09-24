@@ -206,6 +206,7 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0;
     padding: 0;
     background: var(--m3-bg);
     color: var(--m3-text);
@@ -298,10 +299,13 @@ body {
 }
 
 .conteudo {
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 22px 26px 60px;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
 }
 
 .sidebar-overlay {

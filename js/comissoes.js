@@ -368,9 +368,9 @@ function renderPagFuncionarios() {
 
 document.getElementById('formFuncionario').addEventListener('submit', function (e) {
     e.preventDefault();
-    var nome = document.getElementById('pfNomeFunc').value.trim();
+    var nome = textoMaiusculoSalvar(document.getElementById('pfNomeFunc').value);
     var telefone = document.getElementById('pfTelFunc').value.trim();
-    var cargo = document.getElementById('pfCargoFunc').value.trim();
+    var cargo = textoMaiusculoSalvar(document.getElementById('pfCargoFunc').value);
     var obs = document.getElementById('pfObsFunc').value.trim();
     var ativo = document.getElementById('pfAtivoFunc').checked;
     var pcts = lerPctsComissaoFormFunc();

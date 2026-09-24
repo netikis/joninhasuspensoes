@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.3.77';
+var APP_VERSION = '1.3.78';
 
 function rotuloBuildApp() {
     var v = String(APP_VERSION || '');
@@ -21,6 +21,31 @@ function produtoEhServico(p) {
 
 function codigoPecaDe(p) {
     return String((p && (p.codigoPeca || p.codPeca)) || '').trim();
+}
+
+function textoMaiusculoCadastro(s) {
+    return String(s == null ? '' : s).toLocaleUpperCase('pt-BR');
+}
+
+function textoMaiusculoSalvar(s) {
+    return textoMaiusculoCadastro(s).replace(/\s+/g, ' ').trim();
+}
+
+function descricaoPecaDe(pOuItem) {
+    if (!pOuItem) return '';
+    return String(pOuItem.aplicacao || pOuItem.descricao || '').trim();
+}
+
+function rotuloLinhaPeca(it) {
+    if (!it) return '';
+    var d = String(it.desc || it.nome || '').trim();
+    var a = descricaoPecaDe(it);
+    if (!a) return d;
+    if (!d) return a;
+    var dU = textoMaiusculoCadastro(d);
+    var aU = textoMaiusculoCadastro(a);
+    if (dU.indexOf(aU) >= 0) return d;
+    return d + ' — ' + a;
 }
 
 function rotuloUnidade(un) {

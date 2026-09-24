@@ -1108,6 +1108,81 @@ function selecionarPrimeiraSugestaoClienteAt() {
     return true;
 }
 
+function cadastrarClienteRapidoOs() {
+    var nomeEl = document.getElementById('osCliRapidoNome');
+    var telEl = document.getElementById('osCliRapidoTel');
+    var busca = document.getElementById('atClienteBusca');
+    var nome = textoMaiusculoSalvar((nomeEl && nomeEl.value) || (busca && busca.value) || '');
+    var tel = String((telEl && telEl.value) || '').trim();
+    if (!nome) {
+        toast('Informe o nome do cliente.');
+        if (nomeEl) nomeEl.focus();
+        return;
+    }
+    var dig = typeof soDigitosTel === 'function' ? soDigitosTel(tel) : String(tel).replace(/\D/g, '');
+    if (dig.length < 8) {
+        toast('Informe o telefone / WhatsApp.');
+        if (telEl) telEl.focus();
+        return;
+    }
+    var db = carregar();
+    var payload = {
+        id: uid(),
+        nome: nome,
+        apelido: '',
+        cpf: '',
+        cnpj: '',
+        telefone: tel,
+        email: '',
+        cidade: '',
+        cep: '',
+        endereco: '',
+        numero: '',
+        atualizadoEm: new Date().toISOString(),
+        criadoEm: new Date().toISOString()
+    };
+    var chaveNova = chaveClienteNomeTel(payload);
+    var outro = chaveNova
+        ? db.clientes.find(function (c) { return c && chaveClienteNomeTel(c) === chaveNova; })
+        : null;
+    if (outro) {
+        payload = _mesclarDadosCliente(Object.assign({}, outro), payload);
+        payload.id = outro.id;
+        payload.criadoEm = outro.criadoEm || payload.criadoEm;
+        var ix = db.clientes.findIndex(function (c) { return String(c.id) === String(outro.id); });
+        if (ix >= 0) db.clientes[ix] = payload;
+        else db.clientes.push(payload);
+        toast('Já existia o mesmo nome e telefone — ficou um único cadastro.');
+    } else {
+        db.clientes.push(payload);
+        toast('Cliente cadastrado.');
+    }
+    limparExcluido(db, 'clientes', payload.id);
+    unirClientesDuplicadosNoDb(db);
+    salvar(db);
+    if (nomeEl) nomeEl.value = '';
+    if (telEl) telEl.value = '';
+    selecionarClienteAtendimento(payload);
+    var wa = document.getElementById('atWaTel');
+    if (wa) wa.value = payload.telefone || tel;
+    if (typeof preencherSelectsCliente === 'function') preencherSelectsCliente(db);
+    if (typeof renderClientes === 'function') renderClientes();
+}
+
+(function ligarCadastroRapidoOs() {
+    var btn = document.getElementById('btnCliRapidoOs');
+    if (btn) btn.addEventListener('click', cadastrarClienteRapidoOs);
+    ['osCliRapidoNome', 'osCliRapidoTel'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            cadastrarClienteRapidoOs();
+        });
+    });
+})();
+
 function _clienteCombinaBuscaOs(c, texto) {
     var q = String(texto || '').trim().toLowerCase();
     if (!q) return false;
@@ -2204,15 +2279,15 @@ document.getElementById('formCliente').addEventListener('submit', function (e) {
     var id = document.getElementById('cliId').value;
     var payload = {
         id: id || uid(),
-        nome: document.getElementById('cliNome').value.trim(),
-        apelido: document.getElementById('cliApelido').value.trim(),
+        nome: textoMaiusculoSalvar(document.getElementById('cliNome').value),
+        apelido: textoMaiusculoSalvar(document.getElementById('cliApelido').value),
         cpf: document.getElementById('cliCpf').value.trim(),
         cnpj: document.getElementById('cliCnpj').value.trim(),
         telefone: document.getElementById('cliTel').value.trim(),
         email: document.getElementById('cliEmail').value.trim(),
-        cidade: document.getElementById('cliCidade').value.trim(),
+        cidade: textoMaiusculoSalvar(document.getElementById('cliCidade').value),
         cep: document.getElementById('cliCep').value.trim(),
-        endereco: document.getElementById('cliEndereco').value.trim(),
+        endereco: textoMaiusculoSalvar(document.getElementById('cliEndereco').value),
         numero: document.getElementById('cliNumero').value.trim(),
         atualizadoEm: new Date().toISOString()
     };
@@ -2728,7 +2803,8 @@ function htmlItensNota(itens) {
     if (!lista.length) return '<p style="color:#000;font-size:0.85rem;">Sem itens lançados.</p>';
     var rows = lista.map(function (it) {
         var tipo = (it.tipo === 'mao') ? 'Mão de obra' : 'Peça';
-        return '<tr><td>' + esc(tipo) + '</td><td>' + esc(it.desc || '') + '</td><td style="text-align:right">' + moeda(it.valor) + '</td></tr>';
+        var descLinha = typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : (it.desc || '');
+        return '<tr><td>' + esc(tipo) + '</td><td>' + esc(descLinha) + '</td><td style="text-align:right">' + moeda(it.valor) + '</td></tr>';
     }).join('');
     var pecas = lista.reduce(function (s, it) { return s + ((it.tipo || 'peca') === 'peca' ? (Number(it.valor) || 0) : 0); }, 0);
     var mao = lista.reduce(function (s, it) { return s + (it.tipo === 'mao' ? (Number(it.valor) || 0) : 0); }, 0);
@@ -4477,6 +4553,8 @@ function preencherFormProd(p, manterFocoNome) {
     document.getElementById('prodId').value = p.id;
     document.getElementById('prodNome').value = p.nome || '';
     document.getElementById('prodCat').value = p.categoria || '';
+    var elDesc = document.getElementById('prodDescricao');
+    if (elDesc) elDesc.value = descricaoPecaDe(p);
     document.getElementById('prodCod').value = p.codigo || '';
     var elCodPeca = document.getElementById('prodCodPeca');
     if (elCodPeca) elCodPeca.value = (typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : (p.codigoPeca || ''));
@@ -4582,10 +4660,11 @@ document.getElementById('formProduto').addEventListener('submit', function (e) {
     var ehServ = tipoCad === 'servico';
     var payload = {
         id: id || uid(),
-        nome: document.getElementById('prodNome').value.trim(),
-        categoria: document.getElementById('prodCat').value.trim(),
+        nome: textoMaiusculoSalvar(document.getElementById('prodNome').value),
+        categoria: textoMaiusculoSalvar(document.getElementById('prodCat').value),
+        descricao: textoMaiusculoSalvar((document.getElementById('prodDescricao') || { value: '' }).value),
         codigo: codigo,
-        codigoPeca: codigoPeca,
+        codigoPeca: textoMaiusculoSalvar(codigoPeca),
         tipo: ehServ ? 'servico' : 'produto',
         custo: Number(document.getElementById('prodCusto').value) || 0,
         venda: Number(document.getElementById('prodVenda').value) || 0,
@@ -4664,7 +4743,7 @@ function renderProdutos() {
     var q = (document.getElementById('buscaProd').value || '').toLowerCase().trim();
     var lista = db.produtos.filter(function (p) {
         if (!q) return true;
-        return [p.nome, p.codigo, (typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : p.codigoPeca), p.categoria].join(' ').toLowerCase().indexOf(q) > -1;
+        return [p.nome, p.codigo, (typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : p.codigoPeca), p.categoria, descricaoPecaDe(p)].join(' ').toLowerCase().indexOf(q) > -1;
     });
     var dir = ordemProdutos.dir === 'desc' ? -1 : 1;
     lista.sort(function (a, b) {
@@ -4720,6 +4799,7 @@ function renderProdutos() {
             '<td>' + esc(p.codigo || '—') + '</td>' +
             '<td>' + esc((typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : p.codigoPeca) || '—') + '</td>' +
             '<td>' + esc(p.nome) +
+            (descricaoPecaDe(p) ? '<div class="muted" style="font-size:0.78rem;font-weight:700">' + esc(descricaoPecaDe(p)) + '</div>' : '') +
             (estoqueBaixo ? ' <span class="badge-estoque-baixo">ESTOQUE BAIXO</span>' : '') +
             '</td>' +
             '<td>' + esc(p.categoria || '—') + '</td>' +
@@ -4892,7 +4972,7 @@ function htmlDocumentoVenda(db, o) {
                 esc(it.funcionarioNome || '') +
                 (tipoLbl ? ' · ' + esc(tipoLbl) : '') + '</div>';
         }
-        return '<tr><td>' + esc(it.desc || '') + extraMo + '</td>' +
+        return '<tr><td>' + esc((typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : (it.desc || '')) || '') + extraMo + '</td>' +
             '<td style="text-align:center">' + esc(String(it.qtd != null ? it.qtd : 1)) + '</td>' +
             '<td style="text-align:right">' + moeda(it.venda != null ? it.venda : it.total) + '</td>' +
             '<td style="text-align:right">' + moeda(it.total != null ? it.total : ((Number(it.qtd) || 1) * (Number(it.venda) || 0))) + '</td></tr>';
@@ -5456,7 +5536,8 @@ function renderCarrinhoVenda() {
             var vendaVal = (typeof fmtNumOs === 'function') ? fmtNumOs(it.venda) : String(it.venda || '');
             return '<div class="' + cls + '">' +
                 '<span class="vd-cart-tag" style="color:' + cor + '">' + tag + '</span>' +
-                '<span class="vd-cart-info" title="' + esc(it.desc) + '">' + esc(it.desc) + extra +
+                '<span class="vd-cart-info" title="' + esc(typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : it.desc) + '">' +
+                esc(typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : it.desc) + extra +
                 ' <span class="vd-cart-qtd">(' + esc(String(it.qtd)) + ' ' + esc(rotuloUnidade(it.unidade)) + ')</span></span>' +
                 '<input class="vd-cart-edit" inputmode="decimal" data-vd-valor="' + idx + '" value="' +
                 esc(vendaVal) + '" title="Valor de venda / mão de obra">' +
@@ -5542,6 +5623,8 @@ function iniciarEdicaoItemVd(idx) {
         if (selPF) selPF.value = it.funcionarioId || '';
         var selPT = document.getElementById('vdProdTipoComissao');
         if (selPT) selPT.value = it.tipoMao || '';
+        var elAplEd = document.getElementById('vdProdAplicacao');
+        if (elAplEd) elAplEd.value = descricaoPecaDe(it) || descricaoPecaDe(p) || '';
         atualizarTotalLinhaEstoque();
         atualizarResumoEstoqueVenda();
         if (typeof atualizarPreviewComissaoEstoqueVd === 'function') atualizarPreviewComissaoEstoqueVd();
@@ -5709,7 +5792,8 @@ document.getElementById('btnVdAddEstoque').addEventListener('click', function ()
         produtoId: p.id,
         codigo: p.codigo || '',
         codigoPeca: codigoPecaDe(p),
-        desc: p.nome,
+        desc: textoMaiusculoSalvar(p.nome),
+        aplicacao: textoMaiusculoSalvar(document.getElementById('vdProdAplicacao') && document.getElementById('vdProdAplicacao').value || descricaoPecaDe(p)),
         qtd: qtd,
         unidade: un,
         custo: Number(document.getElementById('vdProdCusto').value) || 0,
@@ -5722,6 +5806,8 @@ document.getElementById('btnVdAddEstoque').addEventListener('click', function ()
     if (substituirItemCarrinhoSeEditando('estoque', itemEstoque)) {
         document.getElementById('vdProdBusca').value = '';
         produtoVendaSelecionado = null;
+        var elAplEdit = document.getElementById('vdProdAplicacao');
+        if (elAplEdit) elAplEdit.value = '';
         atualizarResumoEstoqueVenda();
         document.getElementById('vdProdQtd').value = '1';
         if (typeof atualizarPreviewComissaoEstoqueVd === 'function') atualizarPreviewComissaoEstoqueVd();
@@ -5730,6 +5816,8 @@ document.getElementById('btnVdAddEstoque').addEventListener('click', function ()
     addItemCarrinho(itemEstoque);
     document.getElementById('vdProdBusca').value = '';
     produtoVendaSelecionado = null;
+    var elAplVd = document.getElementById('vdProdAplicacao');
+    if (elAplVd) elAplVd.value = '';
     atualizarResumoEstoqueVenda();
     document.getElementById('vdProdQtd').value = '1';
     document.getElementById('vdProdBusca').focus();
@@ -5773,7 +5861,7 @@ document.getElementById('btnVdAddAvulso').addEventListener('click', function () 
     var itemAvulso = {
         origem: 'avulso',
         produtoId: null,
-        desc: desc,
+        desc: textoMaiusculoSalvar(desc),
         qtd: qtd,
         unidade: document.getElementById('vdAvUn').value || 'un',
         custo: Number(document.getElementById('vdAvCusto').value) || 0,
@@ -5804,7 +5892,7 @@ document.getElementById('btnVdAddAvulso').addEventListener('click', function () 
 });
 
 document.getElementById('btnVdAddMao').addEventListener('click', function () {
-    var desc = document.getElementById('vdMaoDesc').value.trim();
+    var desc = textoMaiusculoSalvar(document.getElementById('vdMaoDesc').value);
     var valor = parseMoeda(document.getElementById('vdMaoValor').value);
     if (!desc) { toast('Informe a descrição da mão de obra.'); return; }
     var tipoMao = (document.getElementById('vdMaoTipoComissao') && document.getElementById('vdMaoTipoComissao').value) || 'servico';
@@ -6107,7 +6195,7 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
         clienteNome = func.nome;
         placa = (document.getElementById('vdPlacaInterno').value || '').toUpperCase().trim();
     } else {
-        clienteNome = document.getElementById('vdCliente').value.trim();
+        clienteNome = textoMaiusculoSalvar(document.getElementById('vdCliente').value);
         resolvido = resolverClienteAtendimento(db, clienteNome);
         placa = (document.getElementById('vdPlaca').value || '').toUpperCase().trim();
     }
@@ -6682,14 +6770,14 @@ function montarAtendimentoDoFormulario() {
     var a = {
         id: id || ('temp_' + Date.now()),
         clienteId: resolvido.ok ? resolvido.clienteId : '',
-        clienteNome: (resolvido.ok && resolvido.clienteNome) || document.getElementById('atClienteBusca').value.trim() || 'cliente',
+        clienteNome: textoMaiusculoSalvar((resolvido.ok && resolvido.clienteNome) || document.getElementById('atClienteBusca').value) || 'CLIENTE',
         clienteAvulso: resolvido.ok ? !!resolvido.clienteAvulso : true,
         clienteCadastro: resolvido.ok ? snapshotClienteCadastro(db, resolvido) : null,
-        responsavel: document.getElementById('atResponsavel').value.trim(),
-        carro: document.getElementById('atCarro').value.trim(),
+        responsavel: textoMaiusculoSalvar(document.getElementById('atResponsavel').value),
+        carro: textoMaiusculoSalvar(document.getElementById('atCarro').value),
         placa: (document.getElementById('atPlaca').value || '').toUpperCase().trim(),
-        cidadePlaca: document.getElementById('atCidadePlaca').value.trim(),
-        cor: document.getElementById('atCor').value.trim(),
+        cidadePlaca: textoMaiusculoSalvar(document.getElementById('atCidadePlaca').value),
+        cor: textoMaiusculoSalvar(document.getElementById('atCor').value),
         anoFabricacao: document.getElementById('atAnoFabricacao').value.trim(),
         anoModelo: document.getElementById('atAnoModelo').value.trim(),
         chassi: document.getElementById('atChassi').value.trim(),
@@ -6699,9 +6787,9 @@ function montarAtendimentoDoFormulario() {
         status: document.getElementById('atStatus').value,
         agendadoPara: document.getElementById('atAgendadoPara').value || '',
         checklist: lerChecklistUI(),
-        estado: document.getElementById('atEstado').value.trim(),
-        diagnostico: (document.getElementById('atDiagnostico') && document.getElementById('atDiagnostico').value.trim()) || '',
-        servicos: document.getElementById('atServicos').value.trim(),
+        estado: textoMaiusculoSalvar(document.getElementById('atEstado').value),
+        diagnostico: textoMaiusculoSalvar(document.getElementById('atDiagnostico') && document.getElementById('atDiagnostico').value),
+        servicos: textoMaiusculoSalvar(document.getElementById('atServicos').value),
         itens: itensTemp.slice(),
         fotos: fotosAtuais.map(function (f) {
             return { id: f.id || uid(), data: f.data || null, url: f.url || null };
@@ -6895,11 +6983,11 @@ function salvarAtendimentoRapidoParaEnvio() {
         clienteNome: resolvido.clienteNome,
         clienteAvulso: resolvido.clienteAvulso,
         clienteCadastro: snapshotClienteCadastro(db, resolvido),
-        responsavel: document.getElementById('atResponsavel').value.trim(),
-        carro: document.getElementById('atCarro').value.trim(),
+        responsavel: textoMaiusculoSalvar(document.getElementById('atResponsavel').value),
+        carro: textoMaiusculoSalvar(document.getElementById('atCarro').value),
         placa: (document.getElementById('atPlaca').value || '').toUpperCase().trim(),
-        cidadePlaca: document.getElementById('atCidadePlaca').value.trim(),
-        cor: document.getElementById('atCor').value.trim(),
+        cidadePlaca: textoMaiusculoSalvar(document.getElementById('atCidadePlaca').value),
+        cor: textoMaiusculoSalvar(document.getElementById('atCor').value),
         anoFabricacao: document.getElementById('atAnoFabricacao').value.trim(),
         anoModelo: document.getElementById('atAnoModelo').value.trim(),
         chassi: document.getElementById('atChassi').value.trim(),
@@ -6909,9 +6997,9 @@ function salvarAtendimentoRapidoParaEnvio() {
         status: document.getElementById('atStatus').value,
         agendadoPara: document.getElementById('atAgendadoPara').value || '',
         checklist: lerChecklistUI(),
-        estado: document.getElementById('atEstado').value.trim(),
-        diagnostico: (document.getElementById('atDiagnostico') && document.getElementById('atDiagnostico').value.trim()) || '',
-        servicos: document.getElementById('atServicos').value.trim(),
+        estado: textoMaiusculoSalvar(document.getElementById('atEstado').value),
+        diagnostico: textoMaiusculoSalvar(document.getElementById('atDiagnostico') && document.getElementById('atDiagnostico').value),
+        servicos: textoMaiusculoSalvar(document.getElementById('atServicos').value),
         itens: itensTemp.slice(),
         fotos: fotosAtuais.map(function (f) {
             return { id: f.id || uid(), data: f.data || null, url: f.url || null };
@@ -7125,7 +7213,8 @@ function montarMsgOrcamentoAtual() {
     if (!itensTemp.length) msg += '- (ainda sem itens)\n';
     else itensTemp.forEach(function (it) {
         var tag = (it.tipo || 'peca') === 'mao' ? 'MO' : 'Peça';
-        msg += '- [' + tag + '] ' + (it.desc || '') + ': ' + moeda(it.valor) + '\n';
+        var rot = (typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : it.desc) || '';
+        msg += '- [' + tag + '] ' + rot + ': ' + moeda(it.valor) + '\n';
     });
     msg += '\n*Peças:* ' + moeda(tot.pecas);
     msg += '\n*Mão de obra:* ' + moeda(tot.mao);
@@ -7162,7 +7251,8 @@ function enviarWaOrcamentoSalvo(id) {
     msg += '\n*Itens:*\n';
     (a.itens || []).forEach(function (it) {
         var tag = (it.tipo || 'peca') === 'mao' ? 'MO' : 'Peça';
-        msg += '- [' + tag + '] ' + (it.desc || '') + ': ' + moeda(it.valor) + '\n';
+        var rot = (typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : it.desc) || '';
+        msg += '- [' + tag + '] ' + rot + ': ' + moeda(it.valor) + '\n';
     });
     msg += '\n*Peças:* ' + moeda(tot.pecas) + '\n*Mão de obra:* ' + moeda(tot.mao) + '\n*Total:* ' + moeda(a.total != null ? a.total : tot.total);
     abrirWhatsApp(telefoneDoAtendimento(db, a), msg);

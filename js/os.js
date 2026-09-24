@@ -334,6 +334,8 @@ function iniciarEdicaoItemOs(idx) {
     } else {
         normalizarPecaItem(it);
         document.getElementById('itemDesc').value = it.desc || '';
+        var elApl = document.getElementById('itemAplicacao');
+        if (elApl) elApl.value = descricaoPecaDe(it);
         document.getElementById('itemCusto').value = fmtNumOs(it.custoUnit);
         document.getElementById('itemValor').value = fmtNumOs(it.valorUnit);
         if (document.getElementById('itemQtd')) document.getElementById('itemQtd').value = String(it.qtd || 1);
@@ -403,7 +405,7 @@ function htmlLinhaItemOs(it, idx) {
         }
         return '<div class="row os-item-linha' + clsEdit + '" style="margin-bottom:8px;align-items:center;gap:6px">' +
             '<div class="col" style="flex:2"><span class="os-tag os-tag-peca">PEÇA</span>' +
-            esc(it.desc) + extraP + '</div>' +
+            esc(typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : it.desc) + extraP + '</div>' +
             '<div class="col" style="flex:1.1;display:flex;align-items:center;gap:4px">' +
             '<button type="button" class="btn btn-secondary" data-qtd-menos="' + idx + '" style="padding:4px 10px;min-width:36px">−</button>' +
             '<input type="number" min="1" step="1" value="' + esc(String(it.qtd)) + '" data-qtd-input="' + idx + '" ' +
@@ -655,7 +657,9 @@ function atualizarPreviewComissaoPeca() {
 }
 
 document.getElementById('btnAddItem').addEventListener('click', function () {
-    var desc = document.getElementById('itemDesc').value.trim();
+    var desc = textoMaiusculoSalvar(document.getElementById('itemDesc').value);
+    var elAplInp = document.getElementById('itemAplicacao');
+    var aplicacao = textoMaiusculoSalvar(elAplInp ? elAplInp.value : '');
     var custoUnit = parseMoeda(document.getElementById('itemCusto').value);
     var valorUnit = parseMoeda(document.getElementById('itemValor').value);
     var qtdRaw = document.getElementById('itemQtd') ? document.getElementById('itemQtd').value : '1';
@@ -669,6 +673,7 @@ document.getElementById('btnAddItem').addEventListener('click', function () {
     if (editandoPeca) {
         var itemEd = itensTemp[osItemEditIdx];
         itemEd.desc = desc;
+        itemEd.aplicacao = aplicacao;
         itemEd.qtd = qtd;
         itemEd.custoUnit = custoUnit;
         itemEd.valorUnit = valorUnit;
@@ -677,6 +682,8 @@ document.getElementById('btnAddItem').addEventListener('click', function () {
         aplicarComissaoCamposPecaOs(itemEd);
         cancelarEdicaoItemOs();
         document.getElementById('itemDesc').value = '';
+        var elAplEd = document.getElementById('itemAplicacao');
+        if (elAplEd) elAplEd.value = '';
         document.getElementById('itemCusto').value = '';
         document.getElementById('itemValor').value = '';
         if (document.getElementById('itemQtd')) document.getElementById('itemQtd').value = '1';
@@ -696,6 +703,7 @@ document.getElementById('btnAddItem').addEventListener('click', function () {
     var iExist = itensTemp.findIndex(function (x) {
         if (!x || (x.tipo || 'peca') === 'mao') return false;
         if (String(x.desc || '').toLowerCase() !== desc.toLowerCase()) return false;
+        if (String(descricaoPecaDe(x) || '').toLowerCase() !== (aplicacao || '').toLowerCase()) return false;
         if (String(x.funcionarioId || '') !== String(fidAdd || '')) return false;
         if (String(x.tipoMao || '') !== String(tipoAdd || '')) return false;
         normalizarPecaItem(x);
@@ -705,6 +713,8 @@ document.getElementById('btnAddItem').addEventListener('click', function () {
         normalizarPecaItem(itensTemp[iExist]);
         aplicarQtdPeca(iExist, (Number(itensTemp[iExist].qtd) || 1) + qtd);
         document.getElementById('itemDesc').value = '';
+        var elAplQty = document.getElementById('itemAplicacao');
+        if (elAplQty) elAplQty.value = '';
         document.getElementById('itemCusto').value = '';
         document.getElementById('itemValor').value = '';
         if (document.getElementById('itemQtd')) document.getElementById('itemQtd').value = '1';
@@ -715,6 +725,7 @@ document.getElementById('btnAddItem').addEventListener('click', function () {
     var item = {
         tipo: 'peca',
         desc: desc,
+        aplicacao: aplicacao,
         qtd: qtd,
         custoUnit: custoUnit,
         valorUnit: valorUnit,
@@ -724,6 +735,8 @@ document.getElementById('btnAddItem').addEventListener('click', function () {
     aplicarComissaoCamposPecaOs(item);
     itensTemp.push(item);
     document.getElementById('itemDesc').value = '';
+    var elAplAdd = document.getElementById('itemAplicacao');
+    if (elAplAdd) elAplAdd.value = '';
     document.getElementById('itemCusto').value = '';
     document.getElementById('itemValor').value = '';
     if (document.getElementById('itemQtd')) document.getElementById('itemQtd').value = '1';
@@ -893,7 +906,7 @@ function atualizarPreviewComissaoMao() {
 }
 
 document.getElementById('btnAddMao').addEventListener('click', function () {
-    var desc = document.getElementById('maoDesc').value.trim();
+    var desc = textoMaiusculoSalvar(document.getElementById('maoDesc').value);
     var valor = parseMoeda(document.getElementById('maoValor').value);
     if (!desc) { toast('Informe a descrição da mão de obra.'); return; }
     var fid = document.getElementById('maoFuncId').value;
@@ -931,6 +944,7 @@ document.getElementById('btnAddMao').addEventListener('click', function () {
 
 window._mapaEnterOs = {
     itemDesc: 'btnAddItem',
+    itemAplicacao: 'btnAddItem',
     itemCusto: 'btnAddItem',
     itemValor: 'btnAddItem',
     itemQtd: 'btnAddItem',
@@ -1358,6 +1372,7 @@ function editarAtendimento(id, placaHint) {
             tipo: it.tipo || 'peca',
             tipoMao: tipoMao,
             desc: it.desc || '',
+            aplicacao: descricaoPecaDe(it),
             valor: valorMo,
             custo: Number(it.custo) || 0,
             qtd: it.qtd != null ? Number(it.qtd) : 1,
@@ -1616,7 +1631,7 @@ function buscarProdutosCatalogo(query, limite) {
     if (q.length < 1) return [];
     var lista = listarProdutosParaCatalogo();
     return lista.filter(function (p) {
-        var blob = [p.nome, p.codigo, (typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : p.codigoPeca)].join(' ');
+        var blob = [p.nome, p.codigo, (typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : p.codigoPeca), descricaoPecaDe(p)].join(' ');
         return combinaBuscaCatalogo(blob, q);
     }).sort(function (a, b) {
         var ea = produtoQueryEhExata(q, a) ? 0 : 1;
@@ -1692,8 +1707,10 @@ function aplicarProdutoNoOrcamentoOs(p) {
     var venda = document.getElementById('itemValor');
     if (desc) {
         var peca = typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : (p.codigoPeca || '');
-        desc.value = (p.nome || '') + (peca ? ' [' + peca + ']' : '');
+        desc.value = textoMaiusculoSalvar((p.nome || '') + (peca ? ' [' + peca + ']' : ''));
     }
+    var aplOs = document.getElementById('itemAplicacao');
+    if (aplOs) aplOs.value = textoMaiusculoSalvar(descricaoPecaDe(p));
     if (custo) custo.value = typeof fmtNumOs === 'function' ? fmtNumOs(p.custo) : String(p.custo || '');
     if (venda) venda.value = typeof fmtNumOs === 'function' ? fmtNumOs(p.venda) : String(p.venda || '');
     if (venda) {
@@ -1740,8 +1757,10 @@ function aplicarProdutoNoOrcamentoVenda(p, destino) {
     var busca = document.getElementById('vdProdBusca');
     if (busca) {
         var pecaVd = typeof codigoPecaDe === 'function' ? codigoPecaDe(p) : (p.codigoPeca || '');
-        busca.value = (p.nome || '') + (pecaVd ? ' [' + pecaVd + ']' : (p.codigo ? ' [' + p.codigo + ']' : ''));
+        busca.value = textoMaiusculoSalvar((p.nome || '') + (pecaVd ? ' [' + pecaVd + ']' : (p.codigo ? ' [' + p.codigo + ']' : '')));
     }
+    var aplVd = document.getElementById('vdProdAplicacao');
+    if (aplVd) aplVd.value = textoMaiusculoSalvar(descricaoPecaDe(p));
     var elC = document.getElementById('vdProdCusto');
     var elV = document.getElementById('vdProdVenda');
     var elM = document.getElementById('vdProdMargem');
@@ -1876,6 +1895,7 @@ function rotuloPrecoCatalogo(custo, venda) {
             var qtd = (p.qtd != null && Number(p.qtd) === Number(p.qtd)) ? Number(p.qtd) : null;
             var extra = [
                 (typeof codigoPecaDe === 'function' && codigoPecaDe(p)) ? 'peça ' + codigoPecaDe(p) : '',
+                descricaoPecaDe(p) || '',
                 p.codigo ? 'barras ' + p.codigo : '',
                 (typeof produtoEhServico === 'function' && produtoEhServico(p))
                     ? 'tipo de serviço'

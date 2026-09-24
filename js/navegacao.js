@@ -76,7 +76,16 @@ window._navRegistrarDepoisNavegacao = function (estadoAntes) {
 };
 
 window._atualizarBarraVoltar = function () {
-    /* Comandos de voltar ficam só na seta do mouse, Alt+← e ESC — sem balões na tela */
+    var btn = document.getElementById('btnVoltarPagina');
+    if (!btn) return;
+    var pode = typeof window._navPodeVoltarHistorico === 'function' && window._navPodeVoltarHistorico();
+    btn.disabled = !pode;
+    btn.setAttribute('aria-disabled', pode ? 'false' : 'true');
+    var dest = '';
+    if (pode && window._navHistorico && window._navHistorico.length) {
+        dest = window._navLabelEstado(window._navHistorico[window._navHistorico.length - 1]);
+    }
+    btn.title = dest ? ('Voltar para ' + dest) : 'Voltar para a tela anterior';
 };
 
 window._navIrInicio = function () {
@@ -179,6 +188,13 @@ window.addEventListener('keydown', function (e) {
         e.preventDefault();
         window.voltarPaginaAnterior();
     }
+});
+
+document.addEventListener('click', function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest('#btnVoltarPagina') : null;
+    if (!btn) return;
+    e.preventDefault();
+    if (typeof window.voltarPaginaAnterior === 'function') window.voltarPaginaAnterior();
 });
 
 if (document.readyState === 'loading') {
