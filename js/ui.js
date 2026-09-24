@@ -1,21 +1,62 @@
 'use strict';
 /* Joninha — UI: toast, menus, painéis, renderTudo (etapa 2.2) */
 
-/* Altura real da tela no Android/iPhone (barra de endereço muda o 100vh) */
-function atualizarVhFallback() {
+/* Altura/largura reais no Android e iPhone (barra de endereço, notch, teclado) */
+function classificarTelaCelular(largura) {
+    var lista = (typeof TELAS_CELULAR !== 'undefined' && TELAS_CELULAR.length) ? TELAS_CELULAR : [];
+    if (!lista.length) {
+        return { id: 'gen', marca: 'gen', nome: 'Tela', cssW: Math.round(largura) };
+    }
+    var melhor = lista[0];
+    var dist = Math.abs((Number(melhor.cssW) || 0) - largura);
+    lista.forEach(function (t) {
+        var d = Math.abs((Number(t.cssW) || 0) - largura);
+        if (d < dist) {
+            dist = d;
+            melhor = t;
+        }
+    });
+    return melhor;
+}
+
+function sincronizarTela() {
     try {
-        var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        var vv = window.visualViewport;
+        var w = vv && vv.width > 0 ? vv.width : window.innerWidth;
+        var h = vv && vv.height > 0 ? vv.height : window.innerHeight;
+        if (!(w > 0)) w = window.innerWidth;
         if (!(h > 0)) h = window.innerHeight;
-        document.documentElement.style.setProperty('--vh-fallback', (h * 0.01) + 'px');
+        var root = document.documentElement;
+        root.style.setProperty('--vh-fallback', (h * 0.01) + 'px');
+        root.style.setProperty('--vw', w + 'px');
+        root.style.setProperty('--vh-real', h + 'px');
+        var teclado = 0;
+        if (vv) {
+            teclado = Math.max(0, window.innerHeight - vv.height - (Number(vv.offsetTop) || 0));
+        }
+        root.style.setProperty('--kb-inset', teclado + 'px');
+        var hit = classificarTelaCelular(w);
+        root.setAttribute('data-tela', hit.id || '');
+        root.setAttribute('data-tela-marca', hit.marca || '');
+        root.setAttribute('data-tela-w', String(Math.round(w)));
+        var celular = w <= 900 || (h <= 560 && w <= 1100);
+        root.classList.toggle('tela-celular', celular);
+        root.classList.toggle('tela-estreita', w <= 390);
+        if (document.body) {
+            document.body.classList.toggle('tela-celular', celular);
+            document.body.classList.toggle('tela-estreita', w <= 390);
+        }
     } catch (e) { /* ok */ }
 }
-atualizarVhFallback();
-window.addEventListener('resize', atualizarVhFallback);
+function atualizarVhFallback() { sincronizarTela(); }
+sincronizarTela();
+window.addEventListener('resize', sincronizarTela);
 window.addEventListener('orientationchange', function () {
-    setTimeout(atualizarVhFallback, 180);
+    setTimeout(sincronizarTela, 180);
 });
 if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', atualizarVhFallback);
+    window.visualViewport.addEventListener('resize', sincronizarTela);
+    window.visualViewport.addEventListener('scroll', sincronizarTela);
 }
 
 function atualizarBadgeCanal() {

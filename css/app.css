@@ -2850,8 +2850,8 @@
             }
         }
 
-        /* Celular / tablet estreito — menu gaveta + app (Android + iPhone) */
-        @media (max-width: 900px) {
+        /* Celular / tablet estreito — menu gaveta + app (Android + iPhone, inclusive deitado) */
+        @media (max-width: 900px), (max-height: 560px) and (orientation: landscape) and (pointer: coarse) {
             :root {
                 --app-pad-x: 12px;
                 --app-pad-y: 10px;

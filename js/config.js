@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.3.75';
+var APP_VERSION = '1.3.76';
 
 function rotuloBuildApp() {
     var v = String(APP_VERSION || '');
@@ -111,3 +111,26 @@ var FOTOS_MAX = 10;
 var FOTO_MAX_LADO = 720;
 var FOTO_JPEG_QUALIDADE = 0.68;
 var FOTO_MAX_CHARS = 220000; /* ~165KB — evita estourar doc Firestore */
+
+/* Larguras CSS (px lógicos) de celulares reais — o layout usa estes tamanhos */
+var TELAS_CELULAR = [
+    { id: 'iphone-se1', marca: 'Apple', nome: 'iPhone SE 1 / 5s', cssW: 320, cssH: 568 },
+    { id: 'android-compacto-320', marca: 'Android', nome: 'Android compacto', cssW: 320, cssH: 640 },
+    { id: 'android-360', marca: 'Android', nome: 'Galaxy A / Xiaomi / Moto', cssW: 360, cssH: 800 },
+    { id: 'iphone-se2', marca: 'Apple', nome: 'iPhone SE 2/3 / 8', cssW: 375, cssH: 667 },
+    { id: 'iphone-mini', marca: 'Apple', nome: 'iPhone 12/13 mini', cssW: 375, cssH: 812 },
+    { id: 'android-384', marca: 'Android', nome: 'Pixel compacto', cssW: 384, cssH: 832 },
+    { id: 'iphone-12', marca: 'Apple', nome: 'iPhone 12/13/14', cssW: 390, cssH: 844 },
+    { id: 'iphone-14-pro', marca: 'Apple', nome: 'iPhone 14/15 Pro', cssW: 393, cssH: 852 },
+    { id: 'iphone-16', marca: 'Apple', nome: 'iPhone 16', cssW: 393, cssH: 852 },
+    { id: 'iphone-16-pro', marca: 'Apple', nome: 'iPhone 16 Pro', cssW: 402, cssH: 874 },
+    { id: 'android-412', marca: 'Android', nome: 'Pixel / Galaxy S', cssW: 412, cssH: 915 },
+    { id: 'iphone-xr', marca: 'Apple', nome: 'iPhone XR / 11', cssW: 414, cssH: 896 },
+    { id: 'iphone-promax-12', marca: 'Apple', nome: 'iPhone 12/13 Pro Max', cssW: 428, cssH: 926 },
+    { id: 'iphone-15-plus', marca: 'Apple', nome: 'iPhone 14/15 Plus / Pro Max', cssW: 430, cssH: 932 },
+    { id: 'iphone-16-promax', marca: 'Apple', nome: 'iPhone 16 Pro Max', cssW: 440, cssH: 956 },
+    { id: 'pixel-pro', marca: 'Android', nome: 'Pixel Pro', cssW: 448, cssH: 998 },
+    { id: 'android-480', marca: 'Android', nome: 'Android grande', cssW: 480, cssH: 960 },
+    { id: 'phablet-540', marca: 'Android', nome: 'Phablet', cssW: 540, cssH: 960 },
+    { id: 'android-600', marca: 'Android', nome: 'Android landscape / tablet pequeno', cssW: 600, cssH: 960 }
+];

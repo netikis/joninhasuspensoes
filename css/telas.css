@@ -1,0 +1,266 @@
+/* Joninha — telas Android + iPhone.
+   Escala fluida na largura real (100vw / visualViewport) e pontos de corte
+   nos CSS px lógicos dos aparelhos. */
+
+:root {
+    --tela-iphone-se1: 320px;
+    --tela-android-360: 360px;
+    --tela-iphone-se2: 375px;
+    --tela-iphone-12: 390px;
+    --tela-iphone-14-pro: 393px;
+    --tela-iphone-16-pro: 402px;
+    --tela-android-412: 412px;
+    --tela-iphone-xr: 414px;
+    --tela-iphone-promax: 428px;
+    --tela-iphone-15-plus: 430px;
+    --tela-iphone-16-promax: 440px;
+    --tela-pixel-pro: 448px;
+    --tela-android-480: 480px;
+    --app-pad-x: clamp(8px, 3.2vw, 26px);
+    --app-pad-y: clamp(8px, 2vw, 22px);
+    --gap-ui: clamp(6px, 1.8vw, 16px);
+    --fs-ui: clamp(13px, 0.55vw + 12.2px, 16px);
+    --fs-kpi: clamp(1.15rem, 4.4vw, 2rem);
+    --fs-title: clamp(1.02rem, 2.6vw + 0.4rem, 1.28rem);
+    --sidebar-mobile: min(86vw, 300px);
+    --kb-inset: 0px;
+    --vw: 100vw;
+    --vh-real: 100dvh;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+html,
+body {
+    max-width: 100%;
+}
+
+img, video, canvas, svg, iframe {
+    max-width: 100%;
+}
+
+/* ---------- Celular (largura ou landscape iPhone/Android) ---------- */
+@media (max-width: 900px), (max-height: 560px) and (orientation: landscape) and (pointer: coarse) {
+    :root {
+        --sidebar: var(--sidebar-mobile);
+        --touch-min: 44px;
+    }
+
+    .conteudo {
+        padding: var(--app-pad-y) var(--app-pad-x) calc(52px + var(--safe-bottom) + var(--kb-inset));
+    }
+
+    .topbar {
+        padding-left: var(--app-pad-x);
+        padding-right: var(--app-pad-x);
+        gap: var(--gap-ui);
+    }
+
+    .topbar h1,
+    .topbar-titles h1,
+    .main .topbar h1 {
+        font-size: var(--fs-title);
+    }
+
+    .cards,
+    .cards-oficina {
+        gap: var(--gap-ui);
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 152px), 1fr));
+    }
+
+    .card {
+        padding: clamp(10px, 2.6vw, 16px);
+        min-width: 0;
+    }
+
+    .card .v {
+        font-size: var(--fs-kpi);
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .card .k {
+        font-size: clamp(0.68rem, 2.4vw, 0.78rem);
+    }
+
+    .row {
+        gap: var(--gap-ui);
+    }
+
+    .box,
+    .panel,
+    .table-wrap,
+    .tbl-wrap,
+    .modal-box {
+        max-width: 100%;
+    }
+
+    .box,
+    .table-wrap,
+    .tbl-wrap,
+    .rof-detalhe,
+    .cx-acoes-bar {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .tela-login {
+        padding: calc(10px + var(--safe-top)) calc(10px + var(--safe-right))
+            calc(10px + var(--safe-bottom) + var(--kb-inset)) calc(10px + var(--safe-left));
+        align-items: flex-start;
+    }
+
+    .tela-login-card {
+        width: min(420px, 100%);
+        padding: clamp(14px, 4vw, 22px) clamp(12px, 3.4vw, 20px);
+        margin: auto;
+    }
+
+    .tela-login-card img {
+        max-width: min(240px, 72vw);
+        max-height: clamp(56px, 16vw, 110px);
+    }
+
+    .os-item-linha,
+    .vd-cart-linha {
+        min-width: 0;
+    }
+
+    .cx-acoes-fh {
+        flex-wrap: wrap;
+        white-space: normal;
+    }
+}
+
+/* iPhone SE 1 / Android 320 */
+@media (max-width: 320px) {
+    :root {
+        --app-pad-x: 8px;
+        --app-pad-y: 6px;
+        --sidebar-mobile: min(94vw, 300px);
+    }
+    .cards,
+    .cards-oficina { grid-template-columns: 1fr; }
+    .col { flex: 1 1 100%; min-width: 100%; }
+    .btn-sair-top, .btn-logout { padding: 8px 10px; font-size: 0.78rem; }
+    .login-tabs { flex-direction: column; }
+}
+
+/* Android 360 (Galaxy A, Xiaomi, Moto — o mais comum) */
+@media (min-width: 321px) and (max-width: 359px) {
+    .cards,
+    .cards-oficina { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 360px) {
+    :root { --app-pad-x: 10px; }
+    .top-actions .badge-db { display: none; }
+}
+
+/* iPhone SE 2/3, 8, mini (375) */
+@media (min-width: 361px) and (max-width: 389px) {
+    .cards,
+    .cards-oficina { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* iPhone 12/13/14 (390) e 14/15 Pro (393) */
+@media (min-width: 390px) and (max-width: 411px) {
+    .cards,
+    .cards-oficina { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cards-oficina { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Pixel / Galaxy S (412) e iPhone XR/11 (414) */
+@media (min-width: 412px) and (max-width: 427px) {
+    .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cards-oficina { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* iPhone 12/13 Pro Max (428), 14/15 Plus (430), 16 Pro Max (440) */
+@media (min-width: 428px) and (max-width: 479px) {
+    .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cards-oficina { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .col { flex: 1 1 calc(50% - 8px); min-width: min(100%, 160px); }
+}
+
+/* Android grande / Pixel Pro (448–540) */
+@media (min-width: 448px) and (max-width: 599px) {
+    .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cards-oficina { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Phablet / Android landscape estreito */
+@media (min-width: 540px) and (max-width: 700px) {
+    .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cards-oficina { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* Formulários: 1 coluna em telas estreitas */
+@media (max-width: 560px) {
+    .col { min-width: 100%; flex: 1 1 100%; }
+    .topbar { align-items: flex-start; }
+    .topbar-left { flex: 1 1 auto; min-width: 0; }
+    .top-actions { margin-left: auto; }
+    .modal-acoes .btn { flex: 1 1 100%; }
+    #listaItens .os-item-linha {
+        flex-wrap: wrap;
+    }
+    #listaItens .os-item-linha .col {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+}
+
+/* Altura baixa (iPhone landscape, teclado Android) */
+@media (max-height: 500px) and (orientation: landscape) {
+    .hero-slogan { display: none; }
+    .topbar p, .topbar-titles .sub { display: none; }
+    .tela-login-card img { max-height: 48px; }
+    .conteudo { padding-top: 8px; }
+}
+
+/* Teclado virtual: não esconder o campo focado */
+body.tela-celular .main,
+body.tela-celular .conteudo {
+    padding-bottom: calc(20px + var(--safe-bottom) + var(--kb-inset));
+}
+
+body.tela-celular .tela-login {
+    padding-bottom: calc(12px + var(--safe-bottom) + var(--kb-inset));
+}
+
+/* Landscape largo (iPhone Pro Max deitado — largura > 900) */
+body.tela-celular .btn-menu { display: inline-flex; }
+body.tela-celular .sidebar-close-mobile { display: block; }
+body.tela-celular .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: var(--sidebar-mobile);
+    min-width: 0;
+    max-width: 300px;
+    height: var(--vh-real, 100dvh);
+    transform: translateX(-105%);
+    transition: transform 0.28s ease;
+    z-index: 120;
+    padding-left: calc(12px + var(--safe-left));
+    padding-bottom: calc(12px + var(--safe-bottom));
+}
+body.tela-celular.menu-aberto .sidebar,
+body.menu-aberto.tela-celular .sidebar { transform: translateX(0); }
+body.tela-celular.menu-aberto .sidebar-overlay,
+body.menu-aberto.tela-celular .sidebar-overlay { display: block; }
+body.tela-celular .main {
+    width: 100%;
+    max-width: 100%;
+    height: var(--vh-real, 100dvh);
+}
+
+@media (min-width: 901px) {
+    body.tela-celular .main {
+        width: 100%;
+    }
+}

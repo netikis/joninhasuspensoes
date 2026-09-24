@@ -657,7 +657,7 @@ tbody tr:hover { background: #f1f5f9; }
 }
 
 /* ---------- Mobile ---------- */
-@media (max-width: 900px) {
+@media (max-width: 900px), (max-height: 560px) and (orientation: landscape) and (pointer: coarse) {
     .conteudo { padding: 16px 14px calc(56px + var(--safe-bottom)); }
     .topbar { padding: 10px 16px; padding-top: calc(10px + var(--safe-top)); }
     .sidebar {
