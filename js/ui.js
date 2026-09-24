@@ -56,7 +56,6 @@ window.addEventListener('orientationchange', function () {
 });
 if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', sincronizarTela);
-    window.visualViewport.addEventListener('scroll', sincronizarTela);
 }
 
 function atualizarBadgeCanal() {

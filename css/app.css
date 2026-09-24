@@ -2897,7 +2897,8 @@
                 --sidebar: min(86vw, 300px);
             }
 
-            body { overflow: hidden; width: 100%; max-width: 100vw; }
+            html { height: auto; overflow-x: hidden; overflow-y: auto; }
+            body { display: block; overflow-x: hidden; overflow-y: auto; width: 100%; max-width: 100vw; }
 
             .btn-menu { display: inline-flex; }
             .sidebar-close-mobile { display: block; }
@@ -2929,14 +2930,13 @@
             .main {
                 width: 100%;
                 max-width: 100vw;
-                height: 100vh;
-                height: 100dvh;
-                height: calc(var(--vh-fallback, 1vh) * 100);
+                height: auto;
+                min-height: 100dvh;
+                overflow: visible;
                 padding: calc(var(--app-pad-y) + var(--safe-top))
                     calc(var(--app-pad-x) + var(--safe-right))
                     calc(20px + var(--safe-bottom))
                     calc(var(--app-pad-x) + var(--safe-left));
-                overscroll-behavior-y: contain;
             }
 
             .topbar {

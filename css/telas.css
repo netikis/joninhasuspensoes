@@ -104,6 +104,7 @@ img, video, canvas, svg, iframe {
     .rof-detalhe,
     .cx-acoes-bar {
         overflow-x: auto;
+        overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
     }
 
@@ -222,11 +223,7 @@ img, video, canvas, svg, iframe {
     .conteudo { padding-top: 8px; }
 }
 
-/* Teclado virtual: não esconder o campo focado */
-body.tela-celular .conteudo {
-    padding-bottom: calc(96px + var(--safe-bottom) + var(--kb-inset));
-}
-
+/* Teclado virtual: espaço extra no fim, sem travar o deslize */
 body.tela-celular .tela-login {
     padding-bottom: calc(12px + var(--safe-bottom) + var(--kb-inset));
 }
@@ -252,32 +249,77 @@ body.tela-celular.menu-aberto .sidebar,
 body.menu-aberto.tela-celular .sidebar { transform: translateX(0); }
 body.tela-celular.menu-aberto .sidebar-overlay,
 body.menu-aberto.tela-celular .sidebar-overlay { display: block; }
-body.tela-celular .main {
-    width: 100%;
-    max-width: 100%;
-    height: var(--vh-real, 100dvh);
-    max-height: var(--vh-real, 100dvh);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
 
-body.tela-celular .conteudo {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
-    padding-bottom: calc(96px + var(--safe-bottom) + var(--kb-inset));
-}
-
+/*
+  Celular: a TELA inteira desliza com o dedo (scroll do documento).
+  Travar html/body/.main em 100dvh + overflow hidden impede o toque no Android/iPhone.
+*/
 html.tela-celular,
 body.tela-celular {
-    height: var(--vh-real, 100dvh);
-    max-height: var(--vh-real, 100dvh);
-    overflow: hidden;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 100%;
+    min-height: 100dvh;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
+body.tela-celular {
+    display: block !important;
+}
+body.tela-celular.menu-aberto {
+    overflow: hidden !important;
+}
+body.tela-celular .main,
+body.tela-celular .conteudo {
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    overscroll-behavior: auto;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+}
+body.tela-celular .main {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100%;
+    min-height: 100dvh;
+}
+body.tela-celular .conteudo {
+    flex: none !important;
+    padding-bottom: calc(80px + var(--safe-bottom) + var(--kb-inset));
+}
+body.tela-celular .topbar {
+    position: sticky;
+    top: 0;
+}
+
+@media (max-width: 900px), (max-height: 560px) and (orientation: landscape) and (pointer: coarse) {
+    html, body {
+        height: auto !important;
+        max-height: none !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+    }
+    body { display: block !important; }
+    body.menu-aberto { overflow: hidden !important; }
+    .main, .conteudo {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        overscroll-behavior: auto;
+        touch-action: pan-y;
+    }
+    .main {
+        display: block !important;
+        width: 100% !important;
+        min-height: 100dvh;
+    }
+    .conteudo { flex: none !important; }
 }
 
 @media (min-width: 901px) {
