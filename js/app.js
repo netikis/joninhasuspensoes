@@ -860,6 +860,18 @@ function docCliente(c) {
     return c.cpf || c.cnpj || '—';
 }
 
+function apelidoCliente(c) {
+    return String((c && (c.apelido || c.fantasia)) || '').trim();
+}
+
+function rotuloNomeCliente(c) {
+    if (!c) return '—';
+    var n = String(c.nome || '').trim() || '—';
+    var a = apelidoCliente(c);
+    if (a && a.toLowerCase() !== n.toLowerCase()) return n + ' (' + a + ')';
+    return n;
+}
+
 function nomeCliente(db, id) {
     var c = db.clientes.find(function (x) { return x.id === id; });
     return c ? c.nome : '—';
@@ -949,6 +961,19 @@ function resolverClienteAtendimento(db, texto) {
     if (exato) {
         return { ok: true, clienteId: exato.id, clienteNome: exato.nome, clienteAvulso: false };
     }
+    var porApelido = db.clientes.find(function (c) {
+        var a = nomeClienteChave(apelidoCliente(c));
+        return a && a === nomeClienteChave(nome);
+    });
+    if (porApelido) {
+        return { ok: true, clienteId: porApelido.id, clienteNome: porApelido.nome, clienteAvulso: false };
+    }
+    var porRotulo = db.clientes.find(function (c) {
+        return rotuloNomeCliente(c).toLowerCase() === lower;
+    });
+    if (porRotulo) {
+        return { ok: true, clienteId: porRotulo.id, clienteNome: porRotulo.nome, clienteAvulso: false };
+    }
     var porTel = clienteUnicoPorTelefone(db, nome);
     if (porTel) {
         return { ok: true, clienteId: porTel.id, clienteNome: porTel.nome, clienteAvulso: false };
@@ -961,6 +986,7 @@ function snapshotClienteCadastro(db, resolvido) {
     if (resolvido.clienteAvulso) {
         return {
             nome: resolvido.clienteNome || '',
+            apelido: '',
             avulso: true,
             cpf: '',
             cnpj: '',
@@ -974,10 +1000,11 @@ function snapshotClienteCadastro(db, resolvido) {
     }
     var c = db.clientes.find(function (x) { return x.id === resolvido.clienteId; });
     if (!c) {
-        return { nome: resolvido.clienteNome || '', avulso: false };
+        return { nome: resolvido.clienteNome || '', apelido: '', avulso: false };
     }
     return {
         nome: c.nome || '',
+        apelido: apelidoCliente(c),
         avulso: false,
         cpf: c.cpf || '',
         cnpj: c.cnpj || '',
@@ -1085,7 +1112,10 @@ function _clienteCombinaBuscaOs(c, texto) {
     var q = String(texto || '').trim().toLowerCase();
     if (!q) return false;
     var nome = String(c.nome || '').toLowerCase();
+    var apelido = nomeClienteChave(apelidoCliente(c));
+    var qNorm = nomeClienteChave(texto);
     if (nome.indexOf(q) === 0 || (q.length >= 3 && nome.indexOf(q) >= 0)) return true;
+    if (apelido && (apelido.indexOf(qNorm) === 0 || (qNorm.length >= 2 && apelido.indexOf(qNorm) >= 0))) return true;
     var qDig = soDigitosTel(texto);
     if (qDig.length < 3) return false;
     var t = telefoneClienteDigitos(c);
@@ -1099,12 +1129,14 @@ function _clienteCombinaBuscaOs(c, texto) {
 function _scoreClienteBuscaOs(c, texto) {
     var qDig = soDigitosTel(texto);
     var t = telefoneClienteDigitos(c);
-    var nome = String(c.nome || '').toLowerCase();
-    var q = String(texto || '').trim().toLowerCase();
+    var nome = nomeClienteChave(c.nome);
+    var apelido = nomeClienteChave(apelidoCliente(c));
+    var q = nomeClienteChave(texto);
     if (qDig.length >= 8 && t && telefonesEquivalentes(t, qDig)) return 0;
     if (qDig.length >= 8 && t && t.slice(-8) === qDig.slice(-8)) return 1;
-    if (nome.indexOf(q) === 0) return 2;
-    return 3;
+    if (nome.indexOf(q) === 0 || (apelido && apelido === q)) return 2;
+    if (apelido && apelido.indexOf(q) === 0) return 3;
+    return 4;
 }
 
 function preencherListaClientesAt(db, filtroTexto) {
@@ -1144,7 +1176,7 @@ function preencherListaClientesAt(db, filtroTexto) {
         var tel = c.telefone || c.tel || c.whatsapp || 'sem telefone';
         var extra = [tel, c.cidade].filter(Boolean).join(' · ');
         return '<button type="button" data-cli-id="' + esc(c.id) + '"' + (i === 0 ? ' class="ativo"' : '') + '>' +
-            '<strong>' + esc(c.nome || 'Cliente') + '</strong>' +
+            '<strong>' + esc(rotuloNomeCliente(c)) + '</strong>' +
             '<span>' + esc(extra) + '</span></button>';
     }).join('');
     box.hidden = false;
@@ -2028,7 +2060,15 @@ function preencherSelectsCliente(db) {
         }).forEach(function (c) {
             var opt = document.createElement('option');
             opt.value = c.nome;
+            var ape = apelidoCliente(c);
+            if (ape) opt.label = rotuloNomeCliente(c);
             listaCli.appendChild(opt);
+            if (ape && ape.toLowerCase() !== String(c.nome || '').toLowerCase()) {
+                var optApe = document.createElement('option');
+                optApe.value = ape;
+                optApe.label = rotuloNomeCliente(c);
+                listaCli.appendChild(optApe);
+            }
         });
     }
     preencherListaProdutosVenda(db);
@@ -2080,7 +2120,7 @@ function _campoCliMaisCompleto(a, b) {
 
 function _mesclarDadosCliente(dest, src) {
     if (!dest || !src) return dest;
-    ['nome', 'cpf', 'cnpj', 'telefone', 'email', 'cidade', 'cep', 'endereco', 'numero'].forEach(function (k) {
+    ['nome', 'apelido', 'cpf', 'cnpj', 'telefone', 'email', 'cidade', 'cep', 'endereco', 'numero'].forEach(function (k) {
         dest[k] = _campoCliMaisCompleto(dest[k], src[k]);
     });
     dest.atualizadoEm = new Date().toISOString();
@@ -2088,7 +2128,7 @@ function _mesclarDadosCliente(dest, src) {
 }
 
 function _scoreClienteParaManter(db, c) {
-    var preench = ['cpf', 'cnpj', 'telefone', 'email', 'cidade', 'cep', 'endereco', 'numero']
+    var preench = ['apelido', 'cpf', 'cnpj', 'telefone', 'email', 'cidade', 'cep', 'endereco', 'numero']
         .reduce(function (n, k) { return n + (String(c[k] || '').trim() ? 1 : 0); }, 0);
     var oss = (db.atendimentos || []).filter(function (a) {
         return a && String(a.clienteId) === String(c.id);
@@ -2165,6 +2205,7 @@ document.getElementById('formCliente').addEventListener('submit', function (e) {
     var payload = {
         id: id || uid(),
         nome: document.getElementById('cliNome').value.trim(),
+        apelido: document.getElementById('cliApelido').value.trim(),
         cpf: document.getElementById('cliCpf').value.trim(),
         cnpj: document.getElementById('cliCnpj').value.trim(),
         telefone: document.getElementById('cliTel').value.trim(),
@@ -2240,6 +2281,7 @@ function editarCliente(id) {
     if (!c) return;
     document.getElementById('cliId').value = c.id;
     document.getElementById('cliNome').value = c.nome || '';
+    document.getElementById('cliApelido').value = apelidoCliente(c);
     document.getElementById('cliCpf').value = c.cpf || '';
     document.getElementById('cliCnpj').value = c.cnpj || '';
     document.getElementById('cliTel').value = c.telefone || '';
@@ -2268,7 +2310,10 @@ function renderClientes() {
     var q = (document.getElementById('buscaCliente').value || '').toLowerCase().trim();
     var lista = db.clientes.filter(function (c) {
         if (!q) return true;
-        return [c.nome, c.cpf, c.cnpj, c.telefone, c.cidade].join(' ').toLowerCase().indexOf(q) > -1;
+        return [c.nome, apelidoCliente(c), c.cpf, c.cnpj, c.telefone, c.cidade]
+            .map(function (x) { return nomeClienteChave(x); })
+            .join(' ')
+            .indexOf(nomeClienteChave(q)) > -1;
     }).sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
 
     var tb = document.getElementById('tabelaClientes');
@@ -2282,7 +2327,7 @@ function renderClientes() {
     lista.forEach(function (c) {
         var tr = document.createElement('tr');
         tr.innerHTML =
-            '<td class="cli-nome-perfil" data-perfil="' + esc(c.id) + '" style="color:#fff;font-weight:800">' + esc(c.nome) + '</td>' +
+            '<td class="cli-nome-perfil" data-perfil="' + esc(c.id) + '" style="color:#fff;font-weight:800">' + esc(rotuloNomeCliente(c)) + '</td>' +
             '<td style="color:#fff;font-weight:600">' + esc(docCliente(c)) + '</td>' +
             '<td style="color:#fff;font-weight:600">' + esc(c.telefone || '—') + '</td>' +
             '<td style="color:#fff;font-weight:600">' + esc(c.cidade || '—') + '</td>' +

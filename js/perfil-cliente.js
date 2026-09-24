@@ -9,7 +9,9 @@ function _pertenceCliente(c, doc) {
     if (doc.clienteId && c.id && String(doc.clienteId) === String(c.id)) return true;
     var nDoc = String(doc.clienteNome || doc.cliente || '').trim().toLowerCase();
     var nCli = String(c.nome || '').trim().toLowerCase();
-    return !!(nDoc && nCli && nDoc === nCli);
+    var ape = typeof apelidoCliente === 'function' ? apelidoCliente(c).toLowerCase() : String(c.apelido || '').trim().toLowerCase();
+    if (nDoc && nCli && nDoc === nCli) return true;
+    return !!(nDoc && ape && nDoc === ape);
 }
 
 function _resumoFeitoOs(a) {
@@ -234,6 +236,9 @@ function renderizarPerfilCliente(c, db) {
         '<div class="perfil-cli-top">' +
             '<div>' +
                 '<h2 class="perfil-cli-nome">' + esc(c.nome || 'Cliente') + '</h2>' +
+                (apelidoCliente(c)
+                    ? '<p class="perfil-cli-apelido" style="margin:2px 0 0;font-weight:700;opacity:.9">Apelido: ' + esc(apelidoCliente(c)) + '</p>'
+                    : '') +
                 '<p class="perfil-cli-meta">' +
                     '<span>' + esc(doc) + '</span>' +
                     (c.telefone ? ' · <span>' + esc(c.telefone) + '</span>' : '') +

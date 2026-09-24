@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=76">
-    <link rel="stylesheet" href="css/tema-m3.css?v=76">
-    <link rel="stylesheet" href="css/telas.css?v=76">
+    <link rel="stylesheet" href="css/app.css?v=77">
+    <link rel="stylesheet" href="css/tema-m3.css?v=77">
+    <link rel="stylesheet" href="css/telas.css?v=77">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -282,6 +282,7 @@
                     <input type="hidden" id="cliId">
                     <div class="row">
                         <div class="col" style="flex:2"><label>Nome / Razão Social</label><input id="cliNome" required></div>
+                        <div class="col"><label>Apelido</label><input id="cliApelido" placeholder="Como é conhecido" maxlength="40"></div>
                         <div class="col"><label>CPF</label><input id="cliCpf" maxlength="14" placeholder="000.000.000-00"></div>
                         <div class="col"><label>CNPJ</label><input id="cliCnpj" maxlength="18" placeholder="00.000.000/0000-00"></div>
                     </div>
@@ -308,12 +309,12 @@
                 <h2>Clientes Cadastrados</h2>
                 <p class="hint">Clique no <strong>nome</strong> ou em <strong>Ver</strong> para abrir o histórico, os carros e as notas.</p>
                 <div class="toolbar">
-                    <input type="search" id="buscaCliente" class="search" placeholder="Buscar por nome, telefone ou documento...">
+                    <input type="search" id="buscaCliente" class="search" placeholder="Buscar por nome, apelido, telefone ou documento...">
                 </div>
                 <div class="table-wrap">
                     <table>
                         <thead>
-                            <tr><th>Nome</th><th>Documento</th><th>Telefone</th><th>Cidade</th><th>Ações</th></tr>
+                            <tr><th>Nome / Apelido</th><th>Documento</th><th>Telefone</th><th>Cidade</th><th>Ações</th></tr>
                         </thead>
                         <tbody id="tabelaClientes"></tbody>
                     </table>
@@ -1906,17 +1907,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=76"></script>
-    <script src="js/storage.js?v=76"></script>
-    <script src="js/ui.js?v=76"></script>
-    <script src="js/auth.js?v=76"></script>
-    <script src="js/os.js?v=76"></script>
-    <script src="js/nuvem.js?v=76"></script>
-    <script src="js/caixa.js?v=76"></script>
-    <script src="js/comissoes.js?v=76"></script>
-    <script src="js/app.js?v=76"></script>
-    <script src="js/perfil-cliente.js?v=76"></script>
-    <script src="js/navegacao.js?v=76"></script>
+    <script src="js/config.js?v=77"></script>
+    <script src="js/storage.js?v=77"></script>
+    <script src="js/ui.js?v=77"></script>
+    <script src="js/auth.js?v=77"></script>
+    <script src="js/os.js?v=77"></script>
+    <script src="js/nuvem.js?v=77"></script>
+    <script src="js/caixa.js?v=77"></script>
+    <script src="js/comissoes.js?v=77"></script>
+    <script src="js/app.js?v=77"></script>
+    <script src="js/perfil-cliente.js?v=77"></script>
+    <script src="js/navegacao.js?v=77"></script>
 </body>
 </html>
 
