@@ -5214,8 +5214,9 @@ function listarFuncionariosOrdenados(db, soAtivos) {
 function preencherSelectFuncionariosVenda() {
     var sel = document.getElementById('vdFuncionarioId');
     if (!sel) return;
-    var db = carregar();
-    var funcs = listarFuncionariosOrdenados(db, true);
+    var funcs = (typeof listarFuncionariosParaSelect === 'function')
+        ? listarFuncionariosParaSelect(true)
+        : listarFuncionariosOrdenados(carregar(), true);
     var atual = sel.value;
     sel.innerHTML = '<option value="">Selecione o funcionário...</option>' + funcs.map(function (f) {
         var extra = f.cargo ? ' · ' + f.cargo : '';

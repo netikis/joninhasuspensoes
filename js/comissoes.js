@@ -270,7 +270,10 @@ function renderListaFuncionarios() {
     comCanalInterno(function () {
         var db = carregar();
         var q = ((document.getElementById('buscaFuncionario') && document.getElementById('buscaFuncionario').value) || '').trim().toLowerCase();
-        var funcs = listarFuncionariosOrdenados(db, false).filter(function (f) {
+        var base = (typeof listarFuncionariosParaSelect === 'function')
+            ? listarFuncionariosParaSelect(false)
+            : listarFuncionariosOrdenados(db, false);
+        var funcs = base.filter(function (f) {
             if (!q) return true;
             return [f.nome, f.telefone, f.cargo, f.obs].join(' ').toLowerCase().indexOf(q) >= 0;
         });
@@ -618,18 +621,50 @@ document.getElementById('buscaPagFunc').addEventListener('input', renderPagFunci
 /* caixa: ver js/caixa.js */
 
 
+function listarFuncionariosParaSelect(soAtivos) {
+    var map = {};
+    function add(lista) {
+        (lista || []).forEach(function (f) {
+            if (!f || !f.id) return;
+            if (soAtivos && f.ativo === false) return;
+            var id = String(f.id);
+            var prev = map[id];
+            if (!prev || String(f.atualizadoEm || f.criadoEm || '') >= String(prev.atualizadoEm || prev.criadoEm || '')) {
+                map[id] = f;
+            }
+        });
+    }
+    try {
+        if (typeof listarFuncionariosInterno === 'function') add(listarFuncionariosInterno());
+    } catch (e0) { /* ok */ }
+    try {
+        var rawI = localStorage.getItem(STORAGE_INTERNO);
+        if (rawI) add((JSON.parse(rawI) || {}).funcionarios);
+    } catch (e1) { /* ok */ }
+    try {
+        if (typeof carregarMain === 'function') add((carregarMain() || {}).funcionarios);
+        else {
+            var rawM = localStorage.getItem(STORAGE_KEY);
+            if (rawM) add((JSON.parse(rawM) || {}).funcionarios);
+        }
+    } catch (e2) { /* ok */ }
+    try {
+        if (typeof comCanalInterno === 'function') {
+            comCanalInterno(function () { add((carregar() || {}).funcionarios); });
+        }
+    } catch (e3) { /* ok */ }
+    return Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) {
+        return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR');
+    });
+}
+window.listarFuncionariosParaSelect = listarFuncionariosParaSelect;
+
 function preencherSelectMaoFunc() {
     var funcs = [];
     try {
-        comCanalInterno(function () {
-            funcs = listarFuncionariosOrdenados(carregar(), true);
-        });
+        funcs = listarFuncionariosParaSelect(true);
     } catch (e) {
-        try {
-            var raw = localStorage.getItem(STORAGE_INTERNO);
-            var int = raw ? JSON.parse(raw) : {};
-            funcs = (int.funcionarios || []).filter(function (f) { return f.ativo !== false; });
-        } catch (e2) { funcs = []; }
+        funcs = [];
     }
     var opts = funcs.map(function (f) {
         return '<option value="' + esc(f.id) + '">' + esc(f.nome || '') + '</option>';
@@ -652,15 +687,11 @@ function preencherSelectMecanicoVenda() {
     var sels = ['vdMecanicoId', 'vdMecanicoId2', 'vdMaoFuncId', 'vdProdFuncId', 'vdAvFuncId'];
     var funcs = [];
     try {
-        comCanalInterno(function () {
-            funcs = listarFuncionariosOrdenados(carregar(), true);
-        });
+        funcs = typeof listarFuncionariosParaSelect === 'function'
+            ? listarFuncionariosParaSelect(true)
+            : [];
     } catch (e) {
-        try {
-            var raw = localStorage.getItem(STORAGE_INTERNO);
-            var int = raw ? JSON.parse(raw) : {};
-            funcs = (int.funcionarios || []).filter(function (f) { return f.ativo !== false; });
-        } catch (e2) { funcs = []; }
+        funcs = [];
     }
     var opts = funcs.map(function (f) {
         return '<option value="' + esc(f.id) + '">' + esc(f.nome || '') + '</option>';
@@ -841,10 +872,10 @@ function renderComissoes() {
             var cur = sel.value;
             var opts = '<option value="">Todos</option>';
             try {
-                comCanalInterno(function () {
-                    listarFuncionariosOrdenados(carregar(), false).forEach(function (f) {
-                        opts += '<option value="' + esc(f.id) + '">' + esc(f.nome || '') + '</option>';
-                    });
+                (typeof listarFuncionariosParaSelect === 'function'
+                    ? listarFuncionariosParaSelect(false)
+                    : []).forEach(function (f) {
+                    opts += '<option value="' + esc(f.id) + '">' + esc(f.nome || '') + '</option>';
                 });
             } catch (e) {}
             sel.innerHTML = opts;
@@ -870,4 +901,24 @@ var _comMesEl = document.getElementById('comMes');
 if (_comMesEl) _comMesEl.addEventListener('change', renderComissoes);
 var _comFiltroEl = document.getElementById('comFuncFiltro');
 if (_comFiltroEl) _comFiltroEl.addEventListener('change', renderComissoes);
+
+(function ligarSelectsFuncionario() {
+    var ids = ['pecaFuncId', 'maoFuncId', 'vdMecanicoId', 'vdMecanicoId2', 'vdMaoFuncId',
+        'vdProdFuncId', 'vdAvFuncId', 'vdFuncionarioId', 'comFuncFiltro', 'pfFuncId'];
+    function encher() {
+        if (typeof preencherSelectMaoFunc === 'function') preencherSelectMaoFunc();
+        if (typeof preencherSelectMecanicoVenda === 'function') preencherSelectMecanicoVenda();
+        if (typeof preencherSelectFuncionariosVenda === 'function') preencherSelectFuncionariosVenda();
+    }
+    ids.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el || el.getAttribute('data-func-fill') === '1') return;
+        el.setAttribute('data-func-fill', '1');
+        el.addEventListener('focus', encher);
+        el.addEventListener('pointerdown', function () {
+            if (el.options && el.options.length <= 1) encher();
+        });
+    });
+    encher();
+})();
 
