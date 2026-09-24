@@ -97,6 +97,14 @@ img, video, canvas, svg, iframe {
     .modal-box {
         max-width: 100%;
     }
+    #modalVerRelatorio .modal-box {
+        overflow: hidden;
+        max-height: 92vh;
+    }
+    #modalVerRelatorio .modal-ver-rel-corpo {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 
     .box,
     .table-wrap,

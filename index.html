@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=82">
-    <link rel="stylesheet" href="css/tema-m3.css?v=82">
-    <link rel="stylesheet" href="css/telas.css?v=82">
+    <link rel="stylesheet" href="css/app.css?v=83">
+    <link rel="stylesheet" href="css/tema-m3.css?v=83">
+    <link rel="stylesheet" href="css/telas.css?v=83">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -1202,13 +1202,19 @@
 
             <div class="box">
                 <h2>Fechamentos gravados</h2>
-                <p class="hint">Cada vez que você fecha o caixa, o saldo da tela fica aqui. Pode imprimir de novo.</p>
+                <p class="hint">Cada vez que você fecha o caixa, o saldo da tela fica aqui. <strong>Ver</strong> só abre na tela; <strong>Imprimir</strong> abre a impressora.</p>
                 <div id="relCxFechamentos"></div>
             </div>
 
             <div class="box">
-                <h2>Relatórios mensais (PDF)</h2>
-                <p class="hint">Informe o mês/ano (Ex: 07/2026). Cada relatório separa entradas, saídas e, no geral, pendentes.</p>
+                <h2>📁 Meses encerrados</h2>
+                <p class="hint">Assim que o mês acaba, a pasta fica pronta sozinha. Abra para olhar mão de obra, ganho em peças, entradas, saídas e o restante — ou imprima.</p>
+                <div id="relCxPastasMes"></div>
+            </div>
+
+            <div class="box">
+                <h2>Relatórios mensais</h2>
+                <p class="hint">Informe o mês/ano (Ex: 07/2026). <strong>Ver</strong> abre na tela; <strong>Imprimir</strong> gera PDF / impressora.</p>
                 <div class="lista-relatorios-mes">
                     <div class="item-relatorio-mes">
                         <div>
@@ -1216,7 +1222,8 @@
                             <span class="desc-relatorio">Entradas e saídas do balcão (dinheiro / gaveta)</span>
                         </div>
                         <div class="acoes-relatorio-mes">
-                            <button type="button" class="btn btn-pdf" data-rel-mes="balcao">📄 PDF</button>
+                            <button type="button" class="btn btn-secondary" data-rel-mes-ver="balcao">👁️ Ver</button>
+                            <button type="button" class="btn btn-pdf" data-rel-mes="balcao">🖨️ Imprimir</button>
                         </div>
                     </div>
                     <div class="item-relatorio-mes">
@@ -1225,7 +1232,8 @@
                             <span class="desc-relatorio">PIX, cartões e lançamentos do banco</span>
                         </div>
                         <div class="acoes-relatorio-mes">
-                            <button type="button" class="btn btn-pdf" data-rel-mes="banco">📄 PDF</button>
+                            <button type="button" class="btn btn-secondary" data-rel-mes-ver="banco">👁️ Ver</button>
+                            <button type="button" class="btn btn-pdf" data-rel-mes="banco">🖨️ Imprimir</button>
                         </div>
                     </div>
                     <div class="item-relatorio-mes">
@@ -1234,7 +1242,8 @@
                             <span class="desc-relatorio">Somente pendentes do período</span>
                         </div>
                         <div class="acoes-relatorio-mes">
-                            <button type="button" class="btn btn-pdf" data-rel-mes="pendentes">📄 PDF</button>
+                            <button type="button" class="btn btn-secondary" data-rel-mes-ver="pendentes">👁️ Ver</button>
+                            <button type="button" class="btn btn-pdf" data-rel-mes="pendentes">🖨️ Imprimir</button>
                         </div>
                     </div>
                     <div class="item-relatorio-mes">
@@ -1243,7 +1252,8 @@
                             <span class="desc-relatorio">Tudo: balcão + banco + contas a receber (entradas, saídas e pendentes)</span>
                         </div>
                         <div class="acoes-relatorio-mes">
-                            <button type="button" class="btn btn-pdf" data-rel-mes="geral">📄 PDF</button>
+                            <button type="button" class="btn btn-secondary" data-rel-mes-ver="geral">👁️ Ver</button>
+                            <button type="button" class="btn btn-pdf" data-rel-mes="geral">🖨️ Imprimir</button>
                         </div>
                     </div>
                     <div class="item-relatorio-mes">
@@ -1800,6 +1810,18 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modalVerRelatorio">
+        <div class="modal-box modal-ver-rel-box">
+            <h3 id="modalVerRelTitulo">Relatório</h3>
+            <p class="hint">Só para olhar. Se quiser papel ou PDF, use Imprimir.</p>
+            <div id="modalVerRelCorpo" class="modal-ver-rel-corpo"></div>
+            <div class="modal-acoes" style="margin-top:14px">
+                <button type="button" class="btn btn-pdf" id="btnVerRelImprimir">🖨️ Imprimir</button>
+                <button type="button" class="btn btn-primary" id="btnVerRelFechar">Fechar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modalNota">
         <div class="modal-box">
             <h3 id="modalNotaTitulo">Nota do atendimento</h3>
@@ -1933,17 +1955,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=82"></script>
-    <script src="js/storage.js?v=82"></script>
-    <script src="js/ui.js?v=82"></script>
-    <script src="js/auth.js?v=82"></script>
-    <script src="js/os.js?v=82"></script>
-    <script src="js/nuvem.js?v=82"></script>
-    <script src="js/caixa.js?v=82"></script>
-    <script src="js/comissoes.js?v=82"></script>
-    <script src="js/app.js?v=82"></script>
-    <script src="js/perfil-cliente.js?v=82"></script>
-    <script src="js/navegacao.js?v=82"></script>
+    <script src="js/config.js?v=83"></script>
+    <script src="js/storage.js?v=83"></script>
+    <script src="js/ui.js?v=83"></script>
+    <script src="js/auth.js?v=83"></script>
+    <script src="js/os.js?v=83"></script>
+    <script src="js/nuvem.js?v=83"></script>
+    <script src="js/caixa.js?v=83"></script>
+    <script src="js/comissoes.js?v=83"></script>
+    <script src="js/app.js?v=83"></script>
+    <script src="js/perfil-cliente.js?v=83"></script>
+    <script src="js/navegacao.js?v=83"></script>
 </body>
 </html>
 

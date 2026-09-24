@@ -429,7 +429,7 @@ function abrirRelatorioFechamento(id) {
         toast('Fechamento não encontrado.');
         return;
     }
-    imprimirFechamentoDia(f);
+    verFechamentoDia(f);
 }
 window.abrirRelatorioFechamento = abrirRelatorioFechamento;
 
@@ -1095,10 +1095,18 @@ function tratarCliqueAcoesDocumentoCaixa(e) {
         }
         return true;
     }
-    b = e.target.closest('[data-cx-fech], [data-cx-fech-pdf]');
+    b = e.target.closest('[data-cx-fech]');
     if (b) {
         hit();
-        abrirRelatorioFechamento(b.getAttribute('data-cx-fech') || b.getAttribute('data-cx-fech-pdf'));
+        abrirRelatorioFechamento(b.getAttribute('data-cx-fech'));
+        return true;
+    }
+    b = e.target.closest('[data-cx-fech-pdf]');
+    if (b) {
+        hit();
+        var fPdf = fechamentoPorId(b.getAttribute('data-cx-fech-pdf'));
+        if (fPdf) imprimirFechamentoDia(fPdf);
+        else toast('Fechamento não encontrado.');
         return true;
     }
     b = e.target.closest('[data-cx-edit-vd]');
@@ -1671,6 +1679,227 @@ function pastaMesLabel(mesAno) {
     return (MES_NOMES_CX[p[0]] || p[0]) + ' / ' + p[1];
 }
 
+function mesAnoParaYm(mesAno) {
+    var p = String(mesAno || '').split('/');
+    if (p.length !== 2) return '';
+    return p[1] + '-' + p[0];
+}
+
+function ymParaMesAno(ym) {
+    ym = String(ym || '');
+    if (ym.length < 7) return '';
+    return ym.slice(5, 7) + '/' + ym.slice(0, 4);
+}
+
+function ymAnteriorDe(ym) {
+    var y = Number(String(ym).slice(0, 4));
+    var m = Number(String(ym).slice(5, 7)) - 1;
+    if (!y || isNaN(m)) return '';
+    if (m < 1) {
+        m = 12;
+        y -= 1;
+    }
+    return y + '-' + String(m).padStart(2, '0');
+}
+
+function ultimoDiaYm(ym) {
+    var y = Number(String(ym).slice(0, 4));
+    var m = Number(String(ym).slice(5, 7));
+    if (!y || !m) return String(ym) + '-31';
+    var d = new Date(y, m, 0).getDate();
+    return String(ym) + '-' + String(d).padStart(2, '0');
+}
+
+var _htmlPrintRelatorioAberto = '';
+
+function fecharVisualizacaoRelatorio() {
+    var overlay = document.getElementById('modalVerRelatorio');
+    if (overlay) overlay.classList.remove('aberto');
+}
+
+function abrirVisualizacaoRelatorio(titulo, html) {
+    _htmlPrintRelatorioAberto = html || '';
+    var overlay = document.getElementById('modalVerRelatorio');
+    var tit = document.getElementById('modalVerRelTitulo');
+    var corpo = document.getElementById('modalVerRelCorpo');
+    if (tit) tit.textContent = titulo || 'Relatório';
+    if (corpo) corpo.innerHTML = html || '';
+    if (overlay) overlay.classList.add('aberto');
+    if (corpo) corpo.scrollTop = 0;
+}
+
+(function ligarModalVerRelatorio() {
+    var overlay = document.getElementById('modalVerRelatorio');
+    var btnF = document.getElementById('btnVerRelFechar');
+    var btnI = document.getElementById('btnVerRelImprimir');
+    if (btnF && !btnF._ligadoVerRel) {
+        btnF._ligadoVerRel = true;
+        btnF.addEventListener('click', fecharVisualizacaoRelatorio);
+    }
+    if (btnI && !btnI._ligadoVerRel) {
+        btnI._ligadoVerRel = true;
+        btnI.addEventListener('click', function () {
+            if (_htmlPrintRelatorioAberto && typeof executarImpressaoHtml === 'function') {
+                executarImpressaoHtml(_htmlPrintRelatorioAberto);
+            }
+        });
+    }
+    if (overlay && !overlay._ligadoVerRel) {
+        overlay._ligadoVerRel = true;
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) fecharVisualizacaoRelatorio();
+        });
+    }
+})();
+
+function arquivoPastasMes(db) {
+    if (!db.pastasMes || typeof db.pastasMes !== 'object' || Array.isArray(db.pastasMes)) {
+        db.pastasMes = {};
+    }
+    return db.pastasMes;
+}
+
+function snapshotPastaMes(db, ym) {
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
+    var mesAno = ymParaMesAno(ym);
+    var ini = ym + '-01';
+    var fim = ultimoDiaYm(ym);
+    var of = { pecas: 0, ganho: 0, mao: 0, maoCasa: 0, comissao: 0, despesas: 0, resultado: 0 };
+    if (typeof calcularRelatorioOficina === 'function') {
+        of = calcularRelatorioOficina({ inicio: ini, fim: fim, label: mesAno });
+    }
+    var itens = coletarItensRelatorioMensal(db, 'geral', mesAno);
+    var mont = montarHtmlSecoesRelatorioMes(itens, 'geral');
+    var nAtend = (typeof contarAtendimentosNoMes === 'function')
+        ? contarAtendimentosNoMes(db, ym).total
+        : 0;
+    return {
+        ym: ym,
+        mesAno: mesAno,
+        nome: pastaMesLabel(mesAno),
+        pecas: Number(of.pecas) || 0,
+        ganho: Number(of.ganho) || 0,
+        mao: Number(of.mao) || 0,
+        maoCasa: Number(of.maoCasa) || 0,
+        comissao: Number(of.comissao) || 0,
+        despesas: Number(of.despesas) || 0,
+        resultado: Number(of.resultado) || 0,
+        totEntradas: Number(mont.totEntradas) || 0,
+        totSaidas: Number(mont.totSaidas) || 0,
+        totPendentes: Number(mont.totPendentes) || 0,
+        saldo: Number(mont.saldo) || 0,
+        nAtend: nAtend,
+        geradoEm: new Date().toISOString()
+    };
+}
+
+function pastaMesTemMovimento(snap) {
+    if (!snap) return false;
+    return !!(snap.pecas || snap.ganho || snap.mao || snap.totEntradas ||
+        snap.totSaidas || snap.totPendentes || snap.nAtend);
+}
+
+function garantirPastasMesEncerrados() {
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+    var arq = arquivoPastasMes(db);
+    var atual = (typeof hojeISO === 'function' ? hojeISO() : new Date().toISOString().slice(0, 10)).slice(0, 7);
+    var yms = {};
+    var prev = ymAnteriorDe(atual);
+    if (prev) yms[prev] = true;
+    Object.keys(arq).forEach(function (k) {
+        if (k) yms[k] = true;
+    });
+    try {
+        var arvore = montarArvoreCaixaDados(db);
+        Object.keys(arvore).forEach(function (ano) {
+            Object.keys(arvore[ano] || {}).forEach(function (mesNome) {
+                var ma = arvore[ano][mesNome] && arvore[ano][mesNome].mesAno;
+                var ym = mesAnoParaYm(ma);
+                if (ym) yms[ym] = true;
+            });
+        });
+    } catch (eArv) { /* ok */ }
+    (db.fechamentosCaixa || []).forEach(function (f) {
+        var ym = String((f && (f.data || f.criadoEm)) || '').slice(0, 7);
+        if (/^\d{4}-\d{2}$/.test(ym)) yms[ym] = true;
+    });
+    Object.keys(db.contagemAtendimentosMes || {}).forEach(function (ym) {
+        if (/^\d{4}-\d{2}$/.test(ym)) yms[ym] = true;
+    });
+    var mudou = false;
+    Object.keys(yms).forEach(function (ym) {
+        if (!/^\d{4}-\d{2}$/.test(ym) || ym >= atual) return;
+        var snap = snapshotPastaMes(db, ym);
+        if (!pastaMesTemMovimento(snap) && !arq[ym]) return;
+        var old = arq[ym];
+        if (old) {
+            snap.geradoEm = old.geradoEm || snap.geradoEm;
+            if (old.pecas === snap.pecas && old.ganho === snap.ganho && old.mao === snap.mao &&
+                old.maoCasa === snap.maoCasa && old.totEntradas === snap.totEntradas &&
+                old.totSaidas === snap.totSaidas && old.totPendentes === snap.totPendentes &&
+                old.nAtend === snap.nAtend && old.resultado === snap.resultado) {
+                return;
+            }
+        }
+        arq[ym] = snap;
+        mudou = true;
+    });
+    if (mudou) {
+        db.pastasMes = arq;
+        if (typeof salvarMain === 'function') salvarMain(db);
+        else salvar(db);
+    }
+    return arq;
+}
+
+function renderPastasMesEncerrados() {
+    var box = document.getElementById('relCxPastasMes');
+    if (!box) return;
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+    var arq = arquivoPastasMes(db);
+    var keys = Object.keys(arq).sort().reverse();
+    if (!keys.length) {
+        box.innerHTML = '<p class="muted">Quando o mês acabar, a pasta aparece aqui sozinha (mão de obra, ganho em peças, entradas e saídas).</p>';
+        return;
+    }
+    function item(label, val) {
+        return '<div class="pm-item"><span>' + esc(label) + '</span><b>' + moeda(val) + '</b></div>';
+    }
+    box.innerHTML = keys.map(function (ym) {
+        var p = arq[ym] || {};
+        return '<div class="pasta-mes-enc">' +
+            '<h3>📂 ' + esc(p.nome || pastaMesLabel(p.mesAno || ymParaMesAno(ym))) + '</h3>' +
+            '<div class="pm-grid">' +
+            item('Mão de obra', p.mao) +
+            item('Ganho em peças', p.ganho) +
+            item('Peças (venda)', p.pecas) +
+            item('Entradas', p.totEntradas) +
+            item('Saídas', p.totSaidas) +
+            item('Pendentes', p.totPendentes) +
+            item('Resultado da casa', p.resultado) +
+            '<div class="pm-item"><span>Atendimentos pagos</span><b>' + (Number(p.nAtend) || 0) + '</b></div>' +
+            '</div>' +
+            '<div class="acoes-relatorio-mes">' +
+            '<button type="button" class="btn btn-secondary" data-ver-pasta-mes="' + esc(ym) + '">👁️ Ver</button>' +
+            '<button type="button" class="btn btn-pdf" data-imp-pasta-mes="' + esc(ym) + '">🖨️ Imprimir</button>' +
+            '</div></div>';
+    }).join('');
+    box.querySelectorAll('[data-ver-pasta-mes]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var ym = b.getAttribute('data-ver-pasta-mes');
+            var pasta = arq[ym] || {};
+            gerarRelatorioMensalPDF('geral', pasta.mesAno || ymParaMesAno(ym), 'ver');
+        });
+    });
+    box.querySelectorAll('[data-imp-pasta-mes]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var ym = b.getAttribute('data-imp-pasta-mes');
+            var pasta = arq[ym] || {};
+            gerarRelatorioMensalPDF('geral', pasta.mesAno || ymParaMesAno(ym), 'print');
+        });
+    });
+}
+
 function coletarItensRelatorioMensal(db, filtro, mesAno) {
     filtro = filtro || 'geral';
     mesAno = String(mesAno || '').trim();
@@ -1813,32 +2042,54 @@ function montarHtmlSecoesRelatorioMes(itens, filtro) {
     };
 }
 
-function gerarRelatorioMensalPDF(filtro, mesAnoFixo) {
+function htmlBlocoOficinaMes(of, nAtend) {
+    of = of || {};
+    return '<div class="resumo">' +
+        '<div class="resumo-box" style="color:#2980b9">MÃO DE OBRA<b>' + moeda(of.mao) + '</b></div>' +
+        '<div class="resumo-box" style="color:#16a085">GANHO EM PEÇAS<b>' + moeda(of.ganho) + '</b></div>' +
+        '<div class="resumo-box" style="color:#34495e">PEÇAS (VENDA)<b>' + moeda(of.pecas) + '</b></div>' +
+        '<div class="resumo-box" style="color:#8e44ad">MO DA CASA<b>' + moeda(of.maoCasa) + '</b></div>' +
+        '<div class="resumo-box" style="color:#c0392b">COMISSÃO<b>' + moeda(of.comissao) + '</b></div>' +
+        '<div class="resumo-box" style="color:#e74c3c">DESPESAS OFICINA<b>' + moeda(of.despesas) + '</b></div>' +
+        '<div class="resumo-box" style="color:#1e3a5f">RESULTADO DA CASA<b>' + moeda(of.resultado) + '</b></div>' +
+        '<div class="resumo-box" style="color:#1e3a5f">ATENDIMENTOS PAGOS<b>' + (Number(nAtend) || 0) + '</b></div>' +
+        '</div>';
+}
+
+function montarHtmlRelatorioMensal(filtro, mesAnoFixo) {
     filtro = filtro || 'geral';
     var mesAno = mesAnoFixo || prompt('Digite o mês e ano do relatório (Ex: 07/2026):', mesAnoAtualPadrao());
-    if (!mesAno) return;
+    if (!mesAno) return null;
     mesAno = String(mesAno).trim();
     if (!/^\d{2}\/\d{4}$/.test(mesAno)) {
         alert('Use o formato MM/AAAA (Ex: 07/2026).');
-        return;
+        return null;
     }
-    var db = carregar();
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
     var emp = getEmpresa(db);
-    var itens = coletarItensRelatorioMensal(db, filtro, mesAno);
-    if (!itens.length) {
-        alert('Nenhum registro encontrado para o período: ' + mesAno);
-        return;
-    }
-    var montado = montarHtmlSecoesRelatorioMes(itens, filtro);
     var ymRel = mesAno.slice(3) + '-' + mesAno.slice(0, 2);
+    var ini = ymRel + '-01';
+    var fim = ultimoDiaYm(ymRel);
+    var of = { pecas: 0, ganho: 0, mao: 0, maoCasa: 0, comissao: 0, despesas: 0, resultado: 0 };
+    if (typeof calcularRelatorioOficina === 'function') {
+        of = calcularRelatorioOficina({ inicio: ini, fim: fim, label: mesAno });
+    }
     var nAtend = 0;
     if (typeof contarAtendimentosNoMes === 'function') {
-        nAtend = contarAtendimentosNoMes((typeof carregarMain === 'function') ? carregarMain() : db, ymRel).total;
+        nAtend = contarAtendimentosNoMes(db, ymRel).total;
     }
-    var boxAtend =
-        '<div class="resumo"><div class="resumo-box" style="color:#1e3a5f">ATENDIMENTOS PAGOS NO MÊS (OS + VENDA)<b>' +
-        nAtend + '</b></div></div>';
+    var itens = coletarItensRelatorioMensal(db, filtro, mesAno);
+    var temOficina = (Number(of.pecas) || 0) || (Number(of.mao) || 0) || (Number(of.ganho) || 0) || nAtend;
+    if (!itens.length && !temOficina) {
+        alert('Nenhum registro encontrado para o período: ' + mesAno);
+        return null;
+    }
+    var montado = montarHtmlSecoesRelatorioMes(itens, filtro);
     var titulo = REL_MES_TITULOS[filtro] || REL_MES_TITULOS.geral;
+    var blocoTopo = (filtro === 'geral')
+        ? htmlBlocoOficinaMes(of, nAtend)
+        : ('<div class="resumo"><div class="resumo-box" style="color:#1e3a5f">ATENDIMENTOS PAGOS NO MÊS (OS + VENDA)<b>' +
+            nAtend + '</b></div></div>');
     var html =
         '<div class="nota-espelho relatorio-mensal-print">' +
         htmlCabecalhoNotaEmpresa(emp,
@@ -1856,12 +2107,22 @@ function gerarRelatorioMensalPDF(filtro, mesAnoFixo) {
         '.relatorio-mensal-print table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:11px}' +
         '.relatorio-mensal-print th{background:#ecf0f1;color:#111;padding:8px;text-align:left;font-size:10px;border-bottom:2px solid #bdc3c7}' +
         '</style>' +
-        boxAtend +
+        blocoTopo +
         montado.html +
         '<div style="text-align:center;margin-top:24px;font-size:9px;color:#777">' +
         'Documento gerado pelo Joninha Suspensões em ' + esc(new Date().toLocaleString('pt-BR')) +
         '</div></div>';
-    executarImpressaoHtml(html);
+    return { html: html, titulo: titulo, mesAno: mesAno };
+}
+
+function gerarRelatorioMensalPDF(filtro, mesAnoFixo, modo) {
+    var doc = montarHtmlRelatorioMensal(filtro, mesAnoFixo);
+    if (!doc) return;
+    if (modo === 'ver') {
+        abrirVisualizacaoRelatorio(doc.titulo + ' · ' + doc.mesAno, doc.html);
+        return;
+    }
+    if (typeof executarImpressaoHtml === 'function') executarImpressaoHtml(doc.html);
 }
 
 function montarArvoreCaixaDados(db) {
@@ -2150,14 +2411,28 @@ function gerarArvorePastasCaixa(opts) {
                 : (filtro === 'despesas'
                     ? ('despesas ' + moeda(totS))
                     : ('saldo ' + moeda(totE - totS)));
+            var ymBucket = mesAnoParaYm(bucket.mesAno);
+            var atualYm = (typeof hojeISO === 'function' ? hojeISO() : '').slice(0, 7);
+            var tagEnc = (ymBucket && atualYm && ymBucket < atualYm) ? ' · 📁 encerrado' : '';
+            var pastaSnap = (typeof arquivoPastasMes === 'function' && db)
+                ? (arquivoPastasMes(db)[ymBucket] || null)
+                : null;
             html += '<div class="pasta-cx-mes" onclick="togglePastaCaixa(\'' + idMes + '\')">📂 Mês: ' +
                 esc(mesNome) + ' <small style="font-weight:500;opacity:.85">(' + esc(bucket.mesAno) +
-                ' · ' + resumoMes + ')</small></div>';
+                ' · ' + resumoMes + tagEnc + ')</small></div>';
             html += '<div class="pasta-cx-mes-acoes">' +
+                '<button type="button" class="btn btn-secondary" style="padding:6px 10px;font-size:12px" data-rel-mes-fixo="' +
+                esc(bucket.mesAno) + '" data-rel-mes-ver="' + esc(filtro) + '">👁️ Ver</button>' +
                 '<button type="button" class="btn btn-pdf" style="padding:6px 10px;font-size:12px" data-rel-mes-fixo="' +
-                esc(bucket.mesAno) + '" data-rel-mes="' + esc(filtro) + '">📄 Relatório geral</button>' +
+                esc(bucket.mesAno) + '" data-rel-mes="' + esc(filtro) + '">🖨️ Imprimir</button>' +
                 '<button type="button" class="btn btn-secondary" style="padding:6px 10px;font-size:12px" data-arquivar-mes="' +
                 esc(bucket.mesAno) + '" data-arquivar-filtro="' + esc(filtro) + '">📂 Arquivar no PC</button></div>';
+            if (filtro === 'geral' && pastaSnap) {
+                html += '<div class="pasta-cx-tipo" style="cursor:default">📊 Oficina · MO ' +
+                    moeda(pastaSnap.mao) + ' · ganho peças ' + moeda(pastaSnap.ganho) +
+                    ' · entradas ' + moeda(pastaSnap.totEntradas) +
+                    ' · saídas ' + moeda(pastaSnap.totSaidas) + '</div>';
+            }
             html += '<div id="' + idMes + '" data-pasta-nivel="mes" style="display:none">';
 
             if (filtro === 'despesas') {
@@ -2198,10 +2473,16 @@ function gerarArvorePastasCaixa(opts) {
     });
     el.innerHTML = html;
 
-    el.querySelectorAll('[data-rel-mes-fixo]').forEach(function (b) {
+    el.querySelectorAll('[data-rel-mes-fixo][data-rel-mes-ver]').forEach(function (b) {
         b.addEventListener('click', function (ev) {
             ev.stopPropagation();
-            gerarRelatorioMensalPDF(b.getAttribute('data-rel-mes') || 'geral', b.getAttribute('data-rel-mes-fixo'));
+            gerarRelatorioMensalPDF(b.getAttribute('data-rel-mes-ver') || 'geral', b.getAttribute('data-rel-mes-fixo'), 'ver');
+        });
+    });
+    el.querySelectorAll('[data-rel-mes-fixo][data-rel-mes]').forEach(function (b) {
+        b.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            gerarRelatorioMensalPDF(b.getAttribute('data-rel-mes') || 'geral', b.getAttribute('data-rel-mes-fixo'), 'print');
         });
     });
     el.querySelectorAll('[data-arquivar-mes]').forEach(function (b) {
@@ -2772,6 +3053,7 @@ async function arquivarMesDespesasOsPastaPC(mesAnoFixo) {
 }
 
 function renderRelatorioCaixa() {
+    try { garantirPastasMesEncerrados(); } catch (ePastas) { /* ok */ }
     var db = carregar();
     var hoje = hojeISO();
     var iniMes = hoje.slice(0, 7) + '-01';
@@ -2865,6 +3147,7 @@ function renderRelatorioCaixa() {
     }
 
     gerarArvorePastasCaixa({ elId: 'arvorePastasCaixa', filtro: 'geral', idPrefix: 'pasta_cx' });
+    try { renderPastasMesEncerrados(); } catch (ePm) { /* ok */ }
 
     var boxF = document.getElementById('relCxFechamentos');
     if (boxF) {
@@ -2880,9 +3163,18 @@ function renderRelatorioCaixa() {
                     var sd = Number(f.saldoBanco) || 0;
                     return '<tr><td>' + esc(fmtData(f.data)) + '</td><td>' + moeda(sb) +
                         '</td><td>' + moeda(sd) + '</td><td><strong>' + moeda(f.saldo) +
-                        '</strong></td><td><button type="button" class="btn btn-secondary" data-imp-fech="' +
-                        esc(f.id) + '">Ver / imprimir</button></td></tr>';
+                        '</strong></td><td class="acoes-relatorio-mes">' +
+                        '<button type="button" class="btn btn-secondary" data-ver-fech="' + esc(f.id) + '">👁️ Ver</button>' +
+                        '<button type="button" class="btn btn-pdf" data-imp-fech="' + esc(f.id) + '">🖨️ Imprimir</button>' +
+                        '</td></tr>';
                 }).join('') + '</tbody></table>';
+            boxF.querySelectorAll('[data-ver-fech]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var id = b.getAttribute('data-ver-fech');
+                    var hit = listaF.find(function (x) { return String(x.id) === String(id); });
+                    if (hit) verFechamentoDia(hit);
+                });
+            });
             boxF.querySelectorAll('[data-imp-fech]').forEach(function (b) {
                 b.addEventListener('click', function () {
                     var id = b.getAttribute('data-imp-fech');
@@ -2918,7 +3210,13 @@ document.getElementById('btnImprimirRelCx').addEventListener('click', function (
 document.querySelectorAll('[data-rel-mes]').forEach(function (b) {
     if (b.hasAttribute('data-rel-mes-fixo')) return;
     b.addEventListener('click', function () {
-        gerarRelatorioMensalPDF(b.getAttribute('data-rel-mes') || 'geral');
+        gerarRelatorioMensalPDF(b.getAttribute('data-rel-mes') || 'geral', null, 'print');
+    });
+});
+document.querySelectorAll('[data-rel-mes-ver]').forEach(function (b) {
+    if (b.hasAttribute('data-rel-mes-fixo')) return;
+    b.addEventListener('click', function () {
+        gerarRelatorioMensalPDF(b.getAttribute('data-rel-mes-ver') || 'geral', null, 'ver');
     });
 });
 /* Pastas Ano→Mês removidas da UI (1.3.1) — listeners desligados de propósito */
@@ -3184,28 +3482,39 @@ function htmlCorpoFechamentoCaixa(f) {
     return html;
 }
 
-function imprimirFechamentoDia(f) {
-    if (!f) return;
+function htmlDocumentoFechamento(f) {
+    if (!f) return '';
     var emp = (typeof getEmpresa === 'function') ? getEmpresa() : {};
-    if (typeof executarImpressaoHtml === 'function' && typeof htmlCabecalhoNotaEmpresa === 'function') {
-        executarImpressaoHtml(
-            '<div class="nota-espelho">' +
+    if (typeof htmlCabecalhoNotaEmpresa === 'function') {
+        return '<div class="nota-espelho">' +
             htmlCabecalhoNotaEmpresa(emp,
                 '<div class="nota-sub nota-titulo-espelho">Fechamento de caixa · ' + esc(fmtData(f.data)) + '</div>'
             ) +
             htmlCorpoFechamentoCaixa(f) +
-            '</div>'
-        );
+            '</div>';
+    }
+    return '<h1>' + esc((emp && emp.nome) || 'Joninha Suspensões') + '</h1>' +
+        '<h2>Fechamento de caixa — ' + esc(fmtData(f.data)) + '</h2>' +
+        htmlCorpoFechamentoCaixa(f);
+}
+
+function verFechamentoDia(f) {
+    if (!f) return;
+    abrirVisualizacaoRelatorio('Fechamento · ' + fmtData(f.data), htmlDocumentoFechamento(f));
+}
+
+function imprimirFechamentoDia(f) {
+    if (!f) return;
+    var html = htmlDocumentoFechamento(f);
+    if (typeof executarImpressaoHtml === 'function') {
+        executarImpressaoHtml(html);
         return;
     }
-    var html = '<html><head><title>Fechamento ' + esc(f.data) + '</title><style>body{font-family:Segoe UI,sans-serif;padding:24px} h1{margin:0 0 8px} .l{margin:6px 0} h3{margin:16px 0 6px}</style></head><body>';
-    html += '<h1>' + esc((emp && emp.nome) || 'Joninha Suspensões') + '</h1>';
-    html += '<h2>Fechamento de caixa — ' + esc(fmtData(f.data)) + '</h2>';
-    html += htmlCorpoFechamentoCaixa(f);
-    html += '</body></html>';
+    var doc = '<html><head><title>Fechamento ' + esc(f.data) + '</title><style>body{font-family:Segoe UI,sans-serif;padding:24px} h1{margin:0 0 8px} .l{margin:6px 0} h3{margin:16px 0 6px}</style></head><body>';
+    doc += html + '</body></html>';
     var w = window.open('', '_blank');
     if (!w) return;
-    w.document.write(html);
+    w.document.write(doc);
     w.document.close();
     setTimeout(function () { try { w.print(); } catch (e) {} }, 300);
 }

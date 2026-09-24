@@ -893,6 +893,58 @@
             gap: 6px;
             margin: 4px 0 8px 28px;
         }
+        .pasta-mes-enc {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            background: rgba(0, 0, 0, 0.12);
+        }
+        .pasta-mes-enc h3 {
+            margin: 0 0 10px;
+            font-size: 1.05rem;
+        }
+        .pasta-mes-enc .pm-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .pasta-mes-enc .pm-item {
+            background: rgba(0, 0, 0, 0.18);
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+        .pasta-mes-enc .pm-item span {
+            display: block;
+            font-size: 11px;
+            opacity: 0.8;
+            margin-bottom: 2px;
+        }
+        .pasta-mes-enc .pm-item b {
+            font-size: 0.95rem;
+        }
+        #modalVerRelatorio.modal-overlay { z-index: 230; }
+        #modalVerRelatorio .modal-ver-rel-box {
+            width: min(920px, 100%);
+            max-height: 92vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        #modalVerRelatorio .modal-ver-rel-corpo {
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            max-height: calc(92vh - 150px);
+            background: #fff;
+            color: #111;
+            padding: 8px 4px;
+        }
+        #modalVerRelatorio .modal-ver-rel-corpo .nota-espelho {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-shadow: none;
+        }
         .pasta-cx-conteudo {
             padding: 8px 12px 8px 56px;
             background: rgba(0, 0, 0, 0.22);
@@ -2184,14 +2236,16 @@
             border-color: #152642;
         }
         #modalReceberOs .modal-box,
-        #modalRelatorioServicos .modal-box {
+        #modalRelatorioServicos .modal-box,
+        #modalVerRelatorio .modal-box {
             background: #fff !important;
             color: #111827 !important;
             border: 3px solid #c9a227;
             box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
         }
         #modalReceberOs .modal-box h3,
-        #modalRelatorioServicos .modal-box h3 {
+        #modalRelatorioServicos .modal-box h3,
+        #modalVerRelatorio .modal-box h3 {
             color: #152642;
             font-weight: 800;
         }

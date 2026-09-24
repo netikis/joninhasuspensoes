@@ -54,6 +54,7 @@ function estadoVazio() {
         pendentes: [],
         caixaConfig: { inicialBalcao: 0, inicialBanco: 0 },
         fechamentosCaixa: [],
+        pastasMes: {},
         excluidos: excluidosVazio(),
         contagemAtendimentosMes: {},
         contadorPainelAtend: null
@@ -234,6 +235,7 @@ function salvar(db) {
             main.funcionarios = db.funcionarios;
         }
         if (db.excluidos) main.excluidos = garantirExcluidos(db);
+        if (db.pastasMes) main.pastasMes = db.pastasMes;
         salvarMain(main);
     }
     agendarSyncAutomatico('salvar');
