@@ -718,6 +718,9 @@ async function sincronizarOficinaNuvem(opts) {
         }
         try { renderHistorico(); } catch (eH) { /* ok */ }
         try { renderTudo(); } catch (eR) { /* ok */ }
+        try {
+            if (typeof atualizarTelasFuncionarios === 'function') atualizarTelasFuncionarios();
+        } catch (eFuncUi2) { /* ok */ }
     } finally {
         _syncEmAndamento = false;
         atualizarStatusNuvemUI();
@@ -857,6 +860,9 @@ async function sincronizarTodosNuvem(opts) {
         }
         preencherFormEmpresa();
         renderTudo();
+        try {
+            if (typeof atualizarTelasFuncionarios === 'function') atualizarTelasFuncionarios();
+        } catch (eFuncUi) { /* ok */ }
     } finally {
         _syncEmAndamento = false;
         atualizarStatusNuvemUI();

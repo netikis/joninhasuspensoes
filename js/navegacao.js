@@ -78,11 +78,16 @@ window._navRegistrarDepoisNavegacao = function (estadoAntes) {
 window._atualizarBarraVoltar = function () {
     var btn = document.getElementById('btnVoltarPagina');
     if (!btn) return;
-    var pode = typeof window._navPodeVoltarHistorico === 'function' && window._navPodeVoltarHistorico();
-    btn.disabled = !pode;
+    var atual = window._navGetEstado();
+    var pode = (window._navHistorico && window._navHistorico.length > 0) ||
+        (atual && atual.panelId && atual.panelId !== 'painelInicio');
+    /* Nunca disabled: no celular o toque em botão disabled não dispara clique. */
+    btn.disabled = false;
+    btn.removeAttribute('disabled');
+    btn.classList.toggle('sem-historico', !pode);
     btn.setAttribute('aria-disabled', pode ? 'false' : 'true');
     var dest = '';
-    if (pode && window._navHistorico && window._navHistorico.length) {
+    if (window._navHistorico && window._navHistorico.length) {
         dest = window._navLabelEstado(window._navHistorico[window._navHistorico.length - 1]);
     }
     btn.title = dest ? ('Voltar para ' + dest) : 'Voltar para a tela anterior';
@@ -110,17 +115,18 @@ window._navPodeVoltarHistorico = function () {
 
 window.voltarPaginaAnterior = function () {
     if (!_navLogado()) return;
-    if (window._navPodeVoltarHistorico()) {
+    if (window._navHistorico && window._navHistorico.length) {
+        window._navVoltarPilhaInterna();
         window._navIgnorarHistorico = true;
-        try {
-            history.back();
-        } catch (e) {
-            window._navVoltarPilhaInterna();
-        }
-        setTimeout(function () { window._navIgnorarHistorico = false; }, 120);
+        try { history.back(); } catch (eBack) { /* ok */ }
+        setTimeout(function () { window._navIgnorarHistorico = false; }, 450);
         return;
     }
-    window._navIrInicio();
+    var atual = window._navGetEstado();
+    if (atual && atual.panelId && atual.panelId !== 'painelInicio') {
+        window._navIrInicio();
+        return;
+    }
 };
 
 window._navVoltarPilhaInterna = function () {
@@ -190,12 +196,22 @@ window.addEventListener('keydown', function (e) {
     }
 });
 
-document.addEventListener('click', function (e) {
+var _navVoltarToqueEm = 0;
+function _navCliqueVoltar(e) {
     var btn = e.target && e.target.closest ? e.target.closest('#btnVoltarPagina') : null;
     if (!btn) return;
     e.preventDefault();
+    e.stopPropagation();
+    var agora = Date.now();
+    if (agora - _navVoltarToqueEm < 450) return;
+    _navVoltarToqueEm = agora;
     if (typeof window.voltarPaginaAnterior === 'function') window.voltarPaginaAnterior();
-});
+}
+document.addEventListener('click', _navCliqueVoltar);
+document.addEventListener('pointerup', function (e) {
+    if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+    _navCliqueVoltar(e);
+}, { passive: false });
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {

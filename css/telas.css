@@ -294,6 +294,7 @@ body.tela-celular .conteudo {
 body.tela-celular .topbar {
     position: sticky;
     top: 0;
+    z-index: 80;
 }
 
 @media (max-width: 900px), (max-height: 560px) and (orientation: landscape) and (pointer: coarse) {

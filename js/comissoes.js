@@ -230,6 +230,40 @@ function renderCadastroFuncionarios() {
     /* painel só do formulário — lista fica em Funcionários Cadastrados */
 }
 
+function atualizarTelasFuncionarios() {
+    try { renderListaFuncionarios(); } catch (e1) { /* ok */ }
+    try { renderPagFuncionarios(); } catch (e2) { /* ok */ }
+    try { renderComissoes(); } catch (e3) { /* ok */ }
+    try { if (typeof preencherSelectMaoFunc === 'function') preencherSelectMaoFunc(); } catch (e4) { /* ok */ }
+    try { if (typeof preencherSelectFuncionariosVenda === 'function') preencherSelectFuncionariosVenda(); } catch (e5) { /* ok */ }
+    try { if (typeof renderLoginsFuncCfg === 'function') renderLoginsFuncCfg(); } catch (e6) { /* ok */ }
+    try { if (typeof preencherSelectLoginFunc === 'function') preencherSelectLoginFunc(); } catch (e7) { /* ok */ }
+}
+window.atualizarTelasFuncionarios = atualizarTelasFuncionarios;
+
+var _funcUiTimer = null;
+var _funcUiPuxando = false;
+function agendarAtualizarTelasFuncionarios() {
+    atualizarTelasFuncionarios();
+    clearTimeout(_funcUiTimer);
+    _funcUiTimer = setTimeout(atualizarTelasFuncionarios, 700);
+    if (_funcUiPuxando) return;
+    if (typeof baixarBaseNuvemSilencioso !== 'function') return;
+    _funcUiPuxando = true;
+    baixarBaseNuvemSilencioso().then(function (base) {
+        if (base && base.funcionarios && base.funcionarios.length &&
+            typeof aplicarFuncionariosDaNuvem === 'function') {
+            aplicarFuncionariosDaNuvem(base.funcionarios);
+        }
+        atualizarTelasFuncionarios();
+    }).catch(function () {
+        atualizarTelasFuncionarios();
+    }).then(function () {
+        _funcUiPuxando = false;
+    });
+}
+window.agendarAtualizarTelasFuncionarios = agendarAtualizarTelasFuncionarios;
+
 function renderListaFuncionarios() {
     var panel = document.getElementById('painelListaFuncionarios');
     if (!panel) return;
@@ -452,7 +486,10 @@ if (btnListaCad) btnListaCad.addEventListener('click', function () {
     abrirPainel('painelFuncionarios', document.querySelector('.nav-btn[data-panel="painelFuncionarios"]'));
 });
 var btnAtuLista = document.getElementById('btnAtualizarListaFunc');
-if (btnAtuLista) btnAtuLista.addEventListener('click', renderListaFuncionarios);
+if (btnAtuLista) btnAtuLista.addEventListener('click', function () {
+    if (typeof agendarAtualizarTelasFuncionarios === 'function') agendarAtualizarTelasFuncionarios();
+    else renderListaFuncionarios();
+});
 
 document.getElementById('btnFecharVerFunc').addEventListener('click', fecharModalVerFuncionario);
 document.getElementById('modalVerFuncionario').addEventListener('click', function (e) {
@@ -573,8 +610,8 @@ document.getElementById('tabelaPagFuncionarios').addEventListener('click', funct
 });
 
 document.getElementById('btnAtualizarPagFunc').addEventListener('click', function () {
-    renderPagFuncionarios();
-    toast('Lista atualizada.');
+    if (typeof agendarAtualizarTelasFuncionarios === 'function') agendarAtualizarTelasFuncionarios();
+    else renderPagFuncionarios();
 });
 document.getElementById('buscaPagFunc').addEventListener('input', renderPagFuncionarios);
 
@@ -828,4 +865,9 @@ function renderComissoes() {
         }).join('');
     }
 }
+
+var _comMesEl = document.getElementById('comMes');
+if (_comMesEl) _comMesEl.addEventListener('change', renderComissoes);
+var _comFiltroEl = document.getElementById('comFuncFiltro');
+if (_comFiltroEl) _comFiltroEl.addEventListener('change', renderComissoes);
 

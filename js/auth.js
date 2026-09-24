@@ -287,6 +287,9 @@ toast('Não foi possível salvar o login.');
 
 function aplicarFuncionariosDaNuvem(remotos) {
     var logins = forcarAplicarFuncionariosNuvem(remotos || []);
+    try {
+        if (typeof atualizarTelasFuncionarios === 'function') atualizarTelasFuncionarios();
+    } catch (eUi) { /* ok */ }
     return logins.length > 0;
 }
 
@@ -368,16 +371,6 @@ try {
     await s2.fsMod.setDoc(
         s2.fsMod.doc(s2.dbFs, 'joninha_suspensoes_base', 'principal'),
         {
-            funcionarios: listarFuncionariosInterno().map(function (f) {
-                return {
-                    id: f.id,
-                    nome: f.nome,
-                    ativo: f.ativo !== false,
-                    loginUsuario: f.loginUsuario || '',
-                    loginSenhaHash: f.loginSenhaHash || '',
-                    atualizadoEm: f.atualizadoEm || null
-                };
-            }),
             excluidos: excluidosPush || undefined,
             atualizadoEm: pack.atualizadoEm
         },
@@ -428,15 +421,21 @@ function forcarAplicarFuncionariosNuvem(remotos) {
         if (!r || !r.id) return;
         var rid = String(r.id);
         if (funcionarioEstaExcluido(rid, mapaEx, r.atualizadoEm)) return;
-        var cur = byId[rid] || { id: r.id, criadoEm: r.atualizadoEm || new Date().toISOString() };
+        var cur = byId[rid] || { id: r.id, criadoEm: r.atualizadoEm || r.criadoEm || new Date().toISOString() };
         var u = normalizarLoginFunc(r.loginUsuario);
-        byId[rid] = Object.assign({}, cur, {
+        var mesclado = Object.assign({}, cur);
+        ['telefone', 'cargo', 'obs', 'pin', 'comissaoPct', 'comissaoAlinhamentoPct',
+            'comissaoServicoPct', 'comissaoAmortecedorPct', 'comissaoAmortecedorOriginalValor',
+            'comissaoAmortecedorOriginalValor2', 'criadoEm'].forEach(function (campo) {
+            if (r[campo] != null && r[campo] !== '') mesclado[campo] = r[campo];
+        });
+        byId[rid] = Object.assign(mesclado, {
             id: r.id,
             nome: r.nome || cur.nome || u || 'Funcionário',
             ativo: r.ativo !== false,
             loginUsuario: u || cur.loginUsuario || '',
             loginSenhaHash: r.loginSenhaHash || cur.loginSenhaHash || '',
-            atualizadoEm: r.atualizadoEm || new Date().toISOString()
+            atualizadoEm: r.atualizadoEm || cur.atualizadoEm || new Date().toISOString()
         });
         /* Nuvem não manda senha em texto — preserva local se existir */
         if (r.loginSenha && !byId[rid].loginSenha) {

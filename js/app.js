@@ -7827,7 +7827,10 @@ function imprimirRelatorioOficina() {
     var bRofPdf = document.getElementById('btnRofPdf');
     if (bRofPdf) bRofPdf.addEventListener('click', imprimirRelatorioOficina);
     var bCom = document.getElementById('btnComAtualizar');
-    if (bCom) bCom.addEventListener('click', renderComissoes);
+    if (bCom) bCom.addEventListener('click', function () {
+        if (typeof agendarAtualizarTelasFuncionarios === 'function') agendarAtualizarTelasFuncionarios();
+        else renderComissoes();
+    });
     var tabA = document.getElementById('tabLoginAdmin');
     var tabF = document.getElementById('tabLoginFunc');
     if (tabA && tabF) {

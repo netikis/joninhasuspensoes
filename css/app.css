@@ -348,8 +348,8 @@
             justify-content: center;
             gap: 6px;
             flex-shrink: 0;
-            min-height: 40px;
-            min-width: 40px;
+            min-height: 44px;
+            min-width: 44px;
             padding: 6px 12px;
             border-radius: 10px;
             border: 1px solid #c5cdd8;
@@ -359,15 +359,21 @@
             font-size: 0.88rem;
             cursor: pointer;
             font-family: inherit;
+            position: relative;
+            z-index: 6;
+            pointer-events: auto;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: rgba(21, 38, 66, 0.12);
         }
         .btn-voltar-pagina .btn-voltar-seta {
             font-size: 1.15rem;
             line-height: 1;
             font-weight: 900;
+            pointer-events: none;
         }
-        .btn-voltar-pagina:disabled {
+        .btn-voltar-pagina .btn-voltar-txt { pointer-events: none; }
+        .btn-voltar-pagina.sem-historico {
             opacity: 0.38;
-            cursor: default;
         }
         .cad-maiusculo {
             text-transform: uppercase;

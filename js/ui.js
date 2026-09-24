@@ -180,6 +180,10 @@ function abrirPainel(id, btn, opcoes) {
     document.getElementById('subtituloPainel').textContent = canalVendas === 'interno' && PAINEIS_CANAL[id]
         ? 'Uso interno — vendas/caixa separados · estoque de produtos unificado'
         : t[1];
+    if (id === 'painelFuncionarios' || id === 'painelListaFuncionarios' || id === 'painelPagFuncionarios') {
+        canalVendas = 'interno';
+        atualizarBadgeCanal();
+    }
     renderTudo();
     if (id === 'painelProdutos') {
         setTimeout(focarLeitor, 80);
@@ -194,22 +198,16 @@ function abrirPainel(id, btn, opcoes) {
     if (id === 'painelRelatorioOficina') renderRelatorioOficina();
     if (id === 'painelComissoes') renderComissoes();
     if (id === 'painelVeiculo') preencherSelectMaoFunc();
-    if (id === 'painelFuncionarios') {
-        canalVendas = 'interno';
-        atualizarBadgeCanal();
-        renderCadastroFuncionarios();
-    }
-    if (id === 'painelListaFuncionarios') {
-        canalVendas = 'interno';
-        atualizarBadgeCanal();
-        renderListaFuncionarios();
-    }
+    if (id === 'painelFuncionarios') renderCadastroFuncionarios();
+    if (id === 'painelListaFuncionarios') renderListaFuncionarios();
     if (id === 'painelPagFuncionarios') {
-        canalVendas = 'interno';
-        atualizarBadgeCanal();
         var pfData = document.getElementById('pfData');
         if (pfData && !pfData.value) pfData.value = hojeISO();
         renderPagFuncionarios();
+    }
+    if (id === 'painelComissoes' || id === 'painelListaFuncionarios' ||
+        id === 'painelPagFuncionarios' || id === 'painelFuncionarios' || id === 'painelVeiculo') {
+        if (typeof agendarAtualizarTelasFuncionarios === 'function') agendarAtualizarTelasFuncionarios();
     }
     if (id === 'painelConfigEmpresa' || id === 'painelConfigLogo') {
         preencherFormEmpresa();
@@ -367,32 +365,26 @@ function renderTudo() {
         db.empresa = empresaPadrao();
         salvar(db);
     }
-    atualizarKPIs(db);
-    preencherSelectsCliente(db);
-    renderClientes();
-    renderHistorico();
-    renderProdutos();
-    renderOrcamentos();
-    renderCaixa();
-    renderCaixaBanco();
-    renderPendentes();
-    renderRelatorioCaixa();
-    if (document.getElementById('painelListaFuncionarios') &&
-        document.getElementById('painelListaFuncionarios').classList.contains('active')) {
-        renderListaFuncionarios();
+    function tenta(fn) {
+        try { fn(); } catch (eR) { console.warn(eR); }
     }
-    if (document.getElementById('painelFuncionarios') &&
-        document.getElementById('painelFuncionarios').classList.contains('active')) {
-        renderCadastroFuncionarios();
-    }
-    if (document.getElementById('painelPagFuncionarios') &&
-        document.getElementById('painelPagFuncionarios').classList.contains('active')) {
-        renderPagFuncionarios();
-    }
+    tenta(function () { atualizarKPIs(db); });
+    tenta(function () { preencherSelectsCliente(db); });
+    tenta(function () { renderClientes(); });
+    tenta(function () { renderHistorico(); });
+    tenta(function () { renderProdutos(); });
+    tenta(function () { renderOrcamentos(); });
+    tenta(function () { renderCaixa(); });
+    tenta(function () { renderCaixaBanco(); });
+    tenta(function () { renderPendentes(); });
+    tenta(function () { renderRelatorioCaixa(); });
+    tenta(function () {
+        if (typeof atualizarTelasFuncionarios === 'function') atualizarTelasFuncionarios();
+    });
     if (document.getElementById('painelOrcamento') &&
         document.getElementById('painelOrcamento').classList.contains('active')) {
-        atualizarUIVendaPorCanal();
+        tenta(function () { atualizarUIVendaPorCanal(); });
     }
-    aplicarIdentidadeVisual();
+    tenta(function () { aplicarIdentidadeVisual(); });
 }
 
