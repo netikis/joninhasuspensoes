@@ -386,13 +386,18 @@ function htmlLinhaItemOs(it, idx) {
     var btnEditTxt = editando ? 'Cancelar' : 'Editar';
     if (tipo === 'peca') {
         normalizarPecaItem(it);
-        var extraP = '<div class="os-item-edit-row">' +
-            '<label>Custo un. <input class="os-edit-val" inputmode="decimal" data-edit-custo="' + idx + '" value="' +
-            esc(fmtNumOs(it.custoUnit)) + '" title="Custo unitário"></label>' +
-            '<label>Venda un. <input class="os-edit-val" inputmode="decimal" data-edit-venda="' + idx + '" value="' +
-            esc(fmtNumOs(it.valorUnit)) + '" title="Venda unitária"></label>' +
-            '<span>Total custo ' + moeda(it.custo) +
-            ' · Ganho <span class="ganho-linha">' + moeda(ganhoItem(it)) + '</span></span></div>';
+        var extraP = '';
+        if (editando) {
+            extraP = '<div class="os-item-edit-row">' +
+                '<label>Custo un. <input class="os-edit-val" inputmode="decimal" data-edit-custo="' + idx + '" value="' +
+                esc(fmtNumOs(it.custoUnit)) + '" title="Custo unitário"></label>' +
+                '<label>Venda un. <input class="os-edit-val" inputmode="decimal" data-edit-venda="' + idx + '" value="' +
+                esc(fmtNumOs(it.valorUnit)) + '" title="Venda unitária"></label>' +
+                '<span>Total custo ' + moeda(it.custo) +
+                ' · Ganho <span class="ganho-linha">' + moeda(ganhoItem(it)) + '</span></span></div>';
+        } else {
+            extraP = '<div class="os-item-edit-row"><span>Venda un. ' + moeda(it.valorUnit) + '</span></div>';
+        }
         if (it.funcionarioId && it.tipoMao) {
             var tipoPecaLbl = rotuloTipoMaoComissao(it.tipoMao);
             var nomePecaF = it.funcionarioNome || 'Funcionário';
