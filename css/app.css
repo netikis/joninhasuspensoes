@@ -1918,8 +1918,47 @@
         #modalImprimirNota.modal-overlay,
         #modalNomePdf.modal-overlay,
         #modalExportFotos.modal-overlay,
-        #modalWaEnvio.modal-overlay {
+        #modalWaEnvio.modal-overlay,
+        #modalCamposCliente.modal-overlay {
             z-index: 240;
+        }
+        .campos-cli-lista {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 12px 0 4px;
+        }
+        .campos-cli-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: #0f1a28;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            user-select: none;
+            color: #f1f5f9;
+        }
+        .campos-cli-item input {
+            width: 22px;
+            height: 22px;
+            accent-color: #16a34a;
+            flex-shrink: 0;
+        }
+        .campos-cli-item span { flex: 1; }
+        .campos-cli-item em {
+            font-style: normal;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #fbbf24;
+            text-transform: uppercase;
+        }
+        .campos-cli-item.interno {
+            border-color: #b45309;
+            background: #1c1408;
         }
         body.dialogo-impressao .modal-overlay {
             visibility: hidden !important;

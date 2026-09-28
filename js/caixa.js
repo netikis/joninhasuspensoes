@@ -1112,8 +1112,13 @@ function tratarCliqueAcoesDocumentoCaixa(e) {
     if (b) {
         hit();
         var idOsPdf = b.getAttribute('data-cx-pdf');
-        abrirNota(idOsPdf);
-        setTimeout(function () { salvarNotaPdfArquivo(); }, 80);
+        var dbPdf = typeof carregar === 'function' ? carregar() : null;
+        var aPdf = dbPdf && (dbPdf.atendimentos || []).find(function (x) { return x && String(x.id) === String(idOsPdf); });
+        if (!aPdf) { if (typeof toast === 'function') toast('OS não encontrada.'); return true; }
+        Promise.resolve(gerarHtmlClienteOs(aPdf, { perguntarFotos: true })).then(function (prep) {
+            if (!prep) return;
+            salvarNotaPdfArquivo();
+        });
         return true;
     }
     b = e.target.closest('[data-cx-link]');

@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=85">
-    <link rel="stylesheet" href="css/tema-m3.css?v=85">
-    <link rel="stylesheet" href="css/telas.css?v=85">
+    <link rel="stylesheet" href="css/app.css?v=86">
+    <link rel="stylesheet" href="css/tema-m3.css?v=86">
+    <link rel="stylesheet" href="css/telas.css?v=86">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -1840,6 +1840,41 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modalCamposCliente">
+        <div class="modal-box" style="width:min(480px,100%)">
+            <h3>O que vai para o cliente</h3>
+            <p class="hint">Marque os quadrados. Só o que estiver marcado aparece no WhatsApp, link, PDF e impressão. Custo e ganho ficam de fora, a não ser que você marque.</p>
+            <div class="campos-cli-lista">
+                <label class="campos-cli-item" for="chkCliPecas">
+                    <input type="checkbox" id="chkCliPecas">
+                    <span>VALOR DAS PEÇAS</span>
+                </label>
+                <label class="campos-cli-item" for="chkCliMao">
+                    <input type="checkbox" id="chkCliMao">
+                    <span>MÃO DE OBRA</span>
+                </label>
+                <label class="campos-cli-item" for="chkCliTotal">
+                    <input type="checkbox" id="chkCliTotal">
+                    <span>VALOR TOTAL</span>
+                </label>
+                <label class="campos-cli-item interno" for="chkCliCusto">
+                    <input type="checkbox" id="chkCliCusto">
+                    <span>CUSTO DE PEÇAS</span>
+                    <em>interno</em>
+                </label>
+                <label class="campos-cli-item interno" for="chkCliGanho">
+                    <input type="checkbox" id="chkCliGanho">
+                    <span>GANHOS POR PEÇA</span>
+                    <em>interno</em>
+                </label>
+            </div>
+            <div class="modal-acoes" style="flex-direction:column">
+                <button type="button" class="btn btn-ok" id="btnCamposCliOk" style="width:100%">Continuar com o selecionado</button>
+                <button type="button" class="btn btn-secondary" id="btnCamposCliCancelar" style="width:100%">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modalImprimirNota">
         <div class="modal-box" style="width:min(460px,100%)">
             <h3>Imprimir ou salvar</h3>
@@ -1957,17 +1992,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=85"></script>
-    <script src="js/storage.js?v=85"></script>
-    <script src="js/ui.js?v=85"></script>
-    <script src="js/auth.js?v=85"></script>
-    <script src="js/os.js?v=85"></script>
-    <script src="js/nuvem.js?v=85"></script>
-    <script src="js/caixa.js?v=85"></script>
-    <script src="js/comissoes.js?v=85"></script>
-    <script src="js/app.js?v=85"></script>
-    <script src="js/perfil-cliente.js?v=85"></script>
-    <script src="js/navegacao.js?v=85"></script>
+    <script src="js/config.js?v=86"></script>
+    <script src="js/storage.js?v=86"></script>
+    <script src="js/ui.js?v=86"></script>
+    <script src="js/auth.js?v=86"></script>
+    <script src="js/os.js?v=86"></script>
+    <script src="js/nuvem.js?v=86"></script>
+    <script src="js/caixa.js?v=86"></script>
+    <script src="js/comissoes.js?v=86"></script>
+    <script src="js/app.js?v=86"></script>
+    <script src="js/perfil-cliente.js?v=86"></script>
+    <script src="js/navegacao.js?v=86"></script>
 </body>
 </html>
 

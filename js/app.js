@@ -496,6 +496,7 @@ async function salvarNotaPdfArquivo() {
 }
 
 function obterHtmlNotaAtual() {
+    if (_htmlClientePronto && _htmlNotaImpressaoAtual) return _htmlNotaImpressaoAtual;
     var noViewer = document.querySelector('#viewerPdfCorpo .nota-espelho');
     if (noViewer) return noViewer.outerHTML;
     var noModal = document.querySelector('#modalNotaCorpo .nota-espelho');
@@ -2798,25 +2799,143 @@ function badgeAssinatura(a) {
     return '';
 }
 
-function htmlItensNota(itens) {
-    var lista = itens || [];
-    if (!lista.length) return '<p style="color:#000;font-size:0.85rem;">Sem itens lançados.</p>';
-    var rows = lista.map(function (it) {
-        var tipo = (it.tipo === 'mao') ? 'Mão de obra' : 'Peça';
-        var descLinha = typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : (it.desc || '');
-        return '<tr><td>' + esc(tipo) + '</td><td>' + esc(descLinha) + '</td><td style="text-align:right">' + moeda(it.valor) + '</td></tr>';
-    }).join('');
-    var pecas = lista.reduce(function (s, it) { return s + ((it.tipo || 'peca') === 'peca' ? (Number(it.valor) || 0) : 0); }, 0);
-    var mao = lista.reduce(function (s, it) { return s + (it.tipo === 'mao' ? (Number(it.valor) || 0) : 0); }, 0);
-    return '<table class="nota-itens compacta"><thead><tr><th>Tipo</th><th>Descrição</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
-        rows + '</tbody></table>' +
-        '<div class="nota-subtotais compacto">Peças: <strong>' + moeda(pecas) +
-        '</strong> · Mão de obra: <strong>' + moeda(mao) + '</strong></div>' +
-        '<div class="nota-total compacto">Total: ' + moeda(pecas + mao) + '</div>';
+var CAMPOS_CLIENTE_KEY = 'joninha_campos_cliente_v1';
+var _camposClienteResolve = null;
+var _camposClienteAtual = null;
+var _htmlClientePronto = false;
+
+function visClientePadrao() {
+    return { pecas: true, mao: true, total: true, custo: false, ganho: false };
 }
 
-function htmlPagamentoOs(a) {
+function visClienteDe(v) {
+    var d = visClientePadrao();
+    if (!v || typeof v !== 'object') return d;
+    return {
+        pecas: v.pecas !== false && v.pecas !== 0,
+        mao: v.mao !== false && v.mao !== 0,
+        total: v.total !== false && v.total !== 0,
+        custo: !!v.custo,
+        ganho: !!v.ganho
+    };
+}
+
+function carregarVisClienteSalvo() {
+    try {
+        return visClienteDe(JSON.parse(localStorage.getItem(CAMPOS_CLIENTE_KEY) || 'null'));
+    } catch (e) {
+        return visClientePadrao();
+    }
+}
+
+function salvarVisCliente(vis) {
+    vis = visClienteDe(vis);
+    try { localStorage.setItem(CAMPOS_CLIENTE_KEY, JSON.stringify(vis)); } catch (e) { /* ok */ }
+    _camposClienteAtual = vis;
+    return vis;
+}
+
+function lerVisClienteDoModal() {
+    return {
+        pecas: !!(document.getElementById('chkCliPecas') && document.getElementById('chkCliPecas').checked),
+        mao: !!(document.getElementById('chkCliMao') && document.getElementById('chkCliMao').checked),
+        total: !!(document.getElementById('chkCliTotal') && document.getElementById('chkCliTotal').checked),
+        custo: !!(document.getElementById('chkCliCusto') && document.getElementById('chkCliCusto').checked),
+        ganho: !!(document.getElementById('chkCliGanho') && document.getElementById('chkCliGanho').checked)
+    };
+}
+
+function aplicarVisClienteNoModal(vis) {
+    vis = visClienteDe(vis);
+    var map = {
+        chkCliPecas: vis.pecas,
+        chkCliMao: vis.mao,
+        chkCliTotal: vis.total,
+        chkCliCusto: vis.custo,
+        chkCliGanho: vis.ganho
+    };
+    Object.keys(map).forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.checked = !!map[id];
+    });
+}
+
+function perguntarCamposCliente() {
+    return new Promise(function (resolve) {
+        var modal = document.getElementById('modalCamposCliente');
+        if (!modal) {
+            resolve(visClientePadrao());
+            return;
+        }
+        aplicarVisClienteNoModal(carregarVisClienteSalvo());
+        _camposClienteResolve = resolve;
+        modal.classList.add('aberto');
+    });
+}
+
+function fecharModalCamposCliente(vis) {
+    var modal = document.getElementById('modalCamposCliente');
+    if (modal) modal.classList.remove('aberto');
+    var r = _camposClienteResolve;
+    _camposClienteResolve = null;
+    if (!r) return;
+    if (!vis) {
+        r(null);
+        return;
+    }
+    r(salvarVisCliente(vis));
+}
+
+function htmlItensNota(itens, vis) {
+    vis = visClienteDe(vis);
+    var lista = itens || [];
+    var tot = (typeof totaisItens === 'function')
+        ? totaisItens(lista)
+        : { pecas: 0, mao: 0, custoPecas: 0, ganhoPecas: 0, total: 0 };
+    var showValor = vis.pecas || vis.mao;
+    var colunas = '<th>Tipo</th><th>Descrição</th>';
+    if (showValor) colunas += '<th style="text-align:right">Valor</th>';
+    if (vis.custo) colunas += '<th style="text-align:right">Custo</th>';
+    if (vis.ganho) colunas += '<th style="text-align:right">Ganho</th>';
+    var rows = '';
+    if (lista.length) {
+        rows = lista.map(function (it) {
+            var ehMao = (it.tipo === 'mao');
+            var tipo = ehMao ? 'Mão de obra' : 'Peça';
+            var descLinha = typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : (it.desc || '');
+            var tds = '<td>' + esc(tipo) + '</td><td>' + esc(descLinha) + '</td>';
+            if (showValor) {
+                var mostra = ehMao ? vis.mao : vis.pecas;
+                tds += '<td style="text-align:right">' + (mostra ? moeda(it.valor) : '—') + '</td>';
+            }
+            if (vis.custo) {
+                tds += '<td style="text-align:right">' + (ehMao ? '—' : moeda(it.custo)) + '</td>';
+            }
+            if (vis.ganho) {
+                var g = typeof ganhoItem === 'function' ? ganhoItem(it) : Math.max(0, (Number(it.valor) || 0) - (Number(it.custo) || 0));
+                tds += '<td style="text-align:right">' + (ehMao ? '—' : moeda(g)) + '</td>';
+            }
+            return '<tr>' + tds + '</tr>';
+        }).join('');
+    } else {
+        var span = 2 + (showValor ? 1 : 0) + (vis.custo ? 1 : 0) + (vis.ganho ? 1 : 0);
+        rows = '<tr><td colspan="' + span + '" style="color:#000;font-size:0.85rem;">Sem itens lançados.</td></tr>';
+    }
+    var foot = [];
+    if (vis.pecas) foot.push('Peças: <strong>' + moeda(tot.pecas) + '</strong>');
+    if (vis.mao) foot.push('Mão de obra: <strong>' + moeda(tot.mao) + '</strong>');
+    if (vis.custo) foot.push('Custo de peças: <strong>' + moeda(tot.custoPecas) + '</strong>');
+    if (vis.ganho) foot.push('Ganhos por peça: <strong>' + moeda(tot.ganhoPecas) + '</strong>');
+    var html = '<table class="nota-itens compacta"><thead><tr>' + colunas + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    if (foot.length) html += '<div class="nota-subtotais compacto">' + foot.join(' · ') + '</div>';
+    if (vis.total) html += '<div class="nota-total compacto">Total: ' + moeda(tot.total) + '</div>';
+    return html;
+}
+
+function htmlPagamentoOs(a, vis) {
     if (!a) return '';
+    vis = visClienteDe(vis);
+    if (!vis.total) return '';
     var descR = Number(a.descontoReais) || 0;
     var descP = Number(a.descontoPerc) || 0;
     var recs = (a.recebimentos || []).slice();
@@ -2876,6 +2995,7 @@ function textoChecklistLinhas(mapa) {
 function htmlNotaEspelho(db, a, opts) {
     opts = opts || {};
     var incluirFotos = !!opts.incluirFotos;
+    var vis = visClienteDe(opts.vis);
     var tituloDoc = opts.tituloDoc || 'ESPELHO DE ATENDIMENTO';
     var emp = getEmpresa(db);
     var cad = dadosClienteDoAtendimento(db, a);
@@ -2934,7 +3054,7 @@ function htmlNotaEspelho(db, a, opts) {
         '<div class="nota-campo full"><span class="nota-label">Serviços</span><span class="nota-valor" style="color:#000;font-weight:800">' + esc(a.servicos || '—') + '</span></div>' +
         '</div></div>' +
         blocoFotos +
-        '<div class="nota-bloco compacto"><div class="tit verde">Valores</div><div class="nota-valores-pad compacto">' + htmlItensNota(a.itens) + htmlPagamentoOs(a) + '</div></div>' +
+        '<div class="nota-bloco compacto"><div class="tit verde">Valores</div><div class="nota-valores-pad compacto">' + htmlItensNota(a.itens, vis) + htmlPagamentoOs(a, vis) + '</div></div>' +
         '<div class="nota-sigs compacto">' +
         '<div class="nota-sig"><div class="nota-sig-espaco"></div><div class="nota-sig-base">Assinatura do Responsável</div></div>' +
         '<div class="nota-sig"><div class="nota-sig-espaco">' + sigEspaco + '</div><div class="nota-sig-base">' + sigBase + '</div></div>' +
@@ -2995,6 +3115,16 @@ document.getElementById('btnFotosCancelar').addEventListener('click', function (
 document.getElementById('modalFotosCliente').addEventListener('click', function (e) {
     if (e.target.id === 'modalFotosCliente') fecharModalFotosCliente(null);
 });
+(function ligarModalCamposCliente() {
+    var ok = document.getElementById('btnCamposCliOk');
+    var can = document.getElementById('btnCamposCliCancelar');
+    var modal = document.getElementById('modalCamposCliente');
+    if (ok) ok.addEventListener('click', function () { fecharModalCamposCliente(lerVisClienteDoModal()); });
+    if (can) can.addEventListener('click', function () { fecharModalCamposCliente(null); });
+    if (modal) modal.addEventListener('click', function (e) {
+        if (e.target.id === 'modalCamposCliente') fecharModalCamposCliente(null);
+    });
+})();
 
 var _exportFotosCtx = null; /* { atendimento } ou { lista: fotosAtuais } */
 function abrirModalExportFotos(ctx) {
@@ -3115,6 +3245,7 @@ async function abrirNota(id) {
     }
 
     atendimentoNotaAtual = a;
+    _htmlClientePronto = false;
     var titulo = 'Nota — ' + (a.placa || '').toUpperCase() + ' · ' + nomeAtendimento(db, a);
     var html = htmlNotaEspelho(db, a, { incluirFotos: true }) +
         (atendimentoTemFotos(a)
@@ -3142,39 +3273,78 @@ function fecharNota() {
     fecharViewerPdf();
 }
 
+async function gerarHtmlClienteOs(a, opts) {
+    opts = opts || {};
+    if (!a) { toast('Selecione um atendimento.'); return null; }
+    var vis = opts.vis != null ? visClienteDe(opts.vis) : await perguntarCamposCliente();
+    if (!vis) return null;
+    var db = carregar();
+    var comFotos = !!opts.incluirFotos;
+    if (opts.perguntarFotos) {
+        comFotos = await perguntarEnviarComFotos(a, { forcarPergunta: true });
+        if (comFotos === null) return null;
+    }
+    if (comFotos) {
+        a = await garantirFotosCarregadas(a);
+        var okFoto = (a.fotos || []).some(function (f) { return f && (f.data || f.url); });
+        if (!okFoto) {
+            if (opts.perguntarFotos) toast('Não há fotos disponíveis — seguindo só o documento.');
+            comFotos = false;
+        }
+    }
+    var html = htmlNotaEspelho(db, a, {
+        incluirFotos: !!comFotos,
+        vis: vis,
+        tituloDoc: opts.tituloDoc || 'ESPELHO DE ATENDIMENTO'
+    });
+    atendimentoNotaAtual = a;
+    _htmlNotaImpressaoAtual = html;
+    _tituloNotaImpressao = opts.titulo || ('Espelho — ' + (a.placa || '').toUpperCase() + ' · ' + nomeAtendimento(db, a));
+    _camposClienteAtual = vis;
+    _htmlClientePronto = true;
+    return { html: html, a: a, vis: vis, db: db, comFotos: !!comFotos };
+}
+
 async function imprimirNotaPdf(id) {
     sincronizarAssinaturasNoDb();
     var db = carregar();
     var a = id ? db.atendimentos.find(function (x) { return x.id === id; }) : atendimentoNotaAtual;
     if (!a) { toast('Selecione um atendimento.'); return; }
-    atendimentoNotaAtual = a;
-    var comFotos = await perguntarEnviarComFotos(a, { forcarPergunta: true });
-    if (comFotos === null) return;
-    if (comFotos) {
-        a = await garantirFotosCarregadas(a);
-        var okFoto = (a.fotos || []).some(function (f) { return f && (f.data || f.url); });
-        if (!okFoto) {
-            toast('Não há fotos disponíveis — imprimindo só o documento.');
-            comFotos = false;
-        }
-    }
-    var html = htmlNotaEspelho(db, a, { incluirFotos: !!comFotos });
-    var titulo = 'Espelho — ' + (a.placa || '').toUpperCase() + ' · ' + nomeAtendimento(db, a);
-    _htmlNotaImpressaoAtual = html;
-    _tituloNotaImpressao = titulo;
-
+    var prep = await gerarHtmlClienteOs(a, { perguntarFotos: true });
+    if (!prep) return;
     if (ehCelular()) {
-        /* No celular: abre viewer legível; usuário escolhe Imprimir / Encaminhar / Fechar */
         fecharNota();
-        abrirViewerPdf(html, titulo);
+        abrirViewerPdf(prep.html, _tituloNotaImpressao);
         return;
     }
-    executarImpressaoHtml(html);
+    executarImpressaoHtml(prep.html);
 }
 
-function documentoAssinatura(db, a, incluirFotos) {
+function itensAssinaturaCliente(itens, vis) {
+    vis = visClienteDe(vis);
+    return (itens || []).map(function (it) {
+        var ehMao = (it.tipo === 'mao');
+        var row = {
+            tipo: ehMao ? 'mao' : 'peca',
+            desc: typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : (it.desc || '')
+        };
+        if (ehMao && vis.mao) row.valor = Number(it.valor) || 0;
+        if (!ehMao && vis.pecas) row.valor = Number(it.valor) || 0;
+        if (!ehMao && vis.custo) row.custo = Number(it.custo) || 0;
+        if (!ehMao && vis.ganho) {
+            row.ganho = typeof ganhoItem === 'function'
+                ? ganhoItem(it)
+                : Math.max(0, (Number(it.valor) || 0) - (Number(it.custo) || 0));
+        }
+        return row;
+    });
+}
+
+function documentoAssinatura(db, a, incluirFotos, vis) {
+    vis = visClienteDe(vis);
     var emp = getEmpresa(db);
     var cad = dadosClienteDoAtendimento(db, a);
+    var tot = typeof totaisItens === 'function' ? totaisItens(a.itens || []) : { pecas: 0, mao: 0, custoPecas: 0, ganhoPecas: 0, total: Number(a.total) || 0 };
     var doc = {
         atendimentoId: a.id,
         nomeCliente: cad.nome || nomeAtendimento(db, a),
@@ -3202,8 +3372,16 @@ function documentoAssinatura(db, a, incluirFotos) {
         checklistTexto: textoChecklistLinhas(a.checklist || {}).join('\n'),
         diagnostico: a.diagnostico || '',
         servicos: a.servicos || '',
-        itens: a.itens || [],
-        total: a.total || 0,
+        vis: vis,
+        itens: itensAssinaturaCliente(a.itens, vis),
+        totaisCliente: {
+            pecas: vis.pecas ? tot.pecas : null,
+            mao: vis.mao ? tot.mao : null,
+            custoPecas: vis.custo ? tot.custoPecas : null,
+            ganhoPecas: vis.ganho ? tot.ganhoPecas : null,
+            total: vis.total ? tot.total : null
+        },
+        total: vis.total ? (a.total || tot.total || 0) : null,
         empresa: emp.nome || 'Joninha Suspensões',
         empresaEndereco: enderecoCompleto(emp),
         empresaTelefone: emp.telefone || '',
@@ -3242,6 +3420,8 @@ async function prepararPackLinkAssinatura(id, opts) {
     var db = carregar();
     var a = db.atendimentos.find(function (x) { return x.id === id; });
     if (!a) { toast('Atendimento não encontrado.'); return null; }
+    var vis = opts.vis != null ? visClienteDe(opts.vis) : await perguntarCamposCliente();
+    if (!vis) return null;
     var comFotos = false;
     if (opts.perguntarFotos !== false) {
         comFotos = await perguntarEnviarComFotos(a, { forcarPergunta: true });
@@ -3261,7 +3441,7 @@ async function prepararPackLinkAssinatura(id, opts) {
     var pack = {
         token: a.tokenAssinatura,
         atendimentoId: a.id,
-        documento: documentoAssinatura(db, a, !!comFotos),
+        documento: documentoAssinatura(db, a, !!comFotos, vis),
         criadoEm: prev.criadoEm || new Date().toISOString(),
         atualizadoEm: new Date().toISOString(),
         assinaturaCliente: prev.assinaturaCliente || a.assinaturaCliente || null,
@@ -3312,8 +3492,8 @@ async function prepararPackLinkAssinatura(id, opts) {
     return { link: link, a: atendimentoNotaAtual, pack: pack, comFotos: comFotos, nuvMsg: nuvMsg };
 }
 
-async function abrirLinkAssinatura(id) {
-    var r = await prepararPackLinkAssinatura(id, { perguntarFotos: true });
+async function abrirLinkAssinatura(id, visJa) {
+    var r = await prepararPackLinkAssinatura(id, { perguntarFotos: true, vis: visJa });
     if (!r) return;
     document.getElementById('modalLinkAssinatura').classList.add('aberto');
     toast(
@@ -3322,18 +3502,49 @@ async function abrirLinkAssinatura(id) {
     );
 }
 
-function documentoAssinaturaVenda(db, o) {
+function totaisDocVenda(o) {
+    var pecas = 0, mao = 0, custo = 0, ganho = 0;
+    (o && o.itens || []).forEach(function (it) {
+        var ehMao = (it.origem === 'mao' || it.tipo === 'mao');
+        var qtd = Number(it.qtd) || 1;
+        var totLin = Number(it.total != null ? it.total : ((Number(it.venda) || 0) * qtd)) || 0;
+        var custoLin = (Number(it.custo) || 0) * qtd;
+        if (ehMao) mao += totLin;
+        else {
+            pecas += totLin;
+            custo += custoLin;
+            ganho += Math.max(0, totLin - custoLin);
+        }
+    });
+    return {
+        pecas: pecas,
+        mao: mao,
+        custoPecas: custo,
+        ganhoPecas: ganho,
+        total: Number(o && o.valor) || (pecas + mao)
+    };
+}
+
+function documentoAssinaturaVenda(db, o, vis) {
+    vis = visClienteDe(vis);
     var emp = getEmpresa(db);
     var cad = {};
     if (o.clienteId) {
         var c = (db.clientes || []).find(function (x) { return x && String(x.id) === String(o.clienteId); });
         if (c) cad = c;
     }
-    var itens = (o.itens || []).map(function (it) {
+    var itensBrutos = (o.itens || []).map(function (it) {
         var tipo = (it.origem === 'mao' || it.tipo === 'mao') ? 'mao' : 'peca';
-        var valor = Number(it.total != null ? it.total : it.venda) || 0;
-        return { tipo: tipo, desc: it.desc || '', valor: valor };
+        var qtd = Number(it.qtd) || 1;
+        var totLin = Number(it.total != null ? it.total : ((Number(it.venda) || 0) * qtd)) || 0;
+        var row = { tipo: tipo, desc: it.desc || '' };
+        if (tipo === 'mao' && vis.mao) row.valor = totLin;
+        if (tipo !== 'mao' && vis.pecas) row.valor = totLin;
+        if (tipo !== 'mao' && vis.custo) row.custo = (Number(it.custo) || 0) * qtd;
+        if (tipo !== 'mao' && vis.ganho) row.ganho = Math.max(0, totLin - ((Number(it.custo) || 0) * qtd));
+        return row;
     });
+    var tot = totaisDocVenda(o);
     return {
         vendaId: o.id,
         nomeCliente: o.clienteNome || o.funcionarioNome || cad.nome || '',
@@ -3345,10 +3556,18 @@ function documentoAssinaturaVenda(db, o) {
         placa: o.placa || '',
         carro: o.carro || '',
         entrada: o.dataEmissao || o.criadoEm || '',
-        servicos: o.descricao || itens.map(function (it) { return it.desc; }).filter(Boolean).join(', '),
+        servicos: o.descricao || itensBrutos.map(function (it) { return it.desc; }).filter(Boolean).join(', '),
         diagnostico: o.observacao || '',
-        itens: itens,
-        total: o.valor || 0,
+        vis: vis,
+        itens: itensBrutos,
+        totaisCliente: {
+            pecas: vis.pecas ? tot.pecas : null,
+            mao: vis.mao ? tot.mao : null,
+            custoPecas: vis.custo ? tot.custoPecas : null,
+            ganhoPecas: vis.ganho ? tot.ganhoPecas : null,
+            total: vis.total ? tot.total : null
+        },
+        total: vis.total ? (o.valor || tot.total || 0) : null,
         empresa: emp.nome || 'Joninha Suspensões',
         empresaEndereco: enderecoCompleto(emp),
         empresaTelefone: emp.telefone || '',
@@ -3372,6 +3591,8 @@ async function abrirLinkAssinaturaVenda(id) {
     var db = carregar();
     var o = obterDocumentoVendaPorId(id);
     if (!o) { toast('Venda não encontrada.'); return; }
+    var vis = await perguntarCamposCliente();
+    if (!vis) return;
     if (!o.tokenAssinatura) o.tokenAssinatura = gerarTokenAssinatura();
 
     var mapa = carregarAssinaturas();
@@ -3380,7 +3601,7 @@ async function abrirLinkAssinaturaVenda(id) {
         token: o.tokenAssinatura,
         vendaId: o.id,
         atendimentoId: null,
-        documento: documentoAssinaturaVenda(db, o),
+        documento: documentoAssinaturaVenda(db, o, vis),
         criadoEm: prev.criadoEm || new Date().toISOString(),
         atualizadoEm: new Date().toISOString(),
         assinaturaCliente: prev.assinaturaCliente || o.assinaturaCliente || null,
@@ -4334,7 +4555,12 @@ document.getElementById('btnNotaFechar').addEventListener('click', fecharNota);
 document.getElementById('modalNota').addEventListener('click', function (e) {
     if (e.target.id === 'modalNota') fecharNota();
 });
-document.getElementById('btnNotaPdf').addEventListener('click', function () {
+document.getElementById('btnNotaPdf').addEventListener('click', async function () {
+    var a = atendimentoNotaAtual;
+    if (a) {
+        var prep = await gerarHtmlClienteOs(a, { perguntarFotos: true });
+        if (!prep) return;
+    }
     abrirModalImprimirNota();
 });
 function abrirModalImprimirNota() {
@@ -4382,7 +4608,11 @@ document.getElementById('btnNotaEncaminhar').addEventListener('click', function 
         deFormulario: false
     });
 });
-document.getElementById('btnNotaSalvarPdf').addEventListener('click', function () {
+document.getElementById('btnNotaSalvarPdf').addEventListener('click', async function () {
+    if (!_htmlClientePronto && atendimentoNotaAtual) {
+        var prep = await gerarHtmlClienteOs(atendimentoNotaAtual, { perguntarFotos: true });
+        if (!prep) return;
+    }
     salvarNotaPdfArquivo();
 });
 document.getElementById('btnViewerFechar').addEventListener('click', fecharViewerPdf);
@@ -4394,10 +4624,18 @@ document.getElementById('btnViewerEncaminhar').addEventListener('click', functio
         deFormulario: false
     });
 });
-document.getElementById('btnViewerSalvarPdf').addEventListener('click', function () {
+document.getElementById('btnViewerSalvarPdf').addEventListener('click', async function () {
+    if (!_htmlClientePronto && atendimentoNotaAtual) {
+        var prep = await gerarHtmlClienteOs(atendimentoNotaAtual, { perguntarFotos: true });
+        if (!prep) return;
+    }
     salvarNotaPdfArquivo();
 });
-document.getElementById('btnViewerImprimir').addEventListener('click', function () {
+document.getElementById('btnViewerImprimir').addEventListener('click', async function () {
+    if (!_htmlClientePronto && atendimentoNotaAtual) {
+        var prep = await gerarHtmlClienteOs(atendimentoNotaAtual, { perguntarFotos: true });
+        if (!prep) return;
+    }
     if (_htmlNotaImpressaoAtual) executarImpressaoHtml(_htmlNotaImpressaoAtual);
     else toast('Documento não encontrado.');
 });
@@ -4958,13 +5196,22 @@ function obterDocumentoVendaPorId(id) {
     return o || null;
 }
 
-function htmlDocumentoVenda(db, o) {
+function htmlDocumentoVenda(db, o, vis) {
+    vis = visClienteDe(vis);
     var emp = getEmpresa(db);
     var nome = o.funcionarioNome || o.clienteNome || nomeCliente(db, o.clienteId) || '—';
     var tipo = o.tipo || 'VENDA';
+    var tot = totaisDocVenda(o);
+    var showValor = vis.pecas || vis.mao;
+    var colunas = '<th>Descrição</th><th style="text-align:center">Qtd</th>';
+    if (showValor) colunas += '<th style="text-align:right">Unit.</th><th style="text-align:right">Total</th>';
+    if (vis.custo) colunas += '<th style="text-align:right">Custo</th>';
+    if (vis.ganho) colunas += '<th style="text-align:right">Ganho</th>';
+    var nCols = 2 + (showValor ? 2 : 0) + (vis.custo ? 1 : 0) + (vis.ganho ? 1 : 0);
     var rows = (o.itens || []).map(function (it) {
+        var ehMao = (it.origem || it.tipo) === 'mao' || (it.funcionarioId && it.tipoMao) || it.funcionarioNome;
         var extraMo = '';
-        if ((it.origem || it.tipo) === 'mao' || (it.funcionarioId && it.tipoMao) || it.funcionarioNome) {
+        if (ehMao) {
             var tipoLbl = it.tipoMao
                 ? ((typeof rotuloTipoMaoComissao === 'function') ? rotuloTipoMaoComissao(it.tipoMao) : it.tipoMao)
                 : '';
@@ -4972,12 +5219,23 @@ function htmlDocumentoVenda(db, o) {
                 esc(it.funcionarioNome || '') +
                 (tipoLbl ? ' · ' + esc(tipoLbl) : '') + '</div>';
         }
-        return '<tr><td>' + esc((typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : (it.desc || '')) || '') + extraMo + '</td>' +
-            '<td style="text-align:center">' + esc(String(it.qtd != null ? it.qtd : 1)) + '</td>' +
-            '<td style="text-align:right">' + moeda(it.venda != null ? it.venda : it.total) + '</td>' +
-            '<td style="text-align:right">' + moeda(it.total != null ? it.total : ((Number(it.qtd) || 1) * (Number(it.venda) || 0))) + '</td></tr>';
+        var qtd = Number(it.qtd) || 1;
+        var totLin = Number(it.total != null ? it.total : (qtd * (Number(it.venda) || 0))) || 0;
+        var tds = '<td>' + esc((typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : (it.desc || '')) || '') + extraMo + '</td>' +
+            '<td style="text-align:center">' + esc(String(it.qtd != null ? it.qtd : 1)) + '</td>';
+        if (showValor) {
+            var mostra = ((it.origem || it.tipo) === 'mao') ? vis.mao : vis.pecas;
+            tds += '<td style="text-align:right">' + (mostra ? moeda(it.venda != null ? it.venda : it.total) : '—') + '</td>' +
+                '<td style="text-align:right">' + (mostra ? moeda(totLin) : '—') + '</td>';
+        }
+        if (vis.custo) tds += '<td style="text-align:right">' + (((it.origem || it.tipo) === 'mao') ? '—' : moeda((Number(it.custo) || 0) * qtd)) + '</td>';
+        if (vis.ganho) {
+            var g = Math.max(0, totLin - ((Number(it.custo) || 0) * qtd));
+            tds += '<td style="text-align:right">' + (((it.origem || it.tipo) === 'mao') ? '—' : moeda(g)) + '</td>';
+        }
+        return '<tr>' + tds + '</tr>';
     }).join('');
-    if (!rows) rows = '<tr><td colspan="4" style="text-align:center">Sem itens</td></tr>';
+    if (!rows) rows = '<tr><td colspan="' + nCols + '" style="text-align:center">Sem itens</td></tr>';
     var extras = '';
     if (o.placa) extras += '<div><b>Placa:</b> ' + esc(String(o.placa).toUpperCase()) + '</div>';
     var funcsDoc = [o.mecanicoNome, o.mecanicoNome2].filter(Boolean);
@@ -5003,6 +5261,23 @@ function htmlDocumentoVenda(db, o) {
             return '<div>' + esc(r.forma || '—') + ': <strong>' + moeda(r.valor) + '</strong></div>';
         }).join('')
         : '';
+    var foot = [];
+    if (vis.pecas) foot.push('Peças: <strong>' + moeda(tot.pecas) + '</strong>');
+    if (vis.mao) foot.push('Mão de obra: <strong>' + moeda(tot.mao) + '</strong>');
+    if (vis.custo) foot.push('Custo de peças: <strong>' + moeda(tot.custoPecas) + '</strong>');
+    if (vis.ganho) foot.push('Ganhos por peça: <strong>' + moeda(tot.ganhoPecas) + '</strong>');
+    if (vis.total) {
+        foot.push('Subtotal: <strong>' + moeda(sub) + '</strong>');
+        if (descR > 0) foot.push('Desconto R$: <strong>− ' + moeda(descR) + '</strong>');
+        if (descP > 0) foot.push('Desconto ' + esc(String(descP)) + '%: <strong>− ' + moeda(descPercValor) + '</strong>');
+    }
+    var blocoPgto = '';
+    if (vis.total) {
+        blocoPgto = (recHtml ? '<div class="nota-subtotais compacto" style="margin-top:8px"><b>Recebido</b>' + recHtml +
+            '<div>Total recebido: <strong>' + moeda(recebido) + '</strong></div>' +
+            (aberto > 0.009 ? '<div>Em aberto: <strong>' + moeda(aberto) + '</strong></div>' : '') +
+            '</div>' : (aberto > 0.009 ? '<div class="nota-subtotais compacto">Em aberto: <strong>' + moeda(aberto) + '</strong></div>' : ''));
+    }
     return '<div class="nota-espelho">' +
         htmlCabecalhoNotaEmpresa(emp) +
         '<h2 class="nota-titulo-espelho">' + esc(tipo) + ' Nº ' + esc(String(o.numero || '—')) + '</h2>' +
@@ -5012,18 +5287,11 @@ function htmlDocumentoVenda(db, o) {
         '<div class="nota-grid nota-grid-compacta"><div class="nota-campo full"><span class="nota-label">Nome</span>' +
         '<span class="nota-valor">' + esc(nome) + '</span></div></div>' + extras + '</div>' +
         '<div class="nota-bloco compacto"><div class="tit verde">Itens</div>' +
-        '<table class="nota-itens compacta"><thead><tr><th>Descrição</th><th style="text-align:center">Qtd</th>' +
-        '<th style="text-align:right">Unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>' +
+        '<table class="nota-itens compacta"><thead><tr>' + colunas + '</tr></thead><tbody>' +
         rows + '</tbody></table>' +
-        '<div class="nota-subtotais compacto">Subtotal: <strong>' + moeda(sub) + '</strong>' +
-        (descR > 0 ? '<br>Desconto R$: <strong>− ' + moeda(descR) + '</strong>' : '') +
-        (descP > 0 ? '<br>Desconto ' + esc(String(descP)) + '%: <strong>− ' + moeda(descPercValor) + '</strong>' : '') +
-        '</div>' +
-        '<div class="nota-total compacto">Total: ' + moeda(o.valor) + '</div>' +
-        (recHtml ? '<div class="nota-subtotais compacto" style="margin-top:8px"><b>Recebido</b>' + recHtml +
-            '<div>Total recebido: <strong>' + moeda(recebido) + '</strong></div>' +
-            (aberto > 0.009 ? '<div>Em aberto: <strong>' + moeda(aberto) + '</strong></div>' : '') +
-            '</div>' : (aberto > 0.009 ? '<div class="nota-subtotais compacto">Em aberto: <strong>' + moeda(aberto) + '</strong></div>' : '')) +
+        (foot.length ? '<div class="nota-subtotais compacto">' + foot.join('<br>') + '</div>' : '') +
+        (vis.total ? '<div class="nota-total compacto">Total: ' + moeda(o.valor) + '</div>' : '') +
+        blocoPgto +
         '</div></div>';
 }
 
@@ -5056,15 +5324,19 @@ function imprimirDocumentoVenda(id) {
     var o = id ? obterDocumentoVendaPorId(id) : documentoVendaAtual;
     if (!o) { toast('Documento não encontrado.'); return; }
     documentoVendaAtual = o;
-    var html = htmlDocumentoVenda(db, o);
-    var titulo = (o.tipo || 'VENDA') + ' Nº ' + (o.numero || '—');
-    _htmlNotaImpressaoAtual = html;
-    _tituloNotaImpressao = titulo;
-    if (ehCelular()) {
-        abrirViewerPdf(html, titulo);
-        return;
-    }
-    executarImpressaoHtml(html);
+    perguntarCamposCliente().then(function (vis) {
+        if (!vis) return;
+        var html = htmlDocumentoVenda(db, o, vis);
+        var titulo = (o.tipo || 'VENDA') + ' Nº ' + (o.numero || '—');
+        _htmlNotaImpressaoAtual = html;
+        _tituloNotaImpressao = titulo;
+        _htmlClientePronto = true;
+        if (ehCelular()) {
+            abrirViewerPdf(html, titulo);
+            return;
+        }
+        executarImpressaoHtml(html);
+    });
 }
 
 async function salvarPdfDocumentoVenda(id) {
@@ -5072,8 +5344,11 @@ async function salvarPdfDocumentoVenda(id) {
     var o = id ? obterDocumentoVendaPorId(id) : documentoVendaAtual;
     if (!o) { toast('Documento não encontrado.'); return; }
     documentoVendaAtual = o;
-    var html = htmlDocumentoVenda(db, o);
+    var vis = await perguntarCamposCliente();
+    if (!vis) return;
+    var html = htmlDocumentoVenda(db, o, vis);
     _htmlNotaImpressaoAtual = html;
+    _htmlClientePronto = true;
     _tituloNotaImpressao = (o.tipo || 'VENDA') + ' Nº ' + (o.numero || '—');
     var sugestao = limparNomeArquivoPdf(
         (o.tipo || 'Venda') + '_' + (o.numero || '') + '_' + (o.clienteNome || o.funcionarioNome || 'doc')
@@ -6840,8 +7115,14 @@ function tituloDocWa(tipo) {
     return 'ESPELHO DE ATENDIMENTO';
 }
 
-function abrirModalWaEnvio(ctx) {
-    _waEnvioCtx = ctx || {};
+async function abrirModalWaEnvio(ctx) {
+    ctx = ctx || {};
+    if (!ctx.vis) {
+        var vis = await perguntarCamposCliente();
+        if (!vis) return;
+        ctx.vis = vis;
+    }
+    _waEnvioCtx = ctx;
     var tit = document.getElementById('modalWaEnvioTitulo');
     var hint = document.getElementById('modalWaEnvioHint');
     var tipo = _waEnvioCtx.tipo || 'nota';
@@ -6872,10 +7153,12 @@ async function prepararHtmlWaEnvio(incluirFotos) {
     }
     var opts = {
         incluirFotos: !!incluirFotos,
+        vis: visClienteDe(_waEnvioCtx && _waEnvioCtx.vis),
         tituloDoc: tituloDocWa((_waEnvioCtx && _waEnvioCtx.tipo) || 'nota')
     };
     var html = htmlNotaEspelho(info.db, a, opts);
     _htmlNotaImpressaoAtual = html;
+    _htmlClientePronto = true;
     atendimentoNotaAtual = a;
     return { html: html, a: a, tel: info.tel, db: info.db };
 }
@@ -6889,7 +7172,7 @@ async function waEnvioTexto() {
         return;
     }
     if (tipo === 'orcamento' && id) {
-        enviarWaOrcamentoSalvo(id);
+        enviarWaOrcamentoSalvo(id, _waEnvioCtx && _waEnvioCtx.vis);
         return;
     }
     if (tipo === 'checklist') {
@@ -6902,13 +7185,13 @@ async function waEnvioTexto() {
     if (tipo === 'orcamento') {
         var tel2 = obterTelefoneWhatsAppOs();
         if (!garantirTelefoneWaEnvio(tel2)) return;
-        var m2 = montarMsgOrcamentoAtual();
+        var m2 = montarMsgOrcamentoAtual(_waEnvioCtx && _waEnvioCtx.vis);
         abrirWhatsApp(tel2, m2.msg);
         return;
     }
     var info = obterCtxWaAtendimento();
     if (!info || !info.a) { toast('Abra a nota antes.'); return; }
-    enviarWaOrcamentoSalvo(info.a.id);
+    enviarWaOrcamentoSalvo(info.a.id, _waEnvioCtx && _waEnvioCtx.vis);
 }
 
 async function waEnvioArquivo(formato) {
@@ -7065,7 +7348,7 @@ async function waEnvioAssinar() {
         id = salvo3.id;
     }
 
-    await abrirLinkAssinatura(id);
+    await abrirLinkAssinatura(id, _waEnvioCtx && _waEnvioCtx.vis);
 }
 
 async function enviarWhatsAppOsSalvo(id, tipo) {
@@ -7079,7 +7362,9 @@ async function enviarWhatsAppOsSalvo(id, tipo) {
         return;
     }
     toast('Gerando link e abrindo o WhatsApp…');
-    var r = await prepararPackLinkAssinatura(id, { perguntarFotos: false });
+    var vis = await perguntarCamposCliente();
+    if (!vis) return;
+    var r = await prepararPackLinkAssinatura(id, { perguntarFotos: false, vis: vis });
     if (!r || !r.link) return;
     var msg;
     if (tipo === 'checklist') {
@@ -7098,7 +7383,7 @@ async function enviarWhatsAppOsSalvo(id, tipo) {
         msg += '*Veículo:* ' + (a.carro || '—') + (a.placa ? ' · Placa ' + a.placa : '') + '\n';
         if (a.diagnostico) msg += '\n*Diagnóstico:*\n' + a.diagnostico + '\n';
         if (a.servicos) msg += '\n*Serviços:*\n' + a.servicos + '\n';
-        msg += '\n*Peças:* ' + moeda(tot.pecas) + '\n*Mão de obra:* ' + moeda(tot.mao) + '\n*Total:* ' + moeda(a.total != null ? a.total : tot.total);
+        msg += textoItensEValoresCliente(a.itens || [], tot, vis, a.total);
         msg += '\n\nAguardamos sua aprovação. Obrigado!';
     }
     msg += '\n\n*Abra o link para ver e assinar:*\n' + r.link;
@@ -7109,12 +7394,14 @@ async function enviarWhatsAppOsSalvo(id, tipo) {
 async function enviarWhatsAppOs(tipo) {
     var tel = obterTelefoneWhatsAppOs();
     if (!garantirTelefoneWaEnvio(tel)) return;
+    var vis = await perguntarCamposCliente();
+    if (!vis) return;
     toast('Gerando link e abrindo o WhatsApp…');
     var salvo = salvarAtendimentoRapidoParaEnvio();
     if (!salvo) return;
-    var r = await prepararPackLinkAssinatura(salvo.id, { perguntarFotos: false });
+    var r = await prepararPackLinkAssinatura(salvo.id, { perguntarFotos: false, vis: vis });
     if (!r || !r.link) return;
-    var m = tipo === 'checklist' ? montarMsgChecklistAtual() : montarMsgOrcamentoAtual();
+    var m = tipo === 'checklist' ? montarMsgChecklistAtual() : montarMsgOrcamentoAtual(vis);
     var msg = (m && m.msg ? m.msg : '') + '\n\n*Abra o link para ver e assinar:*\n' + r.link;
     abrirWhatsApp(tel, msg);
     toast('WhatsApp aberto no número informado, com o link do documento.');
@@ -7148,26 +7435,29 @@ async function copiarLinkOsEnvio() {
     }
 }
 
-function acaoOsFormImprimir() {
-    if (!prepararNotaOsDoFormulario()) return;
+async function acaoOsFormImprimir() {
+    if (!(await prepararNotaOsDoFormulario())) return;
     if (typeof abrirModalImprimirNota === 'function') abrirModalImprimirNota();
     else imprimirNotaPdf(atendimentoNotaAtual && atendimentoNotaAtual.id);
 }
 
-function acaoOsFormSalvarPdf() {
-    if (!prepararNotaOsDoFormulario()) return;
+async function acaoOsFormSalvarPdf() {
+    if (!(await prepararNotaOsDoFormulario())) return;
     if (typeof abrirModalImprimirNota === 'function') abrirModalImprimirNota();
     else salvarNotaPdfArquivo();
 }
 
-function prepararNotaOsDoFormulario() {
+async function prepararNotaOsDoFormulario() {
+    var vis = await perguntarCamposCliente();
+    if (!vis) return null;
     var salvo = salvarAtendimentoRapidoParaEnvio();
     if (!salvo) return null;
     var db = carregar();
     var a = (db.atendimentos || []).find(function (x) { return x && x.id === salvo.id; }) || salvo;
     atendimentoNotaAtual = a;
-    var html = htmlNotaEspelho(db, a, { incluirFotos: false, tituloDoc: 'ESPELHO DE ATENDIMENTO' });
+    var html = htmlNotaEspelho(db, a, { incluirFotos: false, tituloDoc: 'ESPELHO DE ATENDIMENTO', vis: vis });
     _htmlNotaImpressaoAtual = html;
+    _htmlClientePronto = true;
     _tituloNotaImpressao = 'OS · ' + (a.placa || '') + ' · ' + (a.clienteNome || '');
     return a;
 }
@@ -7196,7 +7486,38 @@ function montarMsgChecklistAtual() {
     return { msg: msg, telefone: obterTelefoneWhatsAppOs() };
 }
 
-function montarMsgOrcamentoAtual() {
+function textoLinhaItemCliente(it, vis) {
+    vis = visClienteDe(vis);
+    var ehMao = (it.tipo || 'peca') === 'mao';
+    var tag = ehMao ? 'MO' : 'Peça';
+    var rot = (typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : it.desc) || '';
+    var extra = [];
+    if (ehMao && vis.mao) extra.push(moeda(it.valor));
+    if (!ehMao && vis.pecas) extra.push(moeda(it.valor));
+    if (!ehMao && vis.custo) extra.push('custo ' + moeda(it.custo));
+    if (!ehMao && vis.ganho) {
+        var g = typeof ganhoItem === 'function' ? ganhoItem(it) : Math.max(0, (Number(it.valor) || 0) - (Number(it.custo) || 0));
+        extra.push('ganho ' + moeda(g));
+    }
+    return '- [' + tag + '] ' + rot + (extra.length ? ': ' + extra.join(' · ') : '');
+}
+
+function textoItensEValoresCliente(itens, tot, vis, totalAlt) {
+    vis = visClienteDe(vis);
+    tot = tot || { pecas: 0, mao: 0, custoPecas: 0, ganhoPecas: 0, total: 0 };
+    var msg = '\n*Itens / serviços:*\n';
+    if (!(itens || []).length) msg += '- (ainda sem itens)\n';
+    else (itens || []).forEach(function (it) { msg += textoLinhaItemCliente(it, vis) + '\n'; });
+    if (vis.pecas) msg += '\n*Peças:* ' + moeda(tot.pecas);
+    if (vis.mao) msg += '\n*Mão de obra:* ' + moeda(tot.mao);
+    if (vis.custo) msg += '\n*Custo de peças:* ' + moeda(tot.custoPecas);
+    if (vis.ganho) msg += '\n*Ganhos por peça:* ' + moeda(tot.ganhoPecas);
+    if (vis.total) msg += '\n*Total:* ' + moeda(totalAlt != null ? totalAlt : tot.total);
+    return msg;
+}
+
+function montarMsgOrcamentoAtual(vis) {
+    vis = visClienteDe(vis);
     var db = carregar();
     var nome = document.getElementById('atClienteBusca').value.trim() || 'cliente';
     var carro = document.getElementById('atCarro').value.trim();
@@ -7210,17 +7531,8 @@ function montarMsgOrcamentoAtual() {
     if (carro || placa) msg += '\n*Veículo:* ' + (carro || '—') + (placa ? ' · Placa ' + placa : '') + '\n';
     if (diag) msg += '\n*Diagnóstico:*\n' + diag + '\n';
     if (serv) msg += '\n*Serviços:*\n' + serv + '\n';
-    msg += '\n*Itens / serviços:*\n';
-    if (!itensTemp.length) msg += '- (ainda sem itens)\n';
-    else itensTemp.forEach(function (it) {
-        var tag = (it.tipo || 'peca') === 'mao' ? 'MO' : 'Peça';
-        var rot = (typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : it.desc) || '';
-        msg += '- [' + tag + '] ' + rot + ': ' + moeda(it.valor) + '\n';
-    });
-    msg += '\n*Peças:* ' + moeda(tot.pecas);
-    msg += '\n*Mão de obra:* ' + moeda(tot.mao);
-    msg += '\n*Total:* ' + moeda(tot.total) + '\n';
-    msg += '\nAguardamos sua aprovação. Obrigado!';
+    msg += textoItensEValoresCliente(itensTemp, tot, vis, tot.total);
+    msg += '\n\nAguardamos sua aprovação. Obrigado!';
     return { msg: msg, telefone: obterTelefoneWhatsAppOs() };
 }
 
@@ -7238,7 +7550,8 @@ function enviarWaChecklistSalvo(id) {
     abrirWhatsApp(telefoneDoAtendimento(db, a), msg);
 }
 
-function enviarWaOrcamentoSalvo(id) {
+function enviarWaOrcamentoSalvo(id, vis) {
+    vis = visClienteDe(vis);
     var db = carregar();
     var a = (db.atendimentos || []).find(function (x) { return x.id === id; });
     if (!a) { toast('Atendimento não encontrado.'); return; }
@@ -7249,13 +7562,7 @@ function enviarWaOrcamentoSalvo(id) {
     msg += '*Veículo:* ' + (a.carro || '—') + (a.placa ? ' · ' + a.placa : '') + '\n';
     if (a.diagnostico) msg += '\n*Diagnóstico:*\n' + a.diagnostico + '\n';
     if (a.servicos) msg += '\n*Serviços:*\n' + a.servicos + '\n';
-    msg += '\n*Itens:*\n';
-    (a.itens || []).forEach(function (it) {
-        var tag = (it.tipo || 'peca') === 'mao' ? 'MO' : 'Peça';
-        var rot = (typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : it.desc) || '';
-        msg += '- [' + tag + '] ' + rot + ': ' + moeda(it.valor) + '\n';
-    });
-    msg += '\n*Peças:* ' + moeda(tot.pecas) + '\n*Mão de obra:* ' + moeda(tot.mao) + '\n*Total:* ' + moeda(a.total != null ? a.total : tot.total);
+    msg += textoItensEValoresCliente(a.itens || [], tot, vis, a.total);
     abrirWhatsApp(telefoneDoAtendimento(db, a), msg);
 }
 

@@ -370,20 +370,52 @@
             }
 
             var itens = doc.itens || [];
+            var vis = doc.vis || { pecas: true, mao: true, total: true, custo: false, ganho: false };
+            var totCli = doc.totaisCliente || {};
             var box = document.getElementById('dItens');
+            var showValor = vis.pecas || vis.mao;
+            var colunas = '<th>Tipo</th><th>Descrição</th>';
+            if (showValor) colunas += '<th style="text-align:right">Valor</th>';
+            if (vis.custo) colunas += '<th style="text-align:right">Custo</th>';
+            if (vis.ganho) colunas += '<th style="text-align:right">Ganho</th>';
             if (!itens.length) {
                 box.innerHTML = '<p style="color:#8fa3b8">Sem itens.</p>';
             } else {
-                box.innerHTML = '<table><thead><tr><th>Tipo</th><th>Descrição</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
+                box.innerHTML = '<table><thead><tr>' + colunas + '</tr></thead><tbody>' +
                     itens.map(function (it) {
-                        return '<tr><td>' + (it.tipo === 'mao' ? 'Mão de obra' : 'Peça') +
-                            '</td><td>' + (it.desc || '') +
-                            '</td><td style="text-align:right">' + moeda(it.valor) + '</td></tr>';
+                        var ehMao = it.tipo === 'mao';
+                        var tds = '<td>' + (ehMao ? 'Mão de obra' : 'Peça') +
+                            '</td><td>' + (it.desc || '') + '</td>';
+                        if (showValor) {
+                            var mostra = ehMao ? vis.mao : vis.pecas;
+                            tds += '<td style="text-align:right">' + (mostra && it.valor != null ? moeda(it.valor) : '—') + '</td>';
+                        }
+                        if (vis.custo) tds += '<td style="text-align:right">' + (it.custo != null ? moeda(it.custo) : '—') + '</td>';
+                        if (vis.ganho) tds += '<td style="text-align:right">' + (it.ganho != null ? moeda(it.ganho) : '—') + '</td>';
+                        return '<tr>' + tds + '</tr>';
                     }).join('') + '</tbody></table>';
             }
-            var total = itens.reduce(function (s, it) { return s + (Number(it.valor) || 0); }, 0);
-            if (!itens.length && doc.total) total = doc.total;
-            document.getElementById('dTotal').textContent = moeda(total);
+            var foot = [];
+            if (vis.pecas && totCli.pecas != null) foot.push('Peças: ' + moeda(totCli.pecas));
+            if (vis.mao && totCli.mao != null) foot.push('Mão de obra: ' + moeda(totCli.mao));
+            if (vis.custo && totCli.custoPecas != null) foot.push('Custo de peças: ' + moeda(totCli.custoPecas));
+            if (vis.ganho && totCli.ganhoPecas != null) foot.push('Ganhos por peça: ' + moeda(totCli.ganhoPecas));
+            var totalTxt = '';
+            if (vis.total) {
+                var total = totCli.total;
+                if (total == null) {
+                    total = itens.reduce(function (s, it) { return s + (Number(it.valor) || 0); }, 0);
+                    if (!itens.length && doc.total) total = doc.total;
+                }
+                totalTxt = moeda(total);
+            }
+            var elTot = document.getElementById('dTotal');
+            if (foot.length) {
+                elTot.innerHTML = foot.join('<br>') + (totalTxt ? '<div style="margin-top:8px;font-size:1.15em">' + totalTxt + '</div>' : '');
+            } else {
+                elTot.textContent = totalTxt || '';
+                if (!totalTxt) elTot.style.display = 'none';
+            }
         }
 
         function setupCanvas() {
