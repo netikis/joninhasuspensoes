@@ -105,6 +105,9 @@ img, video, canvas, svg, iframe {
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
     }
+    .os-totais-grid {
+        grid-template-columns: 1fr;
+    }
 
     .box,
     .table-wrap,

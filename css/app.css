@@ -665,13 +665,50 @@
             color: #0f172a !important;
             font-weight: 800;
         }
-        .box .total-line #atTotal {
+        .box .total-line #atTotal,
+        .os-total-card-final #atTotal {
             color: #0f7a3f !important;
             font-size: 1.45rem;
         }
         #atSubPecas,
-        #atSubMao {
+        #atSubMao,
+        #atGanhoPecas {
             color: #0f172a !important;
+        }
+        .os-totais-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .os-total-card {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+        .os-total-card span {
+            display: block;
+            font-size: 0.82rem;
+            color: #334155 !important;
+            font-weight: 800;
+            line-height: 1.25;
+            margin-bottom: 6px;
+        }
+        .os-total-card strong {
+            display: block;
+            font-size: 1.28rem;
+            font-weight: 800;
+            color: #0f172a !important;
+        }
+        .os-total-card #atGanhoPecas {
+            color: #15803d !important;
+        }
+        .os-total-card-final {
+            grid-column: 1 / -1;
+            background: #ecfdf3;
+            border-color: #86efac;
+        }
             font-weight: 800;
         }
         .os-itens-total {

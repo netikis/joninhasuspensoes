@@ -726,14 +726,38 @@ tr.row-click:hover { background: #e2e8f0; }
 .box .total-line strong,
 .box .total-line .muted,
 #atSubPecas,
-#atSubMao {
+#atSubMao,
+#atGanhoPecas {
     color: #0f172a !important;
     font-weight: 800;
 }
 .box .os-itens-total-final strong,
-.box .total-line #atTotal {
+.box .total-line #atTotal,
+.os-total-card-final #atTotal {
     color: #0f7a3f !important;
     font-weight: 800;
+}
+.os-totais-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+}
+.os-total-card {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+.os-total-card span {
+    display: block;
+    color: #334155 !important;
+    font-size: 0.82rem;
+    font-weight: 800;
+    margin-bottom: 6px;
+}
+.os-total-card #atGanhoPecas {
+    color: #15803d !important;
 }
 
 .os-bloco-valores {

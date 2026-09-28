@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=84">
-    <link rel="stylesheet" href="css/tema-m3.css?v=84">
-    <link rel="stylesheet" href="css/telas.css?v=84">
+    <link rel="stylesheet" href="css/app.css?v=85">
+    <link rel="stylesheet" href="css/tema-m3.css?v=85">
+    <link rel="stylesheet" href="css/telas.css?v=85">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -520,21 +520,23 @@
                         </div>
                     </div>
                     <div id="listaItens" style="margin-top:12px"></div>
-                    <div class="total-line" style="border-top:none;padding-top:4px;margin-top:4px">
-                        <span class="muted">Peças (venda)</span>
-                        <strong id="atSubPecas" style="font-size:1.1rem">R$ 0,00</strong>
-                    </div>
-                    <div class="total-line" style="border-top:none;padding-top:0;margin-top:0">
-                        <span class="muted">Ganho em peças (venda − custo)</span>
-                        <strong id="atGanhoPecas" class="ganho-linha" style="font-size:1.05rem">R$ 0,00</strong>
-                    </div>
-                    <div class="total-line" style="border-top:none;padding-top:0;margin-top:0">
-                        <span class="muted">Mão de obra (bruta)</span>
-                        <strong id="atSubMao" style="font-size:1.1rem">R$ 0,00</strong>
-                    </div>
-                    <div class="total-line">
-                        <span>Valor total (peças + mão de obra)</span>
-                        <strong id="atTotal">R$ 0,00</strong>
+                    <div class="os-totais-grid">
+                        <div class="os-total-card">
+                            <span>Peças (venda)</span>
+                            <strong id="atSubPecas">R$ 0,00</strong>
+                        </div>
+                        <div class="os-total-card">
+                            <span>Ganho em peças (venda − custo)</span>
+                            <strong id="atGanhoPecas" class="ganho-linha">R$ 0,00</strong>
+                        </div>
+                        <div class="os-total-card">
+                            <span>Mão de obra (bruta)</span>
+                            <strong id="atSubMao">R$ 0,00</strong>
+                        </div>
+                        <div class="os-total-card os-total-card-final">
+                            <span>Valor total (peças + mão de obra)</span>
+                            <strong id="atTotal">R$ 0,00</strong>
+                        </div>
                     </div>
                 </div>
 
@@ -1955,17 +1957,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=84"></script>
-    <script src="js/storage.js?v=84"></script>
-    <script src="js/ui.js?v=84"></script>
-    <script src="js/auth.js?v=84"></script>
-    <script src="js/os.js?v=84"></script>
-    <script src="js/nuvem.js?v=84"></script>
-    <script src="js/caixa.js?v=84"></script>
-    <script src="js/comissoes.js?v=84"></script>
-    <script src="js/app.js?v=84"></script>
-    <script src="js/perfil-cliente.js?v=84"></script>
-    <script src="js/navegacao.js?v=84"></script>
+    <script src="js/config.js?v=85"></script>
+    <script src="js/storage.js?v=85"></script>
+    <script src="js/ui.js?v=85"></script>
+    <script src="js/auth.js?v=85"></script>
+    <script src="js/os.js?v=85"></script>
+    <script src="js/nuvem.js?v=85"></script>
+    <script src="js/caixa.js?v=85"></script>
+    <script src="js/comissoes.js?v=85"></script>
+    <script src="js/app.js?v=85"></script>
+    <script src="js/perfil-cliente.js?v=85"></script>
+    <script src="js/navegacao.js?v=85"></script>
 </body>
 </html>
 
