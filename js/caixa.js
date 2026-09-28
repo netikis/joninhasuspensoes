@@ -354,6 +354,9 @@ function enriquecerFechamentoParaRelatorio(f) {
         if (f.totalOficina == null) f.totalOficina = snap.totalOficina;
         if (f.comissao == null) f.comissao = snap.comissao;
         if (f.maoCasa == null) f.maoCasa = snap.maoCasa;
+        if (f.pecasBruto == null) f.pecasBruto = snap.pecas;
+        if (f.maoObra == null) f.maoObra = snap.mao;
+        if (f.ganhoPecas == null) f.ganhoPecas = snap.ganho;
     } catch (eEnr) { /* ok */ }
     return f;
 }
@@ -406,6 +409,50 @@ function garantirLancamentosFechamento(db) {
         mudou = true;
     });
     return mudou;
+}
+
+function hidratarFechamentosDoCaixa(db) {
+    if (!db) return false;
+    if (!db.fechamentosCaixa) db.fechamentosCaixa = [];
+    var ids = {};
+    db.fechamentosCaixa.forEach(function (f) {
+        if (f && f.id) ids[String(f.id)] = true;
+    });
+    var mudou = false;
+    function puxar(lista) {
+        (lista || []).forEach(function (l) {
+            if (!l) return;
+            var f = l.fechamento;
+            if (!f || !f.id) return;
+            var id = String(f.id);
+            if (ids[id]) {
+                var atual = db.fechamentosCaixa.find(function (x) { return x && String(x.id) === id; });
+                if (atual && !(atual.linhasOficina || []).length && (f.linhasOficina || []).length) {
+                    Object.assign(atual, f);
+                    mudou = true;
+                }
+                return;
+            }
+            db.fechamentosCaixa.push(f);
+            ids[id] = true;
+            mudou = true;
+        });
+    }
+    puxar(db.caixa);
+    puxar(db.caixaBanco);
+    return mudou;
+}
+
+function garantirFechamentosSincronizaveis() {
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+    var a = hidratarFechamentosDoCaixa(db);
+    var b = garantirLancamentosFechamento(db);
+    if (a || b) {
+        if (typeof salvarMain === 'function') salvarMain(db);
+        else salvar(db);
+        if (typeof agendarSyncAutomatico === 'function') agendarSyncAutomatico('salvar');
+    }
+    return db;
 }
 
 function fechamentoPorId(id, db) {
@@ -2056,6 +2103,42 @@ function htmlBlocoOficinaMes(of, nAtend) {
         '</div>';
 }
 
+function htmlTabelaLinhasOficinaMes(linhas) {
+    linhas = linhas || [];
+    if (!linhas.length) {
+        return '<p style="text-align:center;color:#777;padding:8px">Nenhuma OS/venda paga neste período.</p>';
+    }
+    var html = '<table><thead><tr><th>Data</th><th>Doc</th><th>Cliente</th><th style="text-align:right">Peças</th>' +
+        '<th style="text-align:right">Mão de obra</th><th style="text-align:right">Ganho peças</th>' +
+        '<th style="text-align:right">Total cobrado</th></tr></thead><tbody>';
+    var totP = 0, totM = 0, totG = 0, totT = 0;
+    linhas.forEach(function (l) {
+        var pecas = Number(l.pecas) || 0;
+        var mao = Number(l.mao) || 0;
+        var ganho = Number(l.ganho) || 0;
+        var tot = Number(l.total) || (pecas + mao);
+        totP += pecas;
+        totM += mao;
+        totG += ganho;
+        totT += tot;
+        var doc = l.origem === 'VENDA'
+            ? ('Venda' + (l.numero != null && l.numero !== '' ? ' Nº ' + l.numero : ''))
+            : ('OS' + (l.placa ? ' ' + String(l.placa).toUpperCase() : ''));
+        html += '<tr><td>' + esc(fmtData(l.data) || l.data || '—') + '</td><td>' + esc(doc) +
+            '</td><td>' + esc(l.cliente || '—') +
+            '</td><td style="text-align:right">' + moeda(pecas) +
+            '</td><td style="text-align:right">' + moeda(mao) +
+            '</td><td style="text-align:right">' + moeda(ganho) +
+            '</td><td style="text-align:right">' + moeda(tot) + '</td></tr>';
+    });
+    html += '</tbody><tfoot><tr><td colspan="3"><strong>TOTAL OFICINA</strong></td>' +
+        '<td style="text-align:right"><strong>' + moeda(totP) + '</strong></td>' +
+        '<td style="text-align:right"><strong>' + moeda(totM) + '</strong></td>' +
+        '<td style="text-align:right"><strong>' + moeda(totG) + '</strong></td>' +
+        '<td style="text-align:right"><strong>' + moeda(totT) + '</strong></td></tr></tfoot></table>';
+    return html;
+}
+
 function montarHtmlRelatorioMensal(filtro, mesAnoFixo) {
     filtro = filtro || 'geral';
     var mesAno = mesAnoFixo || prompt('Digite o mês e ano do relatório (Ex: 07/2026):', mesAnoAtualPadrao());
@@ -2090,6 +2173,10 @@ function montarHtmlRelatorioMensal(filtro, mesAnoFixo) {
         ? htmlBlocoOficinaMes(of, nAtend)
         : ('<div class="resumo"><div class="resumo-box" style="color:#1e3a5f">ATENDIMENTOS PAGOS NO MÊS (OS + VENDA)<b>' +
             nAtend + '</b></div></div>');
+    var blocoLinhas = (filtro === 'geral')
+        ? ('<div class="section-title entrada"><span>DISCRIMINAÇÃO DA OFICINA (OS E VENDAS PAGAS)</span></div>' +
+            htmlTabelaLinhasOficinaMes(of.linhas || []))
+        : '';
     var html =
         '<div class="nota-espelho relatorio-mensal-print">' +
         htmlCabecalhoNotaEmpresa(emp,
@@ -2108,6 +2195,7 @@ function montarHtmlRelatorioMensal(filtro, mesAnoFixo) {
         '.relatorio-mensal-print th{background:#ecf0f1;color:#111;padding:8px;text-align:left;font-size:10px;border-bottom:2px solid #bdc3c7}' +
         '</style>' +
         blocoTopo +
+        blocoLinhas +
         montado.html +
         '<div style="text-align:center;margin-top:24px;font-size:9px;color:#777">' +
         'Documento gerado pelo Joninha Suspensões em ' + esc(new Date().toLocaleString('pt-BR')) +
@@ -3053,6 +3141,7 @@ async function arquivarMesDespesasOsPastaPC(mesAnoFixo) {
 }
 
 function renderRelatorioCaixa() {
+    try { garantirFechamentosSincronizaveis(); } catch (eFsync) { /* ok */ }
     try { garantirPastasMesEncerrados(); } catch (ePastas) { /* ok */ }
     var db = carregar();
     var hoje = hojeISO();

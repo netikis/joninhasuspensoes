@@ -236,6 +236,7 @@ function salvar(db) {
         }
         if (db.excluidos) main.excluidos = garantirExcluidos(db);
         if (db.pastasMes) main.pastasMes = db.pastasMes;
+        if (db.fechamentosCaixa) main.fechamentosCaixa = db.fechamentosCaixa;
         salvarMain(main);
     }
     agendarSyncAutomatico('salvar');

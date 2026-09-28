@@ -457,6 +457,83 @@ function mesclarListaPorId(localLista, nuvemLista, mapaEx) {
     return aplicarExcluidosNaLista(Object.keys(map).map(function (k) { return map[k]; }), mapaEx);
 }
 
+function cloneParaNuvem(v) {
+    try {
+        return JSON.parse(JSON.stringify(v == null ? null : v));
+    } catch (e) {
+        return v;
+    }
+}
+
+function caixaParaNuvem(lista) {
+    return cloneParaNuvem(lista || []).map(function (x) {
+        if (!x || !x.fechamento) return x;
+        var f = x.fechamento;
+        x.fechamento = {
+            id: f.id,
+            data: f.data,
+            saldo: f.saldo,
+            saldoBalcao: f.saldoBalcao,
+            saldoBanco: f.saldoBanco,
+            periodoDe: f.periodoDe,
+            periodoAte: f.periodoAte
+        };
+        return x;
+    });
+}
+
+function mesclarFechamentosCaixa(localLista, nuvemLista) {
+    var map = {};
+    function score(f) {
+        if (!f) return 0;
+        return (f.linhasOficina || []).length +
+            (f.entradasCaixaOficina || []).length +
+            (f.entradasCaixaOutras || []).length;
+    }
+    function add(lista) {
+        (lista || []).forEach(function (f) {
+            if (!f || !f.id) return;
+            var id = String(f.id);
+            var prev = map[id];
+            if (!prev) {
+                map[id] = f;
+                return;
+            }
+            var sN = score(f);
+            var sP = score(prev);
+            if (sN !== sP) {
+                map[id] = sN > sP ? Object.assign({}, prev, f) : Object.assign({}, f, prev);
+                return;
+            }
+            var tN = String(f.atualizadoEm || f.criadoEm || '');
+            var tP = String(prev.atualizadoEm || prev.criadoEm || '');
+            map[id] = tN > tP ? Object.assign({}, prev, f) : Object.assign({}, f, prev);
+        });
+    }
+    add(localLista);
+    add(nuvemLista);
+    return Object.keys(map).map(function (k) { return map[k]; });
+}
+
+function mesclarPastasMes(localMap, nuvemMap) {
+    var out = {};
+    [localMap || {}, nuvemMap || {}].forEach(function (src) {
+        Object.keys(src).forEach(function (ym) {
+            var a = out[ym];
+            var b = src[ym];
+            if (!b) return;
+            if (!a) {
+                out[ym] = b;
+                return;
+            }
+            var sa = (Number(a.nAtend) || 0) + (Number(a.totEntradas) || 0) + (Number(a.mao) || 0);
+            var sb = (Number(b.nAtend) || 0) + (Number(b.totEntradas) || 0) + (Number(b.mao) || 0);
+            out[ym] = sb >= sa ? Object.assign({}, a, b) : Object.assign({}, b, a);
+        });
+    });
+    return out;
+}
+
 async function enviarLogoEmpresaNuvem(logoDataUrl) {
     var sessao = await obterSessaonuvem();
     var fsMod = sessao.fsMod;
@@ -576,10 +653,13 @@ async function enviarBaseNuvem(db) {
         clientes: db.clientes || [],
         produtos: db.produtos || [],
         orcamentos: db.orcamentos || [],
-        caixa: db.caixa || [],
-        caixaBanco: db.caixaBanco || [],
+        caixa: caixaParaNuvem(db.caixa),
+        caixaBanco: caixaParaNuvem(db.caixaBanco),
         pendentes: db.pendentes || [],
         caixaConfig: db.caixaConfig || { inicialBalcao: 0, inicialBanco: 0 },
+        fechamentosCaixa: cloneParaNuvem(db.fechamentosCaixa || []),
+        pastasMes: cloneParaNuvem(db.pastasMes || {}),
+        contagemAtendimentosMes: cloneParaNuvem(db.contagemAtendimentosMes || {}),
         excluidos: garantirExcluidos(db),
         funcionarios: listarFuncionariosInterno(),
         atualizadoEm: new Date().toISOString()
@@ -649,6 +729,19 @@ async function sincronizarOficinaNuvem(opts) {
                 var ex = garantirExcluidos(db);
                 db.clientes = mesclarListaPorId(db.clientes, baseNuv.clientes, ex.clientes);
                 if (baseNuv.funcionarios) aplicarFuncionariosDaNuvem(baseNuv.funcionarios);
+                if (baseNuv.fechamentosCaixa || baseNuv.pastasMes) {
+                    var mainOf = (typeof carregarMain === 'function') ? carregarMain() : db;
+                    if (baseNuv.fechamentosCaixa) {
+                        mainOf.fechamentosCaixa = mesclarFechamentosCaixa(mainOf.fechamentosCaixa, baseNuv.fechamentosCaixa);
+                    }
+                    if (baseNuv.pastasMes) {
+                        mainOf.pastasMes = mesclarPastasMes(mainOf.pastasMes, baseNuv.pastasMes);
+                    }
+                    if (typeof hidratarFechamentosDoCaixa === 'function') hidratarFechamentosDoCaixa(mainOf);
+                    if (typeof salvarMain === 'function') salvarMain(mainOf);
+                    db.fechamentosCaixa = mainOf.fechamentosCaixa;
+                    db.pastasMes = mainOf.pastasMes;
+                }
             }
         } catch (eBase) { /* offline parcial */ }
 
@@ -771,6 +864,16 @@ async function sincronizarTodosNuvem(opts) {
             db.caixaBanco = mesclarListaPorId(db.caixaBanco, baseNuv.caixaBanco, ex.caixaBanco);
             db.pendentes = mesclarListaPorId(db.pendentes, baseNuv.pendentes, ex.pendentes);
             db.caixaConfig = mesclarCaixaConfig(db.caixaConfig, baseNuv.caixaConfig);
+            if (baseNuv.fechamentosCaixa) {
+                db.fechamentosCaixa = mesclarFechamentosCaixa(db.fechamentosCaixa, baseNuv.fechamentosCaixa);
+            }
+            if (baseNuv.pastasMes) {
+                db.pastasMes = mesclarPastasMes(db.pastasMes, baseNuv.pastasMes);
+            }
+            if (baseNuv.contagemAtendimentosMes) {
+                db.contagemAtendimentosMes = Object.assign({}, db.contagemAtendimentosMes || {}, baseNuv.contagemAtendimentosMes);
+            }
+            if (typeof hidratarFechamentosDoCaixa === 'function') hidratarFechamentosDoCaixa(db);
             if (baseNuv.funcionarios) {
                 aplicarFuncionariosDaNuvem(baseNuv.funcionarios);
             }

@@ -940,6 +940,9 @@
             color: #111;
             padding: 8px 4px;
         }
+        #modalVerRelatorio .modal-ver-rel-corpo table {
+            min-width: 640px;
+        }
         #modalVerRelatorio .modal-ver-rel-corpo .nota-espelho {
             width: 100% !important;
             max-width: 100% !important;
