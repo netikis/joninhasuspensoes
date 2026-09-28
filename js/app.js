@@ -952,26 +952,48 @@ function clienteUnicoPorTelefone(db, texto) {
     return null;
 }
 
+function clientePorId(db, id) {
+    if (!id) return null;
+    return (db.clientes || []).find(function (x) { return x && String(x.id) === String(id); }) || null;
+}
+
+function textoBateComCliente(c, texto) {
+    if (!c) return false;
+    var t = String(texto || '').trim();
+    if (!t) return false;
+    var lower = t.toLowerCase();
+    if (String(c.nome || '').trim().toLowerCase() === lower) return true;
+    if (rotuloNomeCliente(c).toLowerCase() === lower) return true;
+    var ape = apelidoCliente(c);
+    if (ape && nomeClienteChave(ape) === nomeClienteChave(t)) return true;
+    return false;
+}
+
+function _primeiroSeUnico(lista) {
+    return (lista && lista.length === 1) ? lista[0] : null;
+}
+
 function resolverClienteAtendimento(db, texto) {
     var nome = String(texto || '').trim();
     if (!nome) return { ok: false };
     var lower = nome.toLowerCase();
-    var exato = db.clientes.find(function (c) {
+    var lista = db.clientes || [];
+    var exato = _primeiroSeUnico(lista.filter(function (c) {
         return String(c.nome || '').trim().toLowerCase() === lower;
-    });
+    }));
     if (exato) {
         return { ok: true, clienteId: exato.id, clienteNome: exato.nome, clienteAvulso: false };
     }
-    var porApelido = db.clientes.find(function (c) {
+    var porApelido = _primeiroSeUnico(lista.filter(function (c) {
         var a = nomeClienteChave(apelidoCliente(c));
         return a && a === nomeClienteChave(nome);
-    });
+    }));
     if (porApelido) {
         return { ok: true, clienteId: porApelido.id, clienteNome: porApelido.nome, clienteAvulso: false };
     }
-    var porRotulo = db.clientes.find(function (c) {
+    var porRotulo = _primeiroSeUnico(lista.filter(function (c) {
         return rotuloNomeCliente(c).toLowerCase() === lower;
-    });
+    }));
     if (porRotulo) {
         return { ok: true, clienteId: porRotulo.id, clienteNome: porRotulo.nome, clienteAvulso: false };
     }
@@ -980,6 +1002,21 @@ function resolverClienteAtendimento(db, texto) {
         return { ok: true, clienteId: porTel.id, clienteNome: porTel.nome, clienteAvulso: false };
     }
     return { ok: true, clienteId: null, clienteNome: nome, clienteAvulso: true };
+}
+
+function resolverClienteDoFormularioOs(db) {
+    db = db || carregar();
+    var hid = document.getElementById('atClienteId');
+    var busca = document.getElementById('atClienteBusca');
+    var texto = busca ? busca.value : '';
+    var id = hid ? String(hid.value || '').trim() : '';
+    if (id) {
+        var c = clientePorId(db, id);
+        if (c && textoBateComCliente(c, texto)) {
+            return { ok: true, clienteId: c.id, clienteNome: c.nome, clienteAvulso: false };
+        }
+    }
+    return resolverClienteAtendimento(db, texto);
 }
 
 function snapshotClienteCadastro(db, resolvido) {
@@ -1065,8 +1102,8 @@ function atualizarStatusClienteAt() {
         card.innerHTML = '';
         return;
     }
-    var r = resolverClienteAtendimento(db, texto);
-    if (!r.clienteAvulso) {
+    var r = resolverClienteDoFormularioOs(db);
+    if (r.ok && !r.clienteAvulso) {
         hid.value = r.clienteId;
         status.innerHTML = '<span style="color:#8fe0b8;font-weight:700">Cliente cadastrado</span> — dados do cadastro carregados abaixo.';
         var snap = snapshotClienteCadastro(db, r);
@@ -1092,7 +1129,7 @@ function selecionarClienteAtendimento(c) {
     if (!c) return;
     var busca = document.getElementById('atClienteBusca');
     var hid = document.getElementById('atClienteId');
-    if (hid) hid.value = c.id || '';
+    if (hid) hid.value = String(c.id || '');
     if (busca) busca.value = c.nome || '';
     esconderSugestoesClienteAt();
     atualizarStatusClienteAt();
@@ -1260,7 +1297,16 @@ function preencherListaClientesAt(db, filtroTexto) {
 
 function atualizarSugestoesClienteAt() {
     var busca = document.getElementById('atClienteBusca');
-    preencherListaClientesAt(carregar(), busca ? busca.value : '');
+    var hid = document.getElementById('atClienteId');
+    var db = carregar();
+    var id = hid ? String(hid.value || '').trim() : '';
+    if (id) {
+        var cSel = clientePorId(db, id);
+        if (!cSel || !textoBateComCliente(cSel, busca ? busca.value : '')) {
+            hid.value = '';
+        }
+    }
+    preencherListaClientesAt(db, busca ? busca.value : '');
     atualizarStatusClienteAt();
 }
 
@@ -1286,14 +1332,21 @@ function atualizarSugestoesClienteAt() {
     });
     if (box && !box.getAttribute('data-cli-sug')) {
         box.setAttribute('data-cli-sug', '1');
-        box.addEventListener('mousedown', function (e) {
+        function pegarClienteDaSugestao(e) {
             var btn = e.target.closest('[data-cli-id]');
-            if (!btn || !box.contains(btn)) return;
+            if (!btn || !box.contains(btn)) return null;
+            return clientePorId(carregar(), btn.getAttribute('data-cli-id'));
+        }
+        function confirmarSugestaoCliente(e) {
+            var c = pegarClienteDaSugestao(e);
+            if (!c) return;
             e.preventDefault();
-            var db = carregar();
-            var c = (db.clientes || []).find(function (x) { return String(x.id) === String(btn.getAttribute('data-cli-id')); });
-            if (c) selecionarClienteAtendimento(c);
-        });
+            e.stopPropagation();
+            selecionarClienteAtendimento(c);
+        }
+        box.addEventListener('pointerdown', confirmarSugestaoCliente, true);
+        box.addEventListener('mousedown', confirmarSugestaoCliente, true);
+        box.addEventListener('click', confirmarSugestaoCliente, true);
     }
     document.addEventListener('mousedown', function (e) {
         if (!box || box.hidden) return;
@@ -2430,11 +2483,12 @@ function renderClientes() {
         b.addEventListener('click', function () {
             var db2 = carregar();
             var cid = b.getAttribute('data-at');
-            var c = db2.clientes.find(function (x) { return x.id === cid; });
+            var c = db2.clientes.find(function (x) { return String(x.id) === String(cid); });
             abrirPainel('painelVeiculo');
             document.getElementById('atClienteId').value = cid;
             document.getElementById('atClienteBusca').value = c ? c.nome : '';
-            atualizarStatusClienteAt();
+            if (typeof selecionarClienteAtendimento === 'function' && c) selecionarClienteAtendimento(c);
+            else atualizarStatusClienteAt();
         });
     });
 }
@@ -7036,7 +7090,7 @@ function garantirTelefoneWaEnvio(tel) {
 
 function montarAtendimentoDoFormulario() {
     var db = carregar();
-    var resolvido = resolverClienteAtendimento(db, document.getElementById('atClienteBusca').value);
+    var resolvido = resolverClienteDoFormularioOs(db);
     var id = document.getElementById('atId').value;
     var tots = totaisItens(itensTemp);
     var base = id ? (db.atendimentos || []).find(function (x) { return x.id === id; }) : null;
@@ -7243,7 +7297,7 @@ async function waEnvioArquivo(formato) {
 
 function salvarAtendimentoRapidoParaEnvio() {
     var db = carregar();
-    var resolvido = resolverClienteAtendimento(db, document.getElementById('atClienteBusca').value);
+    var resolvido = resolverClienteDoFormularioOs(db);
     if (!resolvido.ok) {
         toast('Informe o nome do cliente (cadastrado ou avulso) para enviar.');
         return null;

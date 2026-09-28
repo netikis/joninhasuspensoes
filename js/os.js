@@ -1158,7 +1158,7 @@ async function salvarAtendimentoAtual() {
         errEl.textContent = '';
     }
     var db = carregar();
-    var resolvido = resolverClienteAtendimento(db, document.getElementById('atClienteBusca').value);
+    var resolvido = resolverClienteDoFormularioOs(db);
     if (!resolvido.ok) {
         mostrarErroSalvarOs('Informe o nome do cliente (cadastrado ou avulso).', 'atClienteBusca');
         return;
