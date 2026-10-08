@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=87">
-    <link rel="stylesheet" href="css/tema-m3.css?v=87">
-    <link rel="stylesheet" href="css/telas.css?v=87">
+    <link rel="stylesheet" href="css/app.css?v=88">
+    <link rel="stylesheet" href="css/tema-m3.css?v=88">
+    <link rel="stylesheet" href="css/telas.css?v=88">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -346,10 +346,10 @@
                     <p class="hint" style="margin-top:10px" id="atClienteStatus">Digite o nome ou o telefone aqui neste campo. O cadastro aparece embaixo para você clicar e puxar para o serviço.</p>
                     <div id="atClienteCard" class="cliente-card-os" style="display:none"></div>
                     <div class="box-cli-rapido-os" id="boxCliRapidoOs">
-                        <p class="hint" style="margin:12px 0 8px;font-weight:700;color:#1e3a5f">Cliente novo (1ª vez)? Cadastre só o nome e o telefone:</p>
+                        <p class="hint" style="margin:12px 0 8px;font-weight:700;color:#1e3a5f">Cliente novo (1ª vez)? Cadastre o nome (telefone é opcional, pode adicionar depois):</p>
                         <div class="row" style="align-items:flex-end">
                             <div class="col"><label>Nome</label><input id="osCliRapidoNome" class="cad-maiusculo" placeholder="NOME DO CLIENTE" autocomplete="off"></div>
-                            <div class="col"><label>Telefone / WhatsApp</label><input id="osCliRapidoTel" type="tel" inputmode="tel" placeholder="(00) 00000-0000" autocomplete="tel"></div>
+                            <div class="col"><label>Telefone / WhatsApp (opcional)</label><input id="osCliRapidoTel" type="tel" inputmode="tel" placeholder="(00) 00000-0000" autocomplete="tel"></div>
                             <div class="col" style="flex:0.85;align-self:end"><button type="button" class="btn btn-ok" id="btnCliRapidoOs" style="width:100%">Cadastrar cliente</button></div>
                         </div>
                     </div>
@@ -1763,6 +1763,11 @@
                 <option value="interno">Modo Interno</option>
             </select>
 
+            <div class="row" style="margin-top:6px">
+                <div class="col"><label>Data que recebi (pagamento)</label><input id="recOsDataPag" type="date"></div>
+                <div class="col"><label>Data da saída (lança no caixa)</label><input id="recOsDataSaida" type="date"></div>
+            </div>
+
             <div class="rec-os-bloco">
                 <div class="rec-os-linha"><span>1) Valor total do orçamento</span><strong id="recOsTotalBruto">R$ 0,00</strong></div>
             </div>
@@ -1808,6 +1813,43 @@
                     <button type="button" class="btn btn-ok" id="btnReceberOsConfirmar" style="width:100%">✅ Confirmar e mandar ao caixa</button>
                     <button type="button" class="btn btn-danger" id="btnReceberOsFechar" style="width:100%">Cancelar</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalOsSemValor">
+        <div class="modal-box" style="width:min(440px,100%)">
+            <h3>🛡️ OS sem valor</h3>
+            <p class="hint" id="osSemValorResumo"></p>
+            <p class="hint">Esta OS está com valor <strong>R$ 0,00</strong>. Escolha como lançar no caixa.</p>
+            <label>Destino do caixa</label>
+            <select id="osSemValorDestino">
+                <option value="normal">Caixa / Relatórios (oficial)</option>
+                <option value="interno">Modo Interno</option>
+            </select>
+            <div class="row" style="margin-top:6px">
+                <div class="col"><label>Data da saída (lança no caixa)</label><input id="osSemValorData" type="date"></div>
+            </div>
+            <div class="modal-acoes" style="flex-direction:column;gap:8px;margin-top:12px">
+                <button type="button" class="btn btn-ok" id="btnOsSemValorGarantia" style="width:100%">🛡️ Lançar como GARANTIA</button>
+                <button type="button" class="btn btn-secondary" id="btnOsSemValorVenda" style="width:100%">🧾 Lançar como VENDA (R$ 0,00)</button>
+                <button type="button" class="btn btn-danger" id="btnOsSemValorCancelar" style="width:100%">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalDatasOs">
+        <div class="modal-box" style="width:min(440px,100%)">
+            <h3>📅 Alterar datas da OS</h3>
+            <p class="hint" id="datasOsResumo"></p>
+            <div class="row">
+                <div class="col"><label>Data que recebi (pagamento)</label><input id="datasOsPag" type="date"></div>
+                <div class="col"><label>Data da saída (lança no caixa)</label><input id="datasOsSaida" type="date"></div>
+            </div>
+            <p class="hint">Os lançamentos desta OS no caixa passam para a data da saída.</p>
+            <div class="modal-acoes" style="flex-direction:column;gap:8px;margin-top:10px">
+                <button type="button" class="btn btn-ok" id="btnDatasOsSalvar" style="width:100%">💾 Salvar datas</button>
+                <button type="button" class="btn btn-danger" id="btnDatasOsCancelar" style="width:100%">Cancelar</button>
             </div>
         </div>
     </div>
@@ -1992,17 +2034,17 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=87"></script>
-    <script src="js/storage.js?v=87"></script>
-    <script src="js/ui.js?v=87"></script>
-    <script src="js/auth.js?v=87"></script>
-    <script src="js/os.js?v=87"></script>
-    <script src="js/nuvem.js?v=87"></script>
-    <script src="js/caixa.js?v=87"></script>
-    <script src="js/comissoes.js?v=87"></script>
-    <script src="js/app.js?v=87"></script>
-    <script src="js/perfil-cliente.js?v=87"></script>
-    <script src="js/navegacao.js?v=87"></script>
+    <script src="js/config.js?v=88"></script>
+    <script src="js/storage.js?v=88"></script>
+    <script src="js/ui.js?v=88"></script>
+    <script src="js/auth.js?v=88"></script>
+    <script src="js/os.js?v=88"></script>
+    <script src="js/nuvem.js?v=88"></script>
+    <script src="js/caixa.js?v=88"></script>
+    <script src="js/comissoes.js?v=88"></script>
+    <script src="js/app.js?v=88"></script>
+    <script src="js/perfil-cliente.js?v=88"></script>
+    <script src="js/navegacao.js?v=88"></script>
 </body>
 </html>
 

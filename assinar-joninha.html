@@ -396,8 +396,6 @@
                     }).join('') + '</tbody></table>';
             }
             var foot = [];
-            if (vis.pecas && totCli.pecas != null) foot.push('Peças: ' + moeda(totCli.pecas));
-            if (vis.mao && totCli.mao != null) foot.push('Mão de obra: ' + moeda(totCli.mao));
             if (vis.custo && totCli.custoPecas != null) foot.push('Custo de peças: ' + moeda(totCli.custoPecas));
             if (vis.ganho && totCli.ganhoPecas != null) foot.push('Ganhos por peça: ' + moeda(totCli.ganhoPecas));
             var totalTxt = '';

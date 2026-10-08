@@ -1158,12 +1158,22 @@ function cadastrarClienteRapidoOs() {
         return;
     }
     var dig = typeof soDigitosTel === 'function' ? soDigitosTel(tel) : String(tel).replace(/\D/g, '');
-    if (dig.length < 8) {
-        toast('Informe o telefone / WhatsApp.');
+    if (dig.length > 0 && dig.length < 8) {
+        toast('Telefone incompleto. Corrija ou deixe em branco para adicionar depois.');
         if (telEl) telEl.focus();
         return;
     }
     var db = carregar();
+    if (!dig.length) {
+        var chaveNome = nomeClienteChave(nome);
+        var mesmoNome = (db.clientes || []).filter(function (c) {
+            return c && nomeClienteChave(c.nome) === chaveNome;
+        });
+        if (mesmoNome.length && !confirm('Já existe cliente com o nome "' + nome + '".\n\n' +
+            'OK = cadastrar outro com este nome (sem telefone)\nCancelar = voltar e escolher na busca')) {
+            return;
+        }
+    }
     var payload = {
         id: uid(),
         nome: nome,
@@ -1193,7 +1203,7 @@ function cadastrarClienteRapidoOs() {
         toast('Já existia o mesmo nome e telefone — ficou um único cadastro.');
     } else {
         db.clientes.push(payload);
-        toast('Cliente cadastrado.');
+        toast(dig.length ? 'Cliente cadastrado.' : 'Cliente cadastrado sem telefone — adicione depois em Clientes.');
     }
     limparExcluido(db, 'clientes', payload.id);
     unirClientesDuplicadosNoDb(db);
@@ -1678,8 +1688,32 @@ function rotuloMesYm(ym) {
 }
 
 function dataDocAtendimento(a) {
-    return String((a && (a.entrada || a.recebidoEm || a.criadoEm)) || '').slice(0, 10);
+    var pago = a && String(a.statusPagamento || '').toUpperCase() === 'PAGO';
+    return String((a && ((pago && a.saida) || a.entrada || a.recebidoEm || a.criadoEm)) || '').slice(0, 10);
 }
+
+/** Linha pequena com entrada e pagamento quando diferem da data mostrada (saída). */
+function htmlNotaDatasOs(a, dataMostrada) {
+    if (!a) return '';
+    var dMostra = dataISODia(dataMostrada);
+    var partes = [];
+    var dEnt = dataISODia(a.entrada);
+    var pago = String(a.statusPagamento || '').toUpperCase() === 'PAGO';
+    if (pago && dEnt && dEnt !== dMostra) partes.push('entrou ' + fmtData(dEnt));
+    var dPag = pago ? dataISODia(a.recebidoEm) : '';
+    if (dPag && dPag !== dMostra) partes.push('pago em ' + fmtData(dPag));
+    if (!partes.length) return '';
+    return '<div style="font-size:0.68rem;color:#8fe0b8;font-weight:700">' + esc(partes.join(' · ')) + '</div>';
+}
+
+/** Texto "pago em dd/mm/aaaa" de um lançamento do caixa quando difere da data do lançamento. */
+function textoPagoEmLanc(l) {
+    if (!l) return '';
+    var dPag = dataISODia(l.pagoEm);
+    if (!dPag || dPag === dataISODia(l.criadoEm)) return '';
+    return 'pago em ' + fmtData(dPag);
+}
+window.textoPagoEmLanc = textoPagoEmLanc;
 
 function dataDocVendaContagem(o) {
     return String((o && (o.dataEmissao || o.recebidoEm || o.criadoEm)) || '').slice(0, 10);
@@ -2080,8 +2114,10 @@ function montarLinhasRelatorioServicos(tipo) {
             } else {
                 tipoLinha = origem || x.forma || 'Entrada';
             }
+            if (x.garantia) tipoLinha = 'OS · GARANTIA';
             linhas.push({
                 data: x.criadoEm,
+                pagoInfo: textoPagoEmLanc(x),
                 tipo: tipoLinha,
                 cliente: cliente,
                 carro: carro,
@@ -2161,7 +2197,9 @@ function abrirRelatorioServicos(tipo) {
         elC.innerHTML = '<div class="table-wrap"><table class="tbl-click"><thead><tr>' +
             '<th>Data</th><th>Tipo</th><th>Cliente</th><th>Carro / placa</th><th>Valor</th></tr></thead><tbody>' +
             linhas.map(function (l, i) {
-                return '<tr data-rel-ix="' + i + '"><td>' + esc(fmtData(l.data)) + '</td><td>' + esc(l.tipo) +
+                return '<tr data-rel-ix="' + i + '"><td>' + esc(fmtData(l.data)) +
+                    (l.pagoInfo ? '<div style="font-size:0.68rem;opacity:0.85;font-weight:700">' + esc(l.pagoInfo) + '</div>' : '') +
+                    '</td><td>' + esc(l.tipo) +
                     '</td><td>' + esc(l.cliente) + '</td><td>' + esc((l.carro ? l.carro + ' · ' : '') + l.placa) +
                     '</td><td>' + moeda(l.valor) + '</td></tr>';
             }).join('') + '</tbody></table></div>';
@@ -2976,8 +3014,6 @@ function htmlItensNota(itens, vis) {
         rows = '<tr><td colspan="' + span + '" style="color:#000;font-size:0.85rem;">Sem itens lançados.</td></tr>';
     }
     var foot = [];
-    if (vis.pecas) foot.push('Peças: <strong>' + moeda(tot.pecas) + '</strong>');
-    if (vis.mao) foot.push('Mão de obra: <strong>' + moeda(tot.mao) + '</strong>');
     if (vis.custo) foot.push('Custo de peças: <strong>' + moeda(tot.custoPecas) + '</strong>');
     if (vis.ganho) foot.push('Ganhos por peça: <strong>' + moeda(tot.ganhoPecas) + '</strong>');
     var html = '<table class="nota-itens compacta"><thead><tr>' + colunas + '</tr></thead><tbody>' + rows + '</tbody></table>';
@@ -3944,7 +3980,7 @@ function renderHistorico() {
         var stPg = String(a.statusPagamento || '').toUpperCase();
         var badgePago = htmlBadgePagamentoHist(a, true);
         var btnReceber = jaPago
-            ? ''
+            ? '<button type="button" class="btn btn-secondary" data-datas-os="' + a.id + '" title="Alterar data do pagamento / saída">📅 Datas</button>'
             : '<button type="button" class="btn btn-receber" data-rec="' + a.id + '">💰 Receber</button>' +
                 ((stPg !== 'PARCIAL' && stPg !== 'PENDENTE' && atendimentoEmAberto(a))
                     ? '<button type="button" class="btn btn-ok" data-fin-cx="' + a.id + '">Mandar ao caixa</button>'
@@ -3968,9 +4004,13 @@ function renderHistorico() {
         );
         var tr = document.createElement('tr');
         if (ehAgendado) tr.className = 'linha-agendada';
+        var dataLinhaOs = ehAgendado && a.agendadoPara
+            ? a.agendadoPara
+            : ((jaPago && a.saida) ? a.saida : (a.entrada || a.criadoEm));
         tr.innerHTML =
-            '<td style="color:#fff;font-weight:600">' + esc(fmtData(ehAgendado && a.agendadoPara ? a.agendadoPara : (a.entrada || a.criadoEm))) +
+            '<td style="color:#fff;font-weight:600">' + esc(fmtData(dataLinhaOs)) +
             (ehAgendado ? '<div style="font-size:0.68rem;color:#f1c40f;font-weight:700">agendado</div>' : '') +
+            (!ehAgendado ? htmlNotaDatasOs(a, dataLinhaOs) : '') +
             '</td>' +
             '<td style="color:#fff;font-weight:800">' + badgeAg + esc(nome) + tagAvulso + badgeAssinatura(a) + badgePago + '</td>' +
             '<td style="color:#fff;font-weight:600">' + esc(a.carro || '—') + '</td>' +
@@ -4011,6 +4051,9 @@ function renderHistorico() {
     });
     tb.querySelectorAll('[data-rec]').forEach(function (b) {
         b.addEventListener('click', function () { abrirModalReceberOs(b.getAttribute('data-rec')); });
+    });
+    tb.querySelectorAll('[data-datas-os]').forEach(function (b) {
+        b.addEventListener('click', function () { abrirModalDatasOs(b.getAttribute('data-datas-os')); });
     });
     tb.querySelectorAll('[data-fin-cx]').forEach(function (b) {
         b.addEventListener('click', function () { finalizarEMandarAoCaixa(b.getAttribute('data-fin-cx')); });
@@ -4065,6 +4108,217 @@ function fecharModalReceberOs() {
     receberOsIdAtual = null;
     var m = document.getElementById('modalReceberOs');
     if (m) m.classList.remove('aberto');
+}
+
+/** Lançamentos da OS (balcão, banco e pendentes, oficial e interno) passam para a data da saída. */
+function moverLancamentosOsParaData(atId, ymdSaida, ymdPagNovo) {
+    var dSaida = dataISODia(ymdSaida);
+    if (!atId || !dSaida) return 0;
+    var agora = new Date().toISOString();
+    var n = 0;
+    function ajustar(dbx, comPendentes) {
+        var mudou = false;
+        ['caixa', 'caixaBanco'].forEach(function (k) {
+            (dbx[k] || []).forEach(function (l) {
+                if (!l || l.tipo !== 'entrada' || String(l.atendimentoId || '') !== String(atId)) return;
+                if (!l.pagoEm) l.pagoEm = dataISODia(l.criadoEm) || dSaida;
+                if (ymdPagNovo) l.pagoEm = ymdPagNovo;
+                l.criadoEm = isoComDataLocal(dSaida);
+                if (l.osResumo) l.osResumo.saida = dSaida;
+                l.atualizadoEm = agora;
+                mudou = true;
+                n += 1;
+            });
+        });
+        if (comPendentes) {
+            (dbx.pendentes || []).forEach(function (p) {
+                if (!p || p.status === 'pago' || String(p.atendimentoId || '') !== String(atId)) return;
+                p.criadoEm = isoComDataLocal(dSaida);
+                p.atualizadoEm = agora;
+                mudou = true;
+            });
+        }
+        return mudou;
+    }
+    var main = carregarMain();
+    if (ajustar(main, true)) salvarMain(main);
+    var int = carregarInternoRaw();
+    if (ajustar(int, true)) salvarInternoRaw(int);
+    if (n && typeof agendarSyncAutomatico === 'function') agendarSyncAutomatico('salvar');
+    return n;
+}
+
+function atualizarTelasAposCaixaOs() {
+    renderHistorico();
+    renderCaixa();
+    renderCaixaBanco();
+    renderPendentes();
+    renderRelatorioCaixa();
+    renderRelatorioOficina();
+    var dbK = typeof carregarMain === 'function' ? carregarMain() : carregar();
+    atualizarKPIs(dbK);
+    if (typeof renderCarrosEmAberto === 'function') renderCarrosEmAberto(dbK);
+}
+
+var datasOsIdAtual = null;
+
+function abrirModalDatasOs(atId) {
+    var info = obterAtendimentoParaReceber(atId);
+    if (!info || !info.a) {
+        toast('OS não encontrada.');
+        return;
+    }
+    var a = info.a;
+    datasOsIdAtual = atId;
+    var res = document.getElementById('datasOsResumo');
+    if (res) {
+        res.innerHTML = '<strong>' + esc(nomeAtendimento(info.db, a)) + '</strong> — ' + esc(a.carro || '—') +
+            ' · Placa <strong>' + esc((a.placa || '—').toUpperCase()) + '</strong>' +
+            (a.entrada ? ' · Entrou ' + esc(fmtData(a.entrada)) : '');
+    }
+    document.getElementById('datasOsPag').value = dataISODia(a.recebidoEm) || hojeISO();
+    document.getElementById('datasOsSaida').value = dataISODia(a.saida) || dataISODia(a.recebidoEm) || hojeISO();
+    document.getElementById('modalDatasOs').classList.add('aberto');
+}
+
+function fecharModalDatasOs() {
+    datasOsIdAtual = null;
+    var m = document.getElementById('modalDatasOs');
+    if (m) m.classList.remove('aberto');
+}
+
+function salvarDatasOs() {
+    if (!datasOsIdAtual) return;
+    var dPag = dataISODia(document.getElementById('datasOsPag').value);
+    var dSai = dataISODia(document.getElementById('datasOsSaida').value);
+    if (!dPag || !dSai) {
+        toast('Informe as duas datas.');
+        return;
+    }
+    var info = obterAtendimentoParaReceber(datasOsIdAtual);
+    if (!info || !info.a) {
+        toast('OS não encontrada.');
+        fecharModalDatasOs();
+        return;
+    }
+    var a = info.a;
+    var pagIso = isoComDataLocal(dPag);
+    a.recebidoEm = pagIso;
+    a.saida = dSai;
+    a.recebimentos = (a.recebimentos || []).map(function (r) {
+        return Object.assign({}, r, { em: pagIso });
+    });
+    a.atualizadoEm = new Date().toISOString();
+    var ix = (info.db.atendimentos || []).findIndex(function (x) { return x && String(x.id) === String(a.id); });
+    if (ix >= 0) info.db.atendimentos[ix] = a;
+    if (info.viaMain) salvarMain(info.db);
+    else salvar(info.db);
+    moverLancamentosOsParaData(a.id, dSai, dPag);
+    if (typeof agendarSyncAutomatico === 'function') agendarSyncAutomatico('salvar');
+    fecharModalDatasOs();
+    atualizarTelasAposCaixaOs();
+    toast('Datas atualizadas: pago em ' + fmtData(dPag) + ' · saída ' + fmtData(dSai) + '.');
+}
+window.abrirModalDatasOs = abrirModalDatasOs;
+
+var osSemValorIdAtual = null;
+
+function abrirModalOsSemValor(atId) {
+    var info = obterAtendimentoParaReceber(atId);
+    if (!info || !info.a) {
+        toast('OS não encontrada.');
+        return;
+    }
+    var a = info.a;
+    osSemValorIdAtual = atId;
+    var res = document.getElementById('osSemValorResumo');
+    if (res) {
+        res.innerHTML = '<strong>' + esc(nomeAtendimento(info.db, a)) + '</strong> — ' + esc(a.carro || '—') +
+            ' · Placa <strong>' + esc((a.placa || '—').toUpperCase()) + '</strong>';
+    }
+    var dest = document.getElementById('osSemValorDestino');
+    if (dest) dest.value = a.canalRecebimento === 'interno' ? 'interno' : 'normal';
+    document.getElementById('osSemValorData').value = dataISODia(a.saida) || hojeISO();
+    document.getElementById('modalOsSemValor').classList.add('aberto');
+}
+
+function fecharModalOsSemValor() {
+    osSemValorIdAtual = null;
+    var m = document.getElementById('modalOsSemValor');
+    if (m) m.classList.remove('aberto');
+}
+
+function lancarOsSemValor(tipo) {
+    if (!osSemValorIdAtual) return;
+    var info = obterAtendimentoParaReceber(osSemValorIdAtual);
+    if (!info || !info.a) {
+        toast('OS não encontrada.');
+        fecharModalOsSemValor();
+        return;
+    }
+    var a = info.a;
+    var ehGarantia = tipo === 'garantia';
+    var rotulo = ehGarantia ? 'Garantia' : 'Venda R$ 0';
+    var dest = (document.getElementById('osSemValorDestino') && document.getElementById('osSemValorDestino').value) || 'normal';
+    var dSai = dataISODia(document.getElementById('osSemValorData').value) || hojeISO();
+    var iso = isoComDataLocal(dSai);
+    var nome = nomeAtendimento(info.db, a);
+    var placa = (a.placa || '—').toUpperCase();
+    a.totalBruto = 0;
+    a.total = 0;
+    a.valorRecebido = 0;
+    a.saldoAberto = 0;
+    a.recebimentos = [];
+    a.statusPagamento = 'PAGO';
+    a.formaPagamento = rotulo;
+    a.tipoLancamento = ehGarantia ? 'GARANTIA' : 'VENDA';
+    a.ehGarantia = ehGarantia;
+    a.canalRecebimento = dest === 'interno' ? 'interno' : 'oficial';
+    a.recebidoEm = iso;
+    a.saida = dSai;
+    a.status = 'Entregue';
+    a.enviadoAoCaixa = true;
+    a.atualizadoEm = new Date().toISOString();
+    var ix = (info.db.atendimentos || []).findIndex(function (x) { return x && String(x.id) === String(a.id); });
+    if (ix >= 0) info.db.atendimentos[ix] = a;
+    if (info.viaMain) salvarMain(info.db);
+    else salvar(info.db);
+
+    var canalAntes = canalVendas;
+    canalVendas = dest === 'interno' ? 'interno' : 'normal';
+    var dbCx = carregar();
+    if (!dbCx.caixa) dbCx.caixa = [];
+    var jaTem = dbCx.caixa.some(function (l) {
+        return l && l.tipo === 'entrada' && String(l.atendimentoId || '') === String(a.id);
+    });
+    if (!jaTem) {
+        dbCx.caixa.push({
+            id: uid(),
+            tipo: 'entrada',
+            descricao: (ehGarantia ? 'GARANTIA' : 'Venda sem valor') + ' OS ' + placa + ' — ' + nome,
+            valor: 0,
+            forma: rotulo,
+            conta: 'balcao',
+            garantia: ehGarantia,
+            atendimentoId: a.id,
+            osResumo: {
+                cliente: nome,
+                placa: placa,
+                carro: a.carro || '',
+                totalOs: 0,
+                entrada: a.entrada || a.criadoEm || '',
+                saida: dSai
+            },
+            pagoEm: dSai,
+            criadoEm: iso
+        });
+    }
+    salvar(dbCx);
+    canalVendas = canalAntes;
+    atualizarBadgeCanal();
+    fecharModalOsSemValor();
+    atualizarTelasAposCaixaOs();
+    toast('OS lançada no caixa como ' + (ehGarantia ? 'GARANTIA' : 'VENDA (R$ 0,00)') + ' em ' + fmtData(dSai) + '.');
 }
 
 function obterAtendimentoParaReceber(id) {
@@ -4177,16 +4431,23 @@ function abrirModalReceberOs(atendimentoId) {
     }
     var a = info.a;
     if (String(a.statusPagamento || '').toUpperCase() === 'PAGO') {
-        alert('Esta OS já está marcada como PAGA (' + (a.formaPagamento || '—') +
-            (a.canalRecebimento === 'interno' ? ' · Modo Interno' : ' · Caixa oficial') + ').');
+        if (confirm('Esta OS já está marcada como PAGA (' + (a.formaPagamento || '—') +
+            (a.canalRecebimento === 'interno' ? ' · Modo Interno' : ' · Caixa oficial') + ').\n\n' +
+            'Quer alterar a data do pagamento / saída?')) {
+            abrirModalDatasOs(atendimentoId);
+        }
         return;
     }
     var bruto = brutoOrcamentoOs(a);
     if (!(bruto > 0)) {
-        toast('Esta OS está sem valor para receber.');
+        abrirModalOsSemValor(atendimentoId);
         return;
     }
     receberOsIdAtual = atendimentoId;
+    var elDtPag = document.getElementById('recOsDataPag');
+    if (elDtPag) elDtPag.value = hojeISO();
+    var elDtSai = document.getElementById('recOsDataSaida');
+    if (elDtSai) elDtSai.value = dataISODia(a.saida) || hojeISO();
     var nome = nomeAtendimento(info.db, a);
     document.getElementById('receberOsResumo').innerHTML =
         '<strong>' + esc(nome) + '</strong> — ' + esc(a.carro || '—') +
@@ -4247,9 +4508,13 @@ function confirmarRecebimentoOs() {
     var nome = nomeAtendimento(info.db, a);
     var placa = (a.placa || '—').toUpperCase();
     var agoraIso = new Date().toISOString();
+    var dataPag = dataISODia(document.getElementById('recOsDataPag') && document.getElementById('recOsDataPag').value) || hojeISO();
+    var dataSaida = dataISODia(document.getElementById('recOsDataSaida') && document.getElementById('recOsDataSaida').value) ||
+        dataISODia(a.saida) || hojeISO();
+    var pagIso = isoComDataLocal(dataPag);
     var recs = (a.recebimentos || []).slice();
     tot.splits.forEach(function (r) {
-        recs.push({ forma: r.forma, valor: r.valor, em: agoraIso });
+        recs.push({ forma: r.forma, valor: r.valor, em: pagIso });
     });
     var formas = recs.map(function (r) { return r.forma; });
     if (ehBoleto && formas.indexOf('Boleto') < 0) formas.push('Boleto');
@@ -4257,8 +4522,8 @@ function confirmarRecebimentoOs() {
     if (tot.aberto < 0.01) status = 'PAGO';
     else if (tot.recebido > 0.009) status = 'PARCIAL';
     var venc = (typeof somarDiasISO === 'function')
-        ? somarDiasISO(hojeISO(), boletoDias || 0)
-        : hojeISO();
+        ? somarDiasISO(dataPag, boletoDias || 0)
+        : dataPag;
 
     a.totalBruto = tot.bruto;
     a.descontoReais = tot.descR;
@@ -4273,15 +4538,14 @@ function confirmarRecebimentoOs() {
     a.ehBoleto = ehBoleto;
     a.boletoDias = boletoDias;
     a.dataVencimento = venc;
-    a.recebidoEm = agoraIso;
+    a.recebidoEm = pagIso;
     a.atualizadoEm = agoraIso;
     a.enviadoAoCaixa = true;
+    a.saida = dataSaida;
     if (status === 'PAGO') {
         if ((a.status || '') !== 'Entregue') a.status = 'Entregue';
-        if (!a.saida) a.saida = hojeISO();
     } else if ((a.status || '') !== 'Entregue') {
         a.status = 'Pronto';
-        a.saida = a.saida || hojeISO();
     }
     var ix = (info.db.atendimentos || []).findIndex(function (x) { return x && String(x.id) === String(a.id); });
     if (ix >= 0) info.db.atendimentos[ix] = a;
@@ -4305,9 +4569,11 @@ function confirmarRecebimentoOs() {
                 placa: placa,
                 carro: a.carro || '',
                 totalOs: tot.totalFinal,
-                entrada: a.entrada || a.criadoEm || ''
+                entrada: a.entrada || a.criadoEm || '',
+                saida: dataSaida
             },
-            criadoEm: isoComDataLocal(a.entrada || hojeISO())
+            pagoEm: dataPag,
+            criadoEm: isoComDataLocal(dataSaida)
         };
         if (formaPagamentoEhDigital(r.forma)) {
             if (!dbCx.caixaBanco) dbCx.caixaBanco = [];
@@ -4335,12 +4601,13 @@ function confirmarRecebimentoOs() {
             atendimentoId: a.id,
             formaPrevista: ehBoleto ? 'Boleto' : (formas.join(' + ') || ''),
             ehBoleto: ehBoleto,
-            criadoEm: isoComDataLocal(a.entrada || hojeISO())
+            criadoEm: isoComDataLocal(dataSaida)
         });
     }
     salvar(dbCx);
     canalVendas = canalAntes;
     atualizarBadgeCanal();
+    moverLancamentosOsParaData(a.id, dataSaida, null);
 
     var destinoTxt = dest === 'interno' ? 'Modo Interno' : 'Caixa / Relatórios (oficial)';
     fecharModalReceberOs();
@@ -4575,6 +4842,25 @@ function renderAlertaVencidos30(db) {
 document.getElementById('btnReceberOsFechar').addEventListener('click', fecharModalReceberOs);
 document.getElementById('modalReceberOs').addEventListener('click', function (e) {
     if (e.target.id === 'modalReceberOs') fecharModalReceberOs();
+});
+[
+    ['btnOsSemValorGarantia', function () { lancarOsSemValor('garantia'); }],
+    ['btnOsSemValorVenda', function () { lancarOsSemValor('venda'); }],
+    ['btnOsSemValorCancelar', fecharModalOsSemValor],
+    ['btnDatasOsSalvar', salvarDatasOs],
+    ['btnDatasOsCancelar', fecharModalDatasOs]
+].forEach(function (par) {
+    var b = document.getElementById(par[0]);
+    if (b) b.addEventListener('click', par[1]);
+});
+['modalOsSemValor', 'modalDatasOs'].forEach(function (mid) {
+    var m = document.getElementById(mid);
+    if (!m) return;
+    m.addEventListener('click', function (e) {
+        if (e.target.id !== mid) return;
+        if (mid === 'modalOsSemValor') fecharModalOsSemValor();
+        else fecharModalDatasOs();
+    });
 });
 var btnRecOsOk = document.getElementById('btnReceberOsConfirmar');
 if (btnRecOsOk) btnRecOsOk.addEventListener('click', confirmarRecebimentoOs);
@@ -5316,11 +5602,9 @@ function htmlDocumentoVenda(db, o, vis) {
         }).join('')
         : '';
     var foot = [];
-    if (vis.pecas) foot.push('Peças: <strong>' + moeda(tot.pecas) + '</strong>');
-    if (vis.mao) foot.push('Mão de obra: <strong>' + moeda(tot.mao) + '</strong>');
     if (vis.custo) foot.push('Custo de peças: <strong>' + moeda(tot.custoPecas) + '</strong>');
     if (vis.ganho) foot.push('Ganhos por peça: <strong>' + moeda(tot.ganhoPecas) + '</strong>');
-    if (vis.total) {
+    if (vis.total && (descR > 0 || descP > 0)) {
         foot.push('Subtotal: <strong>' + moeda(sub) + '</strong>');
         if (descR > 0) foot.push('Desconto R$: <strong>− ' + moeda(descR) + '</strong>');
         if (descP > 0) foot.push('Desconto ' + esc(String(descP)) + '%: <strong>− ' + moeda(descPercValor) + '</strong>');
@@ -7668,6 +7952,7 @@ function dataCorteOsISO(a, mapaPag) {
     if (!a) return '';
     var id = a.id != null ? String(a.id) : '';
     if (id && mapaPag && mapaPag.at && mapaPag.at[id]) return mapaPag.at[id];
+    if (dataISODia(a.saida)) return dataISODia(a.saida);
     var rec = String(a.recebidoEm || '').slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}$/.test(rec)) return rec;
     return dataAtendimentoISO(a);
@@ -7980,7 +8265,9 @@ function sincronizarOficinaNoCaixaEmpresa() {
         var placa = (a.placa || '—').toUpperCase();
         var forma = a.formaPagamento || 'Dinheiro';
         var digital = formaPagamentoEhDigital(forma);
-        var dataRef = a.recebidoEm || a.atualizadoEm || a.entrada || a.criadoEm || new Date().toISOString();
+        var dataRef = dataISODia(a.saida)
+            ? isoComDataLocal(a.saida)
+            : (a.recebidoEm || a.atualizadoEm || a.entrada || a.criadoEm || new Date().toISOString());
         var lanc = {
             id: uid(),
             tipo: 'entrada',
@@ -7996,9 +8283,11 @@ function sincronizarOficinaNoCaixaEmpresa() {
                 carro: a.carro || '',
                 totalOs: valor,
                 entrada: a.entrada || a.criadoEm || '',
+                saida: dataISODia(a.saida),
                 pecas: Number(a.totalPecas) || t.pecas,
                 mao: Number(a.maoObra) || t.mao
             },
+            pagoEm: dataISODia(a.recebidoEm) || '',
             criadoEm: dataRef
         };
         if (digital) db.caixaBanco.push(lanc);

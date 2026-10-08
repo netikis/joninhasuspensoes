@@ -686,6 +686,12 @@ function classificarTipoCaixaFh(x) {
     return { sigla: 'ENTRADA', cls: 'entrada' };
 }
 
+function htmlPagoEmCaixa(x) {
+    var t = typeof textoPagoEmLanc === 'function' ? textoPagoEmLanc(x) : '';
+    var g = x && x.garantia ? '<div style="font-size:0.68rem;color:#f1c40f;font-weight:800">GARANTIA</div>' : '';
+    return g + (t ? '<div style="font-size:0.68rem;color:#8fe0b8;font-weight:700">' + esc(t) + '</div>' : '');
+}
+
 function numDocCaixaFh(x) {
     if (lancamentoEhFechamento(x) && x.numDoc) return String(x.numDoc);
     if (x.osResumo && x.osResumo.placa) return String(x.osResumo.placa).toUpperCase();
@@ -826,7 +832,7 @@ function renderCaixa() {
         tr.innerHTML =
             '<td style="font-weight:800">' + esc(doc) + '</td>' +
             '<td><span class="badge-cx ' + tip.cls + '">' + tip.sigla + '</span></td>' +
-            '<td>' + esc(dataLanc) + '</td>' +
+            '<td>' + esc(dataLanc) + htmlPagoEmCaixa(x) + '</td>' +
             '<td>' + esc(cli) + '</td>' +
             '<td>' + esc(venc) + '</td>' +
             '<td style="color:' + valorCor + ';font-weight:800">' + moeda(x.valor) + '</td>' +
@@ -1326,7 +1332,7 @@ function renderCaixaBanco() {
         tr.innerHTML =
             '<td style="font-weight:800">' + esc(doc) + '</td>' +
             '<td><span class="badge-cx ' + tip.cls + '">' + tip.sigla + '</span></td>' +
-            '<td>' + esc(dataLanc) + '</td>' +
+            '<td>' + esc(dataLanc) + htmlPagoEmCaixa(x) + '</td>' +
             '<td>' + esc(cli) + '</td>' +
             '<td>' + esc(venc) + '</td>' +
             '<td style="color:' + valorCor + ';font-weight:800">' + moeda(x.valor) + '</td>' +

@@ -942,6 +942,7 @@ document.getElementById('btnAddMao').addEventListener('click', function () {
     document.getElementById('maoFuncId').value = '';
     atualizarPreviewComissaoMao();
     renderItens();
+    try { document.getElementById('maoDesc').focus(); } catch (eFocoMao) { /* ok */ }
     if (fid && comissaoValor > 0) {
         toast('MO ' + rotuloTipoMaoComissao(tipoMao) + ' · comissão ' + moeda(comissaoValor) + ' — vai para Comissões ao salvar.');
     }
@@ -955,10 +956,12 @@ window._mapaEnterOs = {
     itemQtd: 'btnAddItem',
     pecaFuncId: 'btnAddItem',
     pecaTipoComissao: 'btnAddItem',
-    maoDesc: 'btnAddMao',
-    maoValor: 'btnAddMao',
-    maoTipoComissao: 'btnAddMao',
-    maoFuncId: 'btnAddMao'
+    maoValor: 'btnAddMao'
+};
+window._proximoEnterOs = {
+    maoDesc: 'maoFuncId',
+    maoFuncId: 'maoTipoComissao',
+    maoTipoComissao: 'maoValor'
 };
 window._osEnterLock = 0;
 window._osSalvando = false;
@@ -985,6 +988,16 @@ window._osSalvando = false;
             e.stopPropagation();
             return;
         }
+        var prox = window._proximoEnterOs[t.id] && document.getElementById(window._proximoEnterOs[t.id]);
+        if (prox) {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+                prox.focus();
+                if (typeof prox.select === 'function' && prox.tagName === 'INPUT') prox.select();
+            } catch (eFoco) { /* ok */ }
+            return;
+        }
         var botaoId = window._mapaEnterOs[t.id];
         if (!botaoId) return;
         e.preventDefault();
@@ -993,7 +1006,7 @@ window._osSalvando = false;
     }, true);
     if (typeof window.enterClicaBotao === 'function') {
         window.enterClicaBotao(['itemDesc', 'itemCusto', 'itemValor', 'itemQtd', 'pecaFuncId', 'pecaTipoComissao'], 'btnAddItem');
-        window.enterClicaBotao(['maoDesc', 'maoValor', 'maoTipoComissao', 'maoFuncId'], 'btnAddMao');
+        window.enterClicaBotao(['maoValor'], 'btnAddMao');
     }
     var btnS = document.getElementById('btnSalvarAt');
     if (btnS && !btnS.getAttribute('data-os-save')) {
@@ -1267,6 +1280,13 @@ async function salvarAtendimentoAtual() {
         }
         limparExcluido(db, 'atendimentos', payload.id);
         salvar(db);
+        var saidaAntes = existente ? dataISODia(existente.saida) : '';
+        var saidaNova = dataISODia(payload.saida);
+        if (id && saidaNova && saidaNova !== saidaAntes && typeof moverLancamentosOsParaData === 'function') {
+            if (moverLancamentosOsParaData(payload.id, saidaNova, null) > 0) {
+                toast('Lançamentos desta OS no caixa passaram para a saída ' + fmtData(saidaNova) + '.');
+            }
+        }
 
         toast(
             (id ? 'Atendimento atualizado' : 'Atendimento salvo') +
@@ -1736,8 +1756,10 @@ function aplicarServicoMaoNoOs(s) {
         valor.value = typeof fmtNumOs === 'function' ? fmtNumOs(s.valor) : String(s.valor);
     }
     if (typeof atualizarPreviewComissaoMao === 'function') atualizarPreviewComissaoMao();
-    if (valor) {
-        try { valor.focus(); valor.select(); } catch (eF) { /* ok */ }
+    var func = document.getElementById('maoFuncId');
+    var foco = func || valor;
+    if (foco) {
+        try { foco.focus(); } catch (eF) { /* ok */ }
     }
     toast('Serviço selecionado: ' + (s.desc || ''));
 }
