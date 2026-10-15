@@ -157,7 +157,9 @@ function estadoInternoVazio() {
         pendentes: [],
         caixaConfig: { inicialBalcao: 0, inicialBanco: 0 },
         funcionarios: [],
-        pagamentosFuncionarios: []
+        pagamentosFuncionarios: [],
+        anotacoesFuncionarios: [],
+        fechamentosFuncionarios: []
     };
 }
 
@@ -205,7 +207,9 @@ function carregar() {
         funcionarios: (typeof mesclarFuncionarios === 'function'
             ? mesclarFuncionarios(main.funcionarios, int.funcionarios)
             : (int.funcionarios || []).concat(main.funcionarios || [])),
-        pagamentosFuncionarios: int.pagamentosFuncionarios || []
+        pagamentosFuncionarios: int.pagamentosFuncionarios || [],
+        anotacoesFuncionarios: int.anotacoesFuncionarios || [],
+        fechamentosFuncionarios: int.fechamentosFuncionarios || []
     });
 }
 
@@ -222,7 +226,9 @@ function salvar(db) {
             pendentes: db.pendentes || [],
             caixaConfig: db.caixaConfig || { inicialBalcao: 0, inicialBanco: 0 },
             funcionarios: db.funcionarios != null ? db.funcionarios : (intAtual.funcionarios || []),
-            pagamentosFuncionarios: db.pagamentosFuncionarios != null ? db.pagamentosFuncionarios : (intAtual.pagamentosFuncionarios || [])
+            pagamentosFuncionarios: db.pagamentosFuncionarios != null ? db.pagamentosFuncionarios : (intAtual.pagamentosFuncionarios || []),
+            anotacoesFuncionarios: db.anotacoesFuncionarios != null ? db.anotacoesFuncionarios : (intAtual.anotacoesFuncionarios || []),
+            fechamentosFuncionarios: db.fechamentosFuncionarios != null ? db.fechamentosFuncionarios : (intAtual.fechamentosFuncionarios || [])
         });
         var main = carregarMain();
         main.empresa = db.empresa || main.empresa;

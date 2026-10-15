@@ -359,6 +359,58 @@ window.enterClicaBotao = function (campoIds, botaoId) {
     });
 };
 
+function rolarParaTopoTela() {
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e1) { window.scrollTo(0, 0); }
+    ['.main', '.conteudo'].forEach(function (sel) {
+        var el = document.querySelector(sel);
+        if (el && el.scrollTop > 0) {
+            try { el.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e2) { el.scrollTop = 0; }
+        }
+    });
+    var painel = document.querySelector('.painel.active, section.active');
+    if (painel && painel.scrollTop > 0) painel.scrollTop = 0;
+}
+window.rolarParaTopoTela = rolarParaTopoTela;
+
+function campoAceitaFoco(el) {
+    if (!el || el.disabled || el.readOnly) return false;
+    if (el.type === 'hidden') return false;
+    return el.offsetParent !== null || el.getClientRects().length > 0;
+}
+
+/* Foca o próximo campo visível depois de atualId. Retorna false se não há próximo. */
+window.focarProximoCampo = function (ids, atualId) {
+    var ix = (ids || []).indexOf(atualId);
+    if (ix < 0) return false;
+    for (var i = ix + 1; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (!campoAceitaFoco(el)) continue;
+        try {
+            el.focus();
+            if (el.tagName === 'INPUT' && typeof el.select === 'function') el.select();
+        } catch (eF) { /* ok */ }
+        return true;
+    }
+    return false;
+};
+
+/* Enter pula para o próximo campo; no último, clica o botão. */
+window.enterProximoCampo = function (campoIds, botaoId) {
+    (campoIds || []).forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('keydown', function (e) {
+            if (!teclaEhEnter(e)) return;
+            if (el.tagName === 'TEXTAREA') return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.focarProximoCampo(campoIds, id)) return;
+            var btn = document.getElementById(botaoId);
+            if (btn) btn.click();
+        }, true);
+    });
+};
+
 function renderTudo() {
     var db = carregar();
     if (!db.empresa) {

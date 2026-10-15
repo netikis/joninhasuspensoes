@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=89">
-    <link rel="stylesheet" href="css/tema-m3.css?v=89">
-    <link rel="stylesheet" href="css/telas.css?v=89">
+    <link rel="stylesheet" href="css/app.css?v=90">
+    <link rel="stylesheet" href="css/tema-m3.css?v=90">
+    <link rel="stylesheet" href="css/telas.css?v=90">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -224,6 +224,11 @@
                     <div class="v" id="kpiCaixa">R$ 0</div>
                     <div class="card-sub">Balcão + banco</div>
                 </button>
+            </div>
+            <div class="inicio-fech-bar">
+                <p class="hint" id="kpiInicioDesde">Contando desde o último fechamento.</p>
+                <button type="button" class="btn btn-ok" id="btnInicioFecharCaixa">🔒 Fechar caixa e zerar</button>
+                <button type="button" class="btn btn-secondary" id="btnInicioFecharPeriodo">📅 Fechar por período</button>
             </div>
             <div class="cards" id="cardsGanhoDespesaInicio">
                 <button type="button" class="card card-atalho card-ent" data-goto="painelRelatorioOficina" title="Ganho da casa: mão de obra + lucro em peças (OS e venda juntas)">
@@ -644,7 +649,7 @@
                         </div>
                     </div>
                     <div class="row" style="margin-top:14px">
-                        <button type="submit" class="btn btn-primary">Salvar Produto</button>
+                        <button type="submit" class="btn btn-primary" id="btnSalvarProd">Salvar Produto</button>
                         <button type="button" class="btn btn-secondary" id="btnFocoLeitor">Focar leitor</button>
                         <button type="button" class="btn btn-secondary" id="btnCancelarProd" style="display:none">Cancelar edição</button>
                     </div>
@@ -1405,6 +1410,18 @@
                         <div class="col"><label>MO Rebaixados (R$)</label><input id="pfComissaoAmortecedorOriginal2" inputmode="decimal" placeholder="Ex: 10,00"></div>
                     </div>
                     <div class="row" style="margin-top:10px">
+                        <div class="col"><label>Salário (R$)</label><input id="pfSalarioFunc" inputmode="decimal" placeholder="Ex: 2.000,00"></div>
+                        <div class="col"><label>Dia do pagamento</label>
+                            <select id="pfDiaPagFunc"><option value="">— escolher —</option></select>
+                        </div>
+                        <div class="col"><label>Horário de entrada</label><input id="pfHoraEntradaFunc" type="time" value="08:00"></div>
+                        <div class="col"><label>Tolerância atraso (min)</label><input id="pfToleranciaFunc" type="number" min="0" step="1" value="10"></div>
+                    </div>
+                    <div class="row" style="margin-top:10px">
+                        <div class="col"><label>Desconto por falta (R$)</label><input id="pfDescFaltaFunc" inputmode="decimal" placeholder="Em branco = salário ÷ 30"></div>
+                        <div class="col"><label>Desconto atraso (R$ por hora)</label><input id="pfDescAtrasoFunc" inputmode="decimal" placeholder="Em branco = salário ÷ 220"></div>
+                    </div>
+                    <div class="row" style="margin-top:10px">
                         <div class="col"><label>PIN (opcional)</label><input id="pfPinFunc" type="password" inputmode="numeric" maxlength="8" placeholder="Ex: 1234"></div>
                         <div class="col" style="flex:2"><label>Observação</label><input id="pfObsFunc" placeholder="Opcional"></div>
                         <div class="col" style="flex:0.9;align-self:end">
@@ -1514,6 +1531,65 @@
                         </div>
                     </form>
                 </div>
+            </div>
+
+            <div class="box">
+                <h2>📝 Anotações do funcionário (calendário)</h2>
+                <p class="hint" style="margin-top:0">Falta, horário que chegou, vale, despesa ou bônus. Toque no dia do calendário para lançar naquele dia. O dia do pagamento aparece marcado com 💰.</p>
+                <div class="row">
+                    <div class="col"><label>Funcionário</label><select id="anFuncId"><option value="">Selecione...</option></select></div>
+                    <div class="col"><label>Mês</label><input type="month" id="anMes"></div>
+                </div>
+                <div id="anCalendario" class="func-cal" style="margin-top:10px"></div>
+                <div class="row" style="margin-top:10px">
+                    <div class="col"><label>Tipo</label>
+                        <select id="anTipo">
+                            <option value="chegada">⏰ Horário que chegou</option>
+                            <option value="falta">❌ Falta (desconta)</option>
+                            <option value="vale">💵 Vale / adiantamento (desconta)</option>
+                            <option value="despesa">🧾 Despesa (desconta)</option>
+                            <option value="bonus">➕ Bônus / extra (soma)</option>
+                            <option value="obs">📝 Só anotação</option>
+                        </select>
+                    </div>
+                    <div class="col"><label>Data</label><input type="date" id="anData"></div>
+                    <div class="col" id="anWrapHora"><label>Chegou às</label><input type="time" id="anHora"></div>
+                    <div class="col" id="anWrapValor"><label>Valor (R$)</label><input id="anValor" inputmode="decimal" placeholder="0,00"></div>
+                </div>
+                <div class="row" style="margin-top:10px">
+                    <div class="col" style="flex:2"><label>Observação</label><input id="anObs" placeholder="Opcional"></div>
+                    <div class="col" style="align-self:end"><button type="button" class="btn btn-primary" id="btnAnLancar" style="width:100%">➕ Lançar anotação</button></div>
+                </div>
+                <p class="hint" id="anPrevia" style="margin-bottom:0;color:#8fe0b8;font-weight:700"></p>
+                <div class="table-wrap" style="margin-top:10px">
+                    <table>
+                        <thead><tr><th>Data</th><th>Tipo</th><th>Detalhe</th><th>Soma / desconto</th><th>Obs.</th><th></th></tr></thead>
+                        <tbody id="tabelaAnotacoesFunc"></tbody>
+                    </table>
+                </div>
+                <div id="listaAnotacoesFuncVazia" class="empty" style="display:none;margin-top:10px">Nenhuma anotação neste mês.</div>
+            </div>
+
+            <div class="box" style="border-color:rgba(39,174,96,0.45)">
+                <h2>🧾 Fechamento do funcionário</h2>
+                <p class="hint" style="margin-top:0">Escolha o funcionário e o período. O sistema soma salário, comissão de mão de obra e bônus, e desconta faltas, atrasos, vales, despesas e o que já foi pago no período.</p>
+                <div class="row">
+                    <div class="col"><label>Funcionário</label><select id="fchFuncId"><option value="">Selecione...</option></select></div>
+                    <div class="col"><label>De</label><input type="date" id="fchIni"></div>
+                    <div class="col"><label>Até</label><input type="date" id="fchFim"></div>
+                    <div class="col"><label>Salário do período (R$)</label><input id="fchSalario" inputmode="decimal" placeholder="Do cadastro"></div>
+                </div>
+                <div class="row" style="margin-top:8px;align-items:center">
+                    <label style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer">
+                        <input type="checkbox" id="fchDescPagos" checked style="width:auto"> Descontar pagamentos já feitos no período
+                    </label>
+                </div>
+                <div class="row" style="margin-top:10px">
+                    <button type="button" class="btn btn-secondary" id="btnFchCalcular">🔄 Calcular</button>
+                    <button type="button" class="btn btn-pdf" id="btnFchImprimir">🖨️ Imprimir relatório</button>
+                    <button type="button" class="btn btn-ok" id="btnFchPagar">✅ Registrar pagamento</button>
+                </div>
+                <div id="fchResultado" style="margin-top:12px"></div>
             </div>
 
             <div class="box">
@@ -1808,7 +1884,7 @@
 
             <div class="rec-os-rodape">
                 <div class="rec-os-linha"><span>Valor recebido agora</span><strong id="recOsRecebido">R$ 0,00</strong></div>
-                <div class="rec-os-linha rec-os-aberto"><span>Em aberto (vai ao perfil do cliente)</span><strong id="recOsAberto">R$ 0,00</strong></div>
+                <div class="rec-os-linha rec-os-aberto"><span>Em aberto (vai ao perfil do cliente · vence em 30 dias)</span><strong id="recOsAberto">R$ 0,00</strong></div>
                 <div class="modal-acoes" style="flex-direction:column;gap:8px;margin-top:10px">
                     <button type="button" class="btn btn-ok" id="btnReceberOsConfirmar" style="width:100%">✅ Confirmar e mandar ao caixa</button>
                     <button type="button" class="btn btn-danger" id="btnReceberOsFechar" style="width:100%">Cancelar</button>
@@ -1834,6 +1910,31 @@
                 <button type="button" class="btn btn-ok" id="btnOsSemValorGarantia" style="width:100%">🛡️ Lançar como GARANTIA</button>
                 <button type="button" class="btn btn-secondary" id="btnOsSemValorVenda" style="width:100%">🧾 Lançar como VENDA (R$ 0,00)</button>
                 <button type="button" class="btn btn-danger" id="btnOsSemValorCancelar" style="width:100%">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalFecharPeriodo">
+        <div class="modal-box" style="width:min(480px,100%)">
+            <h3>📅 Fechar caixa por período</h3>
+            <p class="hint">Escolha os dias. O fechamento soma as entradas e saídas (balcão + digital) e a oficina só desse período.</p>
+            <div class="modal-acoes" style="flex-wrap:wrap;gap:6px;margin:0 0 8px">
+                <button type="button" class="btn btn-secondary" data-fp-atalho="1a15">Dia 01 a 15</button>
+                <button type="button" class="btn btn-secondary" data-fp-atalho="16afim">Dia 16 ao fim</button>
+                <button type="button" class="btn btn-secondary" data-fp-atalho="mes">Mês inteiro</button>
+                <button type="button" class="btn btn-secondary" data-fp-atalho="hoje">Só hoje</button>
+            </div>
+            <div class="row">
+                <div class="col"><label>De</label><input type="date" id="fpIni"></div>
+                <div class="col"><label>Até</label><input type="date" id="fpFim"></div>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;margin:10px 0 0;cursor:pointer">
+                <input type="checkbox" id="fpZerar" checked style="width:auto"> Zerar os cards da tela inicial até o dia final
+            </label>
+            <div id="fpPrevia" class="hint" style="margin-top:10px"></div>
+            <div class="modal-acoes" style="flex-direction:column;gap:8px;margin-top:10px">
+                <button type="button" class="btn btn-ok" id="btnFpConfirmar" style="width:100%">🔒 Fechar este período</button>
+                <button type="button" class="btn btn-danger" id="btnFpCancelar" style="width:100%">Cancelar</button>
             </div>
         </div>
     </div>
@@ -2034,17 +2135,18 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=89"></script>
-    <script src="js/storage.js?v=89"></script>
-    <script src="js/ui.js?v=89"></script>
-    <script src="js/auth.js?v=89"></script>
-    <script src="js/os.js?v=89"></script>
-    <script src="js/nuvem.js?v=89"></script>
-    <script src="js/caixa.js?v=89"></script>
-    <script src="js/comissoes.js?v=89"></script>
-    <script src="js/app.js?v=89"></script>
-    <script src="js/perfil-cliente.js?v=89"></script>
-    <script src="js/navegacao.js?v=89"></script>
+    <script src="js/config.js?v=90"></script>
+    <script src="js/storage.js?v=90"></script>
+    <script src="js/ui.js?v=90"></script>
+    <script src="js/auth.js?v=90"></script>
+    <script src="js/os.js?v=90"></script>
+    <script src="js/nuvem.js?v=90"></script>
+    <script src="js/caixa.js?v=90"></script>
+    <script src="js/comissoes.js?v=90"></script>
+    <script src="js/app.js?v=90"></script>
+    <script src="js/func-ponto.js?v=90"></script>
+    <script src="js/perfil-cliente.js?v=90"></script>
+    <script src="js/navegacao.js?v=90"></script>
 </body>
 </html>
 

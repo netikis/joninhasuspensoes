@@ -69,8 +69,54 @@ function lerPctsComissaoFormFunc() {
     };
 }
 
+function txtMoedaCampo(v) {
+    var n = Number(v);
+    if (isNaN(n) || n <= 0) return '';
+    return n.toFixed(2).replace('.', ',');
+}
+
+function lerDadosPontoFormFunc() {
+    function moedaCampo(id) {
+        var el = document.getElementById(id);
+        var v = el ? parseMoeda(el.value) : 0;
+        return v > 0 ? +Number(v).toFixed(2) : 0;
+    }
+    var dia = Number((document.getElementById('pfDiaPagFunc') || {}).value) || 0;
+    var tol = Number((document.getElementById('pfToleranciaFunc') || {}).value);
+    return {
+        salario: moedaCampo('pfSalarioFunc'),
+        diaPagamento: dia >= 1 && dia <= 31 ? dia : 0,
+        horaEntrada: (document.getElementById('pfHoraEntradaFunc') || {}).value || '',
+        toleranciaMin: isNaN(tol) || tol < 0 ? 0 : tol,
+        descontoFalta: moedaCampo('pfDescFaltaFunc'),
+        descontoAtrasoHora: moedaCampo('pfDescAtrasoFunc')
+    };
+}
+
+function preencherDadosPontoFormFunc(f) {
+    f = f || {};
+    var set = function (id, v) { var el = document.getElementById(id); if (el) el.value = v; };
+    set('pfSalarioFunc', txtMoedaCampo(f.salario));
+    set('pfDiaPagFunc', f.diaPagamento ? String(f.diaPagamento) : '');
+    set('pfHoraEntradaFunc', f.horaEntrada || '08:00');
+    set('pfToleranciaFunc', f.toleranciaMin != null ? String(f.toleranciaMin) : '10');
+    set('pfDescFaltaFunc', txtMoedaCampo(f.descontoFalta));
+    set('pfDescAtrasoFunc', txtMoedaCampo(f.descontoAtrasoHora));
+}
+
+(function encherDiasPagamentoFunc() {
+    var sel = document.getElementById('pfDiaPagFunc');
+    if (!sel) return;
+    var h = '<option value="">— escolher —</option>';
+    for (var d = 1; d <= 31; d++) {
+        h += '<option value="' + d + '">Dia ' + String(d).padStart(2, '0') + (d >= 29 ? ' (ou último dia do mês)' : '') + '</option>';
+    }
+    sel.innerHTML = h;
+})();
+
 function limparFormFuncionario() {
     document.getElementById('formFuncionario').reset();
+    preencherDadosPontoFormFunc(null);
     document.getElementById('pfFuncEditId').value = '';
     document.getElementById('pfAtivoFunc').checked = true;
     var a = document.getElementById('pfComissaoAlinhamento');
@@ -99,6 +145,7 @@ function preencherFormFuncionario(f) {
     document.getElementById('pfCargoFunc').value = f.cargo || '';
     document.getElementById('pfObsFunc').value = f.obs || '';
     document.getElementById('pfAtivoFunc').checked = f.ativo !== false;
+    preencherDadosPontoFormFunc(f);
     var leg = f.comissaoPct != null ? Number(f.comissaoPct) : 40;
     if (isNaN(leg)) leg = 40;
     var a = document.getElementById('pfComissaoAlinhamento');
@@ -217,6 +264,9 @@ function abrirModalVerFuncionario(id) {
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO AMORTECEDOR ORIGINAL 1</span><div>' + moeda(amortOrig) + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO REBAIXADOS</span><div>' + moeda(amortOrig2) + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">STATUS</span><div style="color:' + (ativo ? '#2ecc71' : '#e74c3c') + '">' + (ativo ? 'Ativo' : 'Inativo') + '</div></div>' +
+            '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">SALÁRIO</span><div>' + moeda(Number(f.salario) || 0) + '</div></div>' +
+            '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">DIA DO PAGAMENTO</span><div>' + (f.diaPagamento ? 'Dia ' + esc(String(f.diaPagamento)) : '—') + '</div></div>' +
+            '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">ENTRADA</span><div>' + esc(f.horaEntrada || '—') + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">PIN</span><div>' + (f.pin ? 'Definido' : 'Não definido') + '</div></div>' +
             '<div style="grid-column:1/-1"><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">OBSERVAÇÃO</span><div>' + esc(f.obs || '—') + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">CADASTRADO EM</span><div>' + esc(fmtData(f.criadoEm) || '—') + '</div></div>' +
@@ -401,6 +451,9 @@ function renderPagFuncionarios() {
         var pfData = document.getElementById('pfData');
         if (pfData && !pfData.value) pfData.value = hojeISO();
     });
+    if (typeof renderAnotacoesFunc === 'function') {
+        try { renderAnotacoesFunc(); } catch (eAn) { console.warn(eAn); }
+    }
 }
 
 document.getElementById('formFuncionario').addEventListener('submit', function (e) {
@@ -411,6 +464,7 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
     var obs = document.getElementById('pfObsFunc').value.trim();
     var ativo = document.getElementById('pfAtivoFunc').checked;
     var pcts = lerPctsComissaoFormFunc();
+    var ponto = lerDadosPontoFormFunc();
     var pin = (document.getElementById('pfPinFunc').value || '').trim();
     var editId = document.getElementById('pfFuncEditId').value;
     if (!nome) { toast('Informe o nome do funcionário.'); return; }
@@ -426,7 +480,7 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
             var i = db.funcionarios.findIndex(function (f) { return f.id === editId; });
             if (i < 0) { toast('Funcionário não encontrado.'); return; }
             var prevPin = db.funcionarios[i].pin || '';
-            db.funcionarios[i] = Object.assign({}, db.funcionarios[i], {
+            db.funcionarios[i] = Object.assign({}, db.funcionarios[i], ponto, {
                 nome: nome,
                 telefone: telefone,
                 cargo: cargo,
@@ -443,7 +497,7 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
             });
             toast('Funcionário atualizado — Alinh. ' + pcts.comissaoAlinhamentoPct + '% · Serv. ' + pcts.comissaoServicoPct + '% · Amort. ' + pcts.comissaoAmortecedorPct + '% · Orig.1 ' + moeda(pcts.comissaoAmortecedorOriginalValor) + ' · Rebaixados ' + moeda(pcts.comissaoAmortecedorOriginalValor2) + '.');
         } else {
-            db.funcionarios.push({
+            db.funcionarios.push(Object.assign({}, ponto, {
                 id: uid(),
                 nome: nome,
                 telefone: telefone,
@@ -459,7 +513,7 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
                 pin: pin,
                 criadoEm: agora,
                 atualizadoEm: agora
-            });
+            }));
             toast('Funcionário cadastrado — % por tipo e os dois R$ de amortecedor original salvos.');
         }
         salvar(db);
@@ -740,8 +794,14 @@ function resolverComissaoLinha(it, f, tipoMao, base) {
     return { pct: pct, pctTxt: String(pct) + '%', valor: valor };
 }
 
-function listarComissoes(filtroFuncId, mesYYYYMM) {
+function listarComissoes(filtroFuncId, mesYYYYMM, iniYmd, fimYmd) {
     var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+    function foraDoPeriodo(d) {
+        if (mesYYYYMM && d.slice(0, 7) !== mesYYYYMM) return true;
+        if (iniYmd && d < iniYmd) return true;
+        if (fimYmd && d > fimYmd) return true;
+        return false;
+    }
     var funcsMap = {};
     function registrarFunc(f) {
         if (!f || !f.id) return;
@@ -767,7 +827,7 @@ function listarComissoes(filtroFuncId, mesYYYYMM) {
     (db.atendimentos || []).forEach(function (a) {
         var d = dataAtendimentoISO(a);
         if (!d) return;
-        if (mesYYYYMM && d.slice(0, 7) !== mesYYYYMM) return;
+        if (foraDoPeriodo(d)) return;
         (a.itens || []).forEach(function (it) {
             if (!it) return;
             var ehMao = (it.tipo || '') === 'mao';
@@ -803,7 +863,7 @@ function listarComissoes(filtroFuncId, mesYYYYMM) {
         if (!o) return;
         var dV = String(o.dataEmissao || o.criadoEm || '').slice(0, 10);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(dV)) return;
-        if (mesYYYYMM && dV.slice(0, 7) !== mesYYYYMM) return;
+        if (foraDoPeriodo(dV)) return;
         var fidDoc = o.mecanicoId || o.funcionarioId || '';
         (o.itens || []).forEach(function (it) {
             if (!it) return;

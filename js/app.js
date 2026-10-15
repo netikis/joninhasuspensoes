@@ -1639,11 +1639,20 @@ function atualizarKPIs(db) {
     var saiBanco = somarMes(db.caixaBanco, 'saida');
     var pendentes = (db.pendentes || []).filter(function (p) { return p.status !== 'pago'; });
     var totPend = pendentes.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
-    setTxt('kpiInicioEntradas', moeda(entradas + entBanco));
-    setTxt('kpiInicioSaidas', moeda(saidas + saiBanco));
+    var painelKpi = (typeof totaisPainelCaixa === 'function') ? totaisPainelCaixa(db) : null;
+    if (painelKpi) {
+        setTxt('kpiInicioEntradas', moeda(painelKpi.balcao.entradas + painelKpi.banco.entradas));
+        setTxt('kpiInicioSaidas', moeda(painelKpi.balcao.saidas + painelKpi.banco.saidas));
+        var corteKpi = String((painelKpi.cfg && (painelKpi.cfg.zeradoEm || painelKpi.cfg.fechadoEm)) || '');
+        setTxt('kpiInicioDesde', /^\d{4}-\d{2}-\d{2}/.test(corteKpi)
+            ? 'Contando desde o último fechamento (' + fmtData(corteKpi.slice(0, 10)) + '). Ao fechar, os cards zeram.'
+            : 'Contando desde o início (ainda não houve fechamento). Ao fechar, os cards zeram.');
+    } else {
+        setTxt('kpiInicioEntradas', moeda(entradas + entBanco));
+        setTxt('kpiInicioSaidas', moeda(saidas + saiBanco));
+    }
     setTxt('kpiInicioPendentes', moeda(totPend));
     setTxt('kpiInicioQtdPend', pendentes.length);
-    var painelKpi = (typeof totaisPainelCaixa === 'function') ? totaisPainelCaixa(db) : null;
     if (painelKpi) {
         setTxt('kpiCaixa', moeda(painelKpi.balcao.saldo + painelKpi.banco.saldo));
     } else {
@@ -4504,7 +4513,7 @@ function confirmarRecebimentoOs() {
     }
     var dest = (document.getElementById('recOsDestino') && document.getElementById('recOsDestino').value) || 'normal';
     var ehBoleto = tot.boleto > 0.009 || tot.boletoDias > 0;
-    var boletoDias = tot.boletoDias > 0 ? tot.boletoDias : (ehBoleto ? 30 : 0);
+    var boletoDias = tot.boletoDias > 0 ? tot.boletoDias : ((ehBoleto || tot.aberto > 0.009) ? 30 : 0);
     var nome = nomeAtendimento(info.db, a);
     var placa = (a.placa || '—').toUpperCase();
     var agoraIso = new Date().toISOString();
@@ -4637,7 +4646,9 @@ function confirmarRecebimentoOs() {
         (tot.aberto > 0.009 ? 'Em aberto (Contas a receber): ' + moeda(tot.aberto) + '\n' : '') +
         'Formas: ' + (a.formaPagamento || '—') + '\n' +
         'Destino: ' + destinoTxt +
-        (ehBoleto ? '\nBoleto vence em ' + boletoDias + ' dia(s) (' + venc + ')' : '')
+        (ehBoleto
+            ? '\nBoleto vence em ' + boletoDias + ' dia(s) (' + fmtData(venc) + ')'
+            : (tot.aberto > 0.009 ? '\nEm aberto vence em ' + boletoDias + ' dia(s) (' + fmtData(venc) + ')' : ''))
     );
     if (tot.aberto > 0.009 && dest !== 'interno') irParaContasReceber();
 }
@@ -6341,10 +6352,16 @@ document.getElementById('vdProdBusca').addEventListener('keydown', function (e) 
         preencherCamposProdutoEstoque();
     }
 });
-if (typeof window.enterClicaBotao === 'function') {
-    window.enterClicaBotao(['vdProdQtd', 'vdProdCusto', 'vdProdMargem', 'vdProdVenda', 'vdProdUn'], 'btnVdAddEstoque');
-    window.enterClicaBotao(['vdAvNome', 'vdAvQtd', 'vdAvCusto', 'vdAvMargem', 'vdAvVenda', 'vdAvUn'], 'btnVdAddAvulso');
-    window.enterClicaBotao(['vdMaoDesc', 'vdMaoValor'], 'btnVdAddMao');
+if (typeof window.enterProximoCampo === 'function') {
+    window.enterProximoCampo(['vdProdAplicacao', 'vdProdUn', 'vdProdQtd', 'vdProdCusto', 'vdProdMargem', 'vdProdVenda',
+        'vdProdFuncId', 'vdProdTipoComissao'], 'btnVdAddEstoque');
+    window.enterProximoCampo(['vdAvNome', 'vdAvUn', 'vdAvQtd', 'vdAvCusto', 'vdAvMargem', 'vdAvVenda',
+        'vdAvFuncId', 'vdAvTipoComissao'], 'btnVdAddAvulso');
+    window.enterProximoCampo(['vdMaoDesc', 'vdMaoFuncId', 'vdMaoTipoComissao', 'vdMaoValor'], 'btnVdAddMao');
+    window.enterProximoCampo(['prodCodPeca', 'prodNome', 'prodCat', 'prodTipo', 'prodCusto', 'prodVenda', 'prodQtd',
+        'prodUn', 'prodDescricao'], 'btnSalvarProd');
+    window.enterProximoCampo(['cliNome', 'cliApelido', 'cliCpf', 'cliCnpj', 'cliTel', 'cliEmail', 'cliCidade',
+        'cliCep', 'cliEndereco', 'cliNumero'], 'btnSalvarCli');
 }
 ['vdProdQtd', 'vdProdVenda'].forEach(function (id) {
     document.getElementById(id).addEventListener('input', function () {

@@ -747,6 +747,7 @@ document.getElementById('btnAddItem').addEventListener('click', function () {
     if (document.getElementById('itemQtd')) document.getElementById('itemQtd').value = '1';
     if (typeof atualizarPreviewComissaoPeca === 'function') atualizarPreviewComissaoPeca();
     renderItens();
+    try { document.getElementById('itemDesc').focus(); } catch (eFocoPeca) { /* ok */ }
     if (Number(item.comissaoValor) > 0.009) {
         toast('Peça adicionada. Comissão ' + moeda(item.comissaoValor) +
             ' para ' + (item.funcionarioNome || 'funcionário') + '.');
@@ -948,21 +949,12 @@ document.getElementById('btnAddMao').addEventListener('click', function () {
     }
 });
 
-window._mapaEnterOs = {
-    itemDesc: 'btnAddItem',
-    itemAplicacao: 'btnAddItem',
-    itemCusto: 'btnAddItem',
-    itemValor: 'btnAddItem',
-    itemQtd: 'btnAddItem',
-    pecaFuncId: 'btnAddItem',
-    pecaTipoComissao: 'btnAddItem',
-    maoValor: 'btnAddMao'
-};
-window._proximoEnterOs = {
-    maoDesc: 'maoFuncId',
-    maoFuncId: 'maoTipoComissao',
-    maoTipoComissao: 'maoValor'
-};
+/* Enter: vai para o próximo campo da linha; no último, clica o botão (último item da lista). */
+window._cadeiasEnterOs = [
+    ['itemDesc', 'itemAplicacao', 'itemCusto', 'itemValor', 'itemQtd', 'pecaFuncId', 'pecaTipoComissao', 'btnAddItem'],
+    ['maoDesc', 'maoFuncId', 'maoTipoComissao', 'maoValor', 'btnAddMao'],
+    ['osCliRapidoNome', 'osCliRapidoTel', 'btnCliRapidoOs']
+];
 window._osEnterLock = 0;
 window._osSalvando = false;
 
@@ -988,26 +980,22 @@ window._osSalvando = false;
             e.stopPropagation();
             return;
         }
-        var prox = window._proximoEnterOs[t.id] && document.getElementById(window._proximoEnterOs[t.id]);
-        if (prox) {
-            e.preventDefault();
-            e.stopPropagation();
-            try {
-                prox.focus();
-                if (typeof prox.select === 'function' && prox.tagName === 'INPUT') prox.select();
-            } catch (eFoco) { /* ok */ }
-            return;
+        var cadeia = null;
+        for (var c = 0; c < window._cadeiasEnterOs.length; c++) {
+            if (window._cadeiasEnterOs[c].indexOf(t.id) > -1) { cadeia = window._cadeiasEnterOs[c]; break; }
         }
-        var botaoId = window._mapaEnterOs[t.id];
-        if (!botaoId) return;
+        if (!cadeia) return;
         e.preventDefault();
         e.stopPropagation();
+        var botaoId = cadeia[cadeia.length - 1];
+        if (t.id === botaoId) {
+            clicarAdd(botaoId, e);
+            return;
+        }
+        if (typeof window.focarProximoCampo === 'function' &&
+            window.focarProximoCampo(cadeia.slice(0, -1), t.id)) return;
         clicarAdd(botaoId, e);
     }, true);
-    if (typeof window.enterClicaBotao === 'function') {
-        window.enterClicaBotao(['itemDesc', 'itemCusto', 'itemValor', 'itemQtd', 'pecaFuncId', 'pecaTipoComissao'], 'btnAddItem');
-        window.enterClicaBotao(['maoValor'], 'btnAddMao');
-    }
     var btnS = document.getElementById('btnSalvarAt');
     if (btnS && !btnS.getAttribute('data-os-save')) {
         btnS.setAttribute('data-os-save', '1');
@@ -1294,6 +1282,8 @@ async function salvarAtendimentoAtual() {
             'A OS continua aberta — pode imprimir, salvar PDF ou mandar ao caixa.'
         );
         document.getElementById('atId').value = payload.id;
+        if (document.activeElement && typeof document.activeElement.blur === 'function') document.activeElement.blur();
+        rolarParaTopoTela();
         renderHistorico();
         atualizarKPIs(carregar());
 
@@ -1738,8 +1728,9 @@ function aplicarProdutoNoOrcamentoOs(p) {
     if (aplOs) aplOs.value = textoMaiusculoSalvar(descricaoPecaDe(p));
     if (custo) custo.value = typeof fmtNumOs === 'function' ? fmtNumOs(p.custo) : String(p.custo || '');
     if (venda) venda.value = typeof fmtNumOs === 'function' ? fmtNumOs(p.venda) : String(p.venda || '');
-    if (venda) {
-        try { venda.focus(); venda.select(); } catch (eF) { /* ok */ }
+    var focoPeca = aplOs || venda;
+    if (focoPeca) {
+        try { focoPeca.focus(); focoPeca.select(); } catch (eF) { /* ok */ }
     }
     if (typeof atualizarPreviewComissaoPeca === 'function') atualizarPreviewComissaoPeca();
     toast('Produto selecionado: ' + (p.nome || ''));

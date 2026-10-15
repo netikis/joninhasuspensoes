@@ -2762,6 +2762,35 @@ async function arquivarMesPastaPC(mesAnoFixo, filtroFixo) {
 }
 
 /* ---------- Pastas mensais — Despesas por OS (Modo Interno) ---------- */
+if (typeof window.listarDespesasInternasPorOs !== 'function') {
+    window.listarDespesasInternasPorOs = function (atendimentoId) {
+        var intDb = carregarInternoRaw();
+        return (intDb.caixa || []).concat(intDb.caixaBanco || []).filter(function (x) {
+            return x && x.tipo === 'saida' && atendimentoId && x.atendimentoId === atendimentoId;
+        });
+    };
+}
+if (typeof window.totalDespesasInternasPorOs !== 'function') {
+    window.totalDespesasInternasPorOs = function (atendimentoId) {
+        return listarDespesasInternasPorOs(atendimentoId).reduce(function (s, x) {
+            return s + (Number(x.valor) || 0);
+        }, 0);
+    };
+}
+if (typeof window.obterOsOcultasDespesas !== 'function') {
+    window.obterOsOcultasDespesas = function () {
+        var intDb = carregarInternoRaw();
+        return intDb.despesasOsOcultas && typeof intDb.despesasOsOcultas === 'object' ? intDb.despesasOsOcultas : {};
+    };
+}
+if (typeof window.resumoLucroOs !== 'function') {
+    window.resumoLucroOs = function (atendimento) {
+        var bruto = Number(atendimento && atendimento.total) || 0;
+        var despesas = totalDespesasInternasPorOs(atendimento && atendimento.id);
+        return { bruto: bruto, despesas: despesas, lucro: bruto - despesas };
+    };
+}
+
 function listarOsDoMes(mesAno) {
     var main = carregarMain();
     var ocultas = obterOsOcultasDespesas();
@@ -3399,6 +3428,192 @@ function fecharCaixaDoDia() {
     imprimirFechamentoDia(rec);
 }
 window.fecharCaixaDoDia = fecharCaixaDoDia;
+
+function somarListaAte(lista, tipo, fim) {
+    return somarListaPeriodo(lista, tipo, '', fim);
+}
+
+function totaisCaixaPeriodo(db, ini, fim) {
+    var bal = {
+        inicial: 0,
+        entradas: somarListaPeriodo(db.caixa, 'entrada', ini, fim),
+        saidas: somarListaPeriodo(db.caixa, 'saida', ini, fim)
+    };
+    bal.saldo = bal.entradas - bal.saidas;
+    var ban = {
+        inicial: 0,
+        entradas: somarListaPeriodo(db.caixaBanco, 'entrada', ini, fim),
+        saidas: somarListaPeriodo(db.caixaBanco, 'saida', ini, fim)
+    };
+    ban.saldo = ban.entradas - ban.saidas;
+    return { balcao: bal, banco: ban };
+}
+
+/** Zera os cards do painel considerando só o que foi lançado até o dia final. */
+function aplicarZerarPaineisAte(db, fim) {
+    var hoje = hojeISO();
+    if (!fim || fim >= hoje) return aplicarZerarPaineisCaixa(db);
+    var cfg = getCaixaConfig(db);
+    cfg.inicialBalcao = 0;
+    cfg.inicialBanco = 0;
+    cfg.basePainelEntradas = somarListaAte(db.caixa, 'entrada', fim);
+    cfg.basePainelSaidas = somarListaAte(db.caixa, 'saida', fim);
+    cfg.basePainelEntradasBanco = somarListaAte(db.caixaBanco, 'entrada', fim);
+    cfg.basePainelSaidasBanco = somarListaAte(db.caixaBanco, 'saida', fim);
+    var ym = hoje.slice(0, 7);
+    if (typeof calcularRelatorioOficina === 'function') {
+        var ofAte = fim.slice(0, 7) === ym
+            ? calcularRelatorioOficina({ inicio: ym + '-01', fim: fim, label: ym })
+            : { pecas: 0, ganho: 0, mao: 0 };
+        cfg.baseOficinaMes = ym;
+        cfg.baseOficinaInicio = fim;
+        cfg.baseOficinaPecas = Number(ofAte.pecas) || 0;
+        cfg.baseOficinaGanho = Number(ofAte.ganho) || 0;
+        cfg.baseOficinaMao = Number(ofAte.mao) || 0;
+    }
+    cfg.zeradoEm = fim + 'T23:59:59.999';
+    cfg.fechadoEm = cfg.zeradoEm;
+    return cfg;
+}
+
+function fecharCaixaPeriodo(ini, fim, zerar) {
+    ini = dataISODia(ini);
+    fim = dataISODia(fim);
+    if (!ini || !fim || ini > fim) {
+        toast('Informe o período (De / Até).');
+        return false;
+    }
+    if (typeof sincronizarOficinaNoCaixaEmpresa === 'function') {
+        try { sincronizarOficinaNoCaixaEmpresa(); } catch (eSyncP) { /* ok */ }
+    }
+    var db = carregarMain();
+    var tot = totaisCaixaPeriodo(db, ini, fim);
+    var bal = tot.balcao;
+    var ban = tot.banco;
+    var snap = snapshotDiscricaoFechamento(db, ini, fim, ini + 'T00:00:00.000');
+    var ateFim = function (x) { return !x.data || x.data <= fim; };
+    var entOf = (snap.entradasCaixaOficina || []).filter(ateFim);
+    var entOut = (snap.entradasCaixaOutras || []).filter(ateFim);
+    var totalOficina = snap.totalOficina != null ? snap.totalOficina : ((Number(snap.pecas) || 0) + (Number(snap.mao) || 0));
+    if (!confirm(
+        'Fechar o caixa de ' + fmtData(ini) + ' a ' + fmtData(fim) + '?\n\n' +
+        'BALCÃO\nEntradas: ' + moeda(bal.entradas) + '\nSaídas: ' + moeda(bal.saidas) + '\nBalanço: ' + moeda(bal.saldo) + '\n\n' +
+        'DIGITAL / BANCO\nEntradas: ' + moeda(ban.entradas) + '\nSaídas: ' + moeda(ban.saidas) + '\nSaldo: ' + moeda(ban.saldo) + '\n\n' +
+        'OFICINA\nPeças: ' + moeda(snap.pecas) + '\nMão de obra: ' + moeda(snap.mao) + '\nTotal oficina: ' + moeda(totalOficina) + '\n\n' +
+        (zerar ? 'Os cards da tela inicial zeram até ' + fmtData(fim) + '.' : 'Os cards da tela inicial NÃO serão zerados.')
+    )) return false;
+    if (!db.fechamentosCaixa) db.fechamentosCaixa = [];
+    if (!db.caixa) db.caixa = [];
+    var agora = new Date().toISOString();
+    var rec = {
+        id: uid(),
+        data: fim,
+        periodoDe: ini,
+        periodoAte: fim,
+        porPeriodo: true,
+        inicialBalcao: 0,
+        entradasBalcao: bal.entradas,
+        saidasBalcao: bal.saidas,
+        saldoBalcao: bal.saldo,
+        inicialBanco: 0,
+        entradasBanco: ban.entradas,
+        saidasBanco: ban.saidas,
+        saldoBanco: ban.saldo,
+        inicial: 0,
+        entradas: bal.entradas + ban.entradas,
+        saidas: bal.saidas + ban.saidas,
+        saldo: bal.saldo + ban.saldo,
+        pecasBruto: snap.pecas,
+        ganhoPecas: snap.ganho,
+        maoObra: snap.mao,
+        totalOficina: totalOficina,
+        comissao: snap.comissao,
+        maoCasa: snap.maoCasa,
+        despesas: snap.despesas,
+        resultado: snap.resultado,
+        linhasOficina: snap.linhasOficina,
+        entradasCaixaOficina: entOf,
+        entradasCaixaOutras: entOut,
+        criadoEm: agora
+    };
+    db.fechamentosCaixa.push(rec);
+    db.caixa.push(montarLancamentoFechamentoCaixa(rec));
+    if (zerar) {
+        db.caixaConfig = aplicarZerarPaineisAte(db, fim);
+        db.caixaConfig.atualizadoEm = agora;
+    }
+    salvarMain(db);
+    if (typeof agendarSyncAutomatico === 'function') agendarSyncAutomatico('salvar');
+    toast('Fechamento de ' + fmtData(ini) + ' a ' + fmtData(fim) + ' gravado' + (zerar ? ' e cards zerados.' : '.'));
+    renderCaixa();
+    renderCaixaBanco();
+    if (typeof renderRelatorioCaixa === 'function') renderRelatorioCaixa();
+    atualizarKPIs(carregarMain());
+    imprimirFechamentoDia(rec);
+    return true;
+}
+window.fecharCaixaPeriodo = fecharCaixaPeriodo;
+
+function fpAtalhoPeriodo(tipo) {
+    var hoje = hojeISO();
+    var ym = hoje.slice(0, 7);
+    var p = ym.split('-');
+    var ult = new Date(Number(p[0]), Number(p[1]), 0).getDate();
+    var ini = ym + '-01';
+    var fim = ym + '-' + String(ult).padStart(2, '0');
+    if (tipo === '1a15') fim = ym + '-15';
+    else if (tipo === '16afim') ini = ym + '-16';
+    else if (tipo === 'hoje') { ini = hoje; fim = hoje; }
+    document.getElementById('fpIni').value = ini;
+    document.getElementById('fpFim').value = fim;
+    atualizarPreviaFecharPeriodo();
+}
+
+function atualizarPreviaFecharPeriodo() {
+    var el = document.getElementById('fpPrevia');
+    if (!el) return;
+    var ini = dataISODia(document.getElementById('fpIni').value);
+    var fim = dataISODia(document.getElementById('fpFim').value);
+    if (!ini || !fim || ini > fim) { el.textContent = 'Escolha o dia inicial e o final.'; return; }
+    var t = totaisCaixaPeriodo(carregarMain(), ini, fim);
+    el.innerHTML = 'Entradas: <strong>' + moeda(t.balcao.entradas + t.banco.entradas) + '</strong> · ' +
+        'Saídas: <strong>' + moeda(t.balcao.saidas + t.banco.saidas) + '</strong> · ' +
+        'Saldo: <strong>' + moeda(t.balcao.saldo + t.banco.saldo) + '</strong>';
+}
+
+function abrirModalFecharPeriodo() {
+    var m = document.getElementById('modalFecharPeriodo');
+    if (!m) return;
+    fpAtalhoPeriodo(Number(hojeISO().slice(8, 10)) <= 15 ? '1a15' : '16afim');
+    m.classList.add('aberto');
+}
+
+(function ligarFecharPeriodo() {
+    var m = document.getElementById('modalFecharPeriodo');
+    if (!m) return;
+    var fechar = function () { m.classList.remove('aberto'); };
+    m.addEventListener('click', function (e) { if (e.target === m) fechar(); });
+    m.querySelectorAll('[data-fp-atalho]').forEach(function (b) {
+        b.addEventListener('click', function () { fpAtalhoPeriodo(b.getAttribute('data-fp-atalho')); });
+    });
+    ['fpIni', 'fpFim'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', atualizarPreviaFecharPeriodo);
+    });
+    document.getElementById('btnFpCancelar').addEventListener('click', fechar);
+    document.getElementById('btnFpConfirmar').addEventListener('click', function () {
+        var ok = fecharCaixaPeriodo(
+            document.getElementById('fpIni').value,
+            document.getElementById('fpFim').value,
+            document.getElementById('fpZerar').checked
+        );
+        if (ok) fechar();
+    });
+    var bI = document.getElementById('btnInicioFecharPeriodo');
+    if (bI) bI.addEventListener('click', abrirModalFecharPeriodo);
+    var bF = document.getElementById('btnInicioFecharCaixa');
+    if (bF) bF.addEventListener('click', function () { fecharCaixaDoDia(); });
+})();
 
 function htmlCorpoFechamentoCaixa(f) {
     if (!f) return '';

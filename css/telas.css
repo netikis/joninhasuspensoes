@@ -109,7 +109,6 @@ img, video, canvas, svg, iframe {
         grid-template-columns: 1fr;
     }
 
-    .box,
     .table-wrap,
     .tbl-wrap,
     .rof-detalhe,
@@ -117,6 +116,22 @@ img, video, canvas, svg, iframe {
         overflow-x: auto;
         overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+    }
+    .table-wrap > table,
+    .tbl-wrap > table {
+        min-width: 560px;
+    }
+    .cx-opcoes-wrap.aberto .cx-opcoes-menu {
+        position: fixed;
+        left: calc(10px + var(--safe-left, 0px));
+        right: calc(10px + var(--safe-right, 0px));
+        top: auto;
+        bottom: calc(10px + var(--safe-bottom, 0px));
+        min-width: 0;
+        max-height: 70vh;
+        overflow-y: auto;
+        z-index: 400;
     }
 
     .tela-login {
@@ -274,7 +289,7 @@ body.tela-celular {
     overflow-x: hidden !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
+    touch-action: manipulation;
 }
 body.tela-celular {
     display: block !important;
@@ -289,7 +304,7 @@ body.tela-celular .conteudo {
     min-height: 0 !important;
     overflow: visible !important;
     overscroll-behavior: auto;
-    touch-action: pan-y;
+    touch-action: manipulation;
     -webkit-overflow-scrolling: touch;
 }
 body.tela-celular .main {
@@ -315,7 +330,7 @@ body.tela-celular .topbar {
         overflow-x: hidden !important;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
-        touch-action: pan-y;
+        touch-action: manipulation;
     }
     body { display: block !important; }
     body.menu-aberto { overflow: hidden !important; }
@@ -324,7 +339,7 @@ body.tela-celular .topbar {
         max-height: none !important;
         overflow: visible !important;
         overscroll-behavior: auto;
-        touch-action: pan-y;
+        touch-action: manipulation;
     }
     .main {
         display: block !important;
