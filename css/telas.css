@@ -122,6 +122,16 @@ img, video, canvas, svg, iframe {
     .tbl-wrap > table {
         min-width: 560px;
     }
+    .box > table,
+    .painel > table {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+    }
     .cx-opcoes-wrap.aberto .cx-opcoes-menu {
         position: fixed;
         left: calc(10px + var(--safe-left, 0px));
