@@ -122,15 +122,44 @@ img, video, canvas, svg, iframe {
     .tbl-wrap > table {
         min-width: 560px;
     }
-    .box > table,
-    .painel > table {
-        display: block;
+    .table-wrap,
+    .tbl-wrap {
         width: 100%;
         max-width: 100%;
-        overflow-x: auto;
-        overflow-y: hidden;
-        -webkit-overflow-scrolling: touch;
-        overscroll-behavior-x: contain;
+        touch-action: pan-x pan-y;
+        scrollbar-width: thin;
+    }
+    .table-wrap td.actions,
+    .table-wrap td.cx-acoes-cell,
+    .table-wrap table:has(td.actions, td.cx-acoes-cell) thead th:last-child {
+        position: sticky;
+        right: 0;
+        z-index: 2;
+        background: #fff;
+        box-shadow: -6px 0 8px -6px rgba(0, 0, 0, 0.35);
+    }
+    .table-wrap tbody tr:nth-child(even) td.actions,
+    .table-wrap tbody tr:nth-child(even) td.cx-acoes-cell {
+        background: #f8fafc;
+    }
+    .table-wrap table:has(td.actions, td.cx-acoes-cell) thead th:last-child {
+        background: #152642;
+        z-index: 3;
+    }
+    .table-wrap td.actions:has(.aberto),
+    .table-wrap td.cx-acoes-cell:has(.aberto),
+    .table-wrap td.actions:focus-within,
+    .table-wrap td.cx-acoes-cell:focus-within {
+        z-index: 50;
+    }
+    .table-wrap::-webkit-scrollbar,
+    .tbl-wrap::-webkit-scrollbar {
+        height: 8px;
+    }
+    .table-wrap::-webkit-scrollbar-thumb,
+    .tbl-wrap::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
     }
     .cx-opcoes-wrap.aberto .cx-opcoes-menu {
         position: fixed;

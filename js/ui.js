@@ -372,6 +372,24 @@ function rolarParaTopoTela() {
 }
 window.rolarParaTopoTela = rolarParaTopoTela;
 
+function envolverTabelasRolagem(raiz) {
+    (raiz || document).querySelectorAll('table').forEach(function (t) {
+        var pai = t.parentElement;
+        if (!pai || t.closest('td, th')) return;
+        if (pai.classList.contains('table-wrap') || pai.classList.contains('tbl-wrap')) return;
+        var w = document.createElement('div');
+        w.className = 'table-wrap tbl-rolagem';
+        pai.insertBefore(w, t);
+        w.appendChild(t);
+    });
+}
+window.envolverTabelasRolagem = envolverTabelasRolagem;
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { envolverTabelasRolagem(); });
+} else {
+    envolverTabelasRolagem();
+}
+
 function campoAceitaFoco(el) {
     if (!el || el.disabled || el.readOnly) return false;
     if (el.type === 'hidden') return false;
