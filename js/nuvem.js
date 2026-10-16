@@ -62,10 +62,10 @@ function atualizarStatusNuvemUI() {
         var syncTxt = _syncUltimaOkEm
             ? ' · última sync ' + esc(fmtHoraSync(_syncUltimaOkEm))
             : '';
-        el.innerHTML = '<strong>Nuvem:</strong> conectado como ' + esc(user.email || 'usuário') +
+        el.innerHTML = '<strong>Nuvem:</strong> conectado como ' + esc(user.email || (user.isAnonymous ? 'acesso sem e-mail' : 'usuário')) +
             ' · ' + esc(cfg.projectId) +
             ' · sync automática' + syncTxt +
-            (_syncEmAndamento ? ' · sincronizando…' : '') + '.';
+            (_syncEmAndamento ? ' · sincronizando' + (_syncProgresso ? ' (' + esc(_syncProgresso) + ')' : '…') : '') + '.';
     } else {
         el.className = 'config-status aviso';
         el.innerHTML = '<strong>Nuvem:</strong> entre com e-mail/senha do Firebase Authentication.';
@@ -117,15 +117,22 @@ async function garantirSessaoNuvemQualquer() {
     }
 }
 
+var _syncDeNovo = false;
 function agendarSyncAutomatico(motivo) {
-    if (_syncEmAndamento) return;
+    if (syncTravado()) {
+        if (motivo === 'salvar') _syncDeNovo = true;
+        return;
+    }
     var cfg = carregarConfigNuvem();
     if (!cfg || !cfg.apiKey || !cfg.projectId) return;
     /* Ao salvar, agenda mesmo com aba em segundo plano (envia o que acabou de mudar) */
     if (motivo !== 'salvar' && document.hidden) return;
     clearTimeout(_syncDebounceTimer);
     _syncDebounceTimer = setTimeout(function () {
-        if (_syncEmAndamento) return;
+        if (syncTravado()) {
+            if (motivo === 'salvar') _syncDeNovo = true;
+            return;
+        }
         if (motivo !== 'salvar' && document.hidden) return;
         dispararSyncConformeSessao({ silencioso: true, motivo: motivo || 'auto' }).catch(function () { /* offline */ });
     }, motivo === 'salvar' ? 2800 : 800);
@@ -312,6 +319,10 @@ async function enviarAtendimentoNuvem(atendimento) {
     var fotos = docOut.fotos || [];
     for (var i = 0; i < fotos.length; i++) {
         var f = fotos[i];
+        if (f.nuvem && f.id) {
+            delete f.data;
+            continue;
+        }
         if (!f.data || !String(f.data).startsWith('data:')) continue;
         var fotoId = f.id || ('f' + i);
         f.id = fotoId;
@@ -328,12 +339,15 @@ async function enviarAtendimentoNuvem(atendimento) {
                 atualizadoEm: new Date().toISOString()
             });
             delete f.data;
+            f.nuvem = true;
         } catch (midErr) {
             return { ok: false, motivo: 'falha ao enviar foto: ' + (midErr.message || midErr.code || '') };
         }
     }
     docOut.fotos = fotos;
     docOut.atualizadoEm = new Date().toISOString();
+    docOut.syncNuvemEm = docOut.atualizadoEm;
+    docOut.digitalNuvem = digitalAtendimento(docOut);
     await fsMod.setDoc(fsMod.doc(dbFs, 'joninha_suspensoes_atendimentos', atendimento.id), docOut);
     return { ok: true, atendimento: docOut };
 }
@@ -359,7 +373,7 @@ async function hidratarFotosDaNuvem(atendimento) {
     return atendimento;
 }
 
-async function baixarAtendimentosNuvem() {
+async function baixarAtendimentosNuvem(localLista) {
     var sessao = await obterSessaonuvem();
     var fsMod = sessao.fsMod;
     var dbFs = sessao.dbFs;
@@ -370,10 +384,123 @@ async function baixarAtendimentosNuvem() {
         if (!a.id) a.id = docSnap.id;
         lista.push(a);
     });
+    /* Só baixa a foto que este aparelho ainda não tem */
+    var fotosLocais = {};
+    (localLista || []).forEach(function (a) {
+        (a && a.fotos || []).forEach(function (f) {
+            if (f && f.id && (f.data || f.url)) fotosLocais[a.id + '_' + f.id] = true;
+        });
+    });
     for (var i = 0; i < lista.length; i++) {
-        await hidratarFotosDaNuvem(lista[i]);
+        var faltaFoto = (lista[i].fotos || []).some(function (f) {
+            return f && f.id && !f.data && !f.url && !fotosLocais[lista[i].id + '_' + f.id];
+        });
+        if (faltaFoto) await hidratarFotosDaNuvem(lista[i]);
     }
     return lista;
+}
+
+var CAMPOS_FORA_DA_DIGITAL = { syncNuvemEm: 1, atualizadoEm: 1, digitalNuvem: 1, fotos: 1 };
+
+function jsonOrdenado(v) {
+    if (v === undefined) return 'null';
+    if (v === null || typeof v !== 'object') return JSON.stringify(v);
+    if (Array.isArray(v)) return '[' + v.map(jsonOrdenado).join(',') + ']';
+    return '{' + Object.keys(v).sort().filter(function (k) { return v[k] !== undefined; }).map(function (k) {
+        return JSON.stringify(k) + ':' + jsonOrdenado(v[k]);
+    }).join(',') + '}';
+}
+
+function digitalAtendimento(a) {
+    var base = {};
+    Object.keys(a || {}).forEach(function (k) {
+        if (!CAMPOS_FORA_DA_DIGITAL[k]) base[k] = a[k];
+    });
+    base.fotos = (a.fotos || []).map(function (f) { return f && f.id; });
+    var s = jsonOrdenado(base);
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return h.toString(36) + '.' + s.length;
+}
+
+function atendimentoPrecisaEnviar(a) {
+    if (!a || !a.id) return false;
+    if ((a.fotos || []).some(function (f) { return f && f.data && !f.nuvem; })) return true;
+    return a.digitalNuvem !== digitalAtendimento(a);
+}
+
+async function enviarAtendimentosAlterados(db) {
+    var ok = 0, falha = 0;
+    var lista = db.atendimentos || [];
+    var idx = [];
+    lista.forEach(function (a, i) { if (atendimentoPrecisaEnviar(a)) idx.push(i); });
+    for (var k = 0; k < idx.length; k++) {
+        var i = idx[k];
+        var at = lista[i];
+        _syncProgresso = 'enviando OS ' + (k + 1) + ' de ' + idx.length;
+        atualizarStatusNuvemUI();
+        _syncInicioEm = Date.now();
+        for (var fi = 0; fi < (at.fotos || []).length; fi++) {
+            var fx = at.fotos[fi];
+            if (fx && fx.data && !fx.nuvem) fx.data = await garantirFotoComprimida(fx.data);
+        }
+        var r;
+        try {
+            r = await enviarAtendimentoNuvem(at);
+        } catch (eEnv) {
+            r = { ok: false, motivo: eEnv && (eEnv.message || eEnv.code) };
+        }
+        if (!r.ok) {
+            falha++;
+            continue;
+        }
+        ok++;
+        var locais = at.fotos || [];
+        var nuvFotos = (r.atendimento && r.atendimento.fotos) || [];
+        at.syncNuvemEm = r.atendimento.syncNuvemEm;
+        at.atualizadoEm = r.atendimento.atualizadoEm;
+        at.digitalNuvem = r.atendimento.digitalNuvem;
+        if (nuvFotos.length) {
+            at.fotos = nuvFotos.map(function (fn, j) {
+                var fl = locais.find(function (x) { return x && fn && x.id === fn.id; }) || locais[j] || {};
+                return {
+                    id: (fn && fn.id) || fl.id || uid(),
+                    data: fl.data || null,
+                    url: fl.url || (fn && fn.url) || null,
+                    nuvem: !!(fn && fn.nuvem)
+                };
+            });
+        }
+    }
+    _syncProgresso = '';
+    return { ok: ok, falha: falha, total: idx.length };
+}
+
+/* O que foi salvo no aparelho enquanto a sync rodava não pode ser apagado pelo salvar(db) final */
+function juntarMudancasDuranteSync(db) {
+    try {
+        var atual = carregar();
+        db.excluidos = mesclarExcluidos(db.excluidos, atual.excluidos);
+        var ex = garantirExcluidos(db);
+        ['clientes', 'produtos', 'orcamentos', 'caixa', 'caixaBanco', 'pendentes'].forEach(function (k) {
+            if (atual[k]) db[k] = mesclarListaPorId(db[k], atual[k], ex[k]);
+        });
+        db.atendimentos = mesclarAtendimentosComExcluidos(db.atendimentos, atual.atendimentos, ex.atendimentos);
+        if (atual.caixaConfig) db.caixaConfig = mesclarCaixaConfig(db.caixaConfig, atual.caixaConfig);
+        if (atual.fechamentosCaixa) db.fechamentosCaixa = mesclarFechamentosCaixa(db.fechamentosCaixa, atual.fechamentosCaixa);
+    } catch (e) { /* ok */ }
+    return db;
+}
+
+var _syncInicioEm = 0;
+var _syncProgresso = '';
+function syncTravado() {
+    if (!_syncEmAndamento) return false;
+    if (_syncInicioEm && Date.now() - _syncInicioEm > 180000) {
+        _syncEmAndamento = false;
+        return false;
+    }
+    return true;
 }
 
 function mesclarAtendimentosLocalNuvem(localLista, nuvemLista) {
@@ -694,8 +821,8 @@ async function sincronizarOficinaNuvem(opts) {
     opts = opts || {};
     var silencioso = !!opts.silencioso;
     var mostrarToast = opts.mostrarToast != null ? !!opts.mostrarToast : !silencioso;
-    if (_syncEmAndamento) {
-        if (!silencioso) toast('Sincronização já em andamento…');
+    if (syncTravado()) {
+        if (!silencioso) toast('Sincronização já em andamento' + (_syncProgresso ? ' (' + _syncProgresso + ')' : '') + '… aguarde.');
         return;
     }
     var cfg = carregarConfigNuvem();
@@ -712,6 +839,8 @@ async function sincronizarOficinaNuvem(opts) {
     }
 
     _syncEmAndamento = true;
+    _syncInicioEm = Date.now();
+    _syncProgresso = '';
     atualizarStatusNuvemUI();
     if (!silencioso) toast('Sincronizando oficina (OS + fotos)…');
 
@@ -745,42 +874,13 @@ async function sincronizarOficinaNuvem(opts) {
             }
         } catch (eBase) { /* offline parcial */ }
 
-        var nuvemLista = await baixarAtendimentosNuvem();
+        var nuvemLista = await baixarAtendimentosNuvem(db.atendimentos);
         var exAt = garantirExcluidos(db).atendimentos;
         db.atendimentos = mesclarAtendimentosComExcluidos(db.atendimentos, nuvemLista, exAt);
 
-        for (var i = 0; i < (db.atendimentos || []).length; i++) {
-            var at = db.atendimentos[i];
-            if (!at || !at.id) continue;
-            /* Comprime fotos locais antes do upload */
-            if (at.fotos && at.fotos.length) {
-                for (var fi = 0; fi < at.fotos.length; fi++) {
-                    if (at.fotos[fi] && at.fotos[fi].data) {
-                        at.fotos[fi].data = await garantirFotoComprimida(at.fotos[fi].data);
-                    }
-                }
-            }
-            var r = await enviarAtendimentoNuvem(at);
-            if (r.ok) {
-                ok++;
-                if (r.atendimento) {
-                    var locais = at.fotos || [];
-                    var nuvFotos = r.atendimento.fotos || [];
-                    db.atendimentos[i].syncNuvemEm = new Date().toISOString();
-                    db.atendimentos[i].fotos = nuvFotos.map(function (fn, idx) {
-                        var fl = locais.find(function (x) { return x && fn && x.id === fn.id; }) || locais[idx] || {};
-                        return {
-                            id: (fn && fn.id) || fl.id || uid(),
-                            data: fl.data || null,
-                            url: fl.url || (fn && fn.url) || null
-                        };
-                    });
-                    if (!db.atendimentos[i].fotos.length && locais.length) {
-                        db.atendimentos[i].fotos = locais;
-                    }
-                }
-            } else falha++;
-        }
+        var envio = await enviarAtendimentosAlterados(db);
+        ok = envio.ok;
+        falha = envio.falha;
 
         /* Sobe só clientes (merge), sem reescrever caixa */
         try {
@@ -795,7 +895,7 @@ async function sincronizarOficinaNuvem(opts) {
             );
         } catch (eCli) { /* ok */ }
 
-        salvar(db);
+        salvar(juntarMudancasDuranteSync(db));
         canalVendas = canalAntes;
         _syncUltimaOkEm = Date.now();
         try { localStorage.setItem(SYNC_ULTIMA_KEY, String(_syncUltimaOkEm)); } catch (eUlt) { /* ok */ }
@@ -807,7 +907,7 @@ async function sincronizarOficinaNuvem(opts) {
         } catch (eAss) { /* ok */ }
 
         if (mostrarToast) {
-            toast('Oficina nuvem: ' + ok + ' OS' + (falha ? ' · ' + falha + ' falha(s)' : '') + '.');
+            toast('Oficina nuvem: ' + ok + ' OS alterada(s) enviada(s)' + (falha ? ' · ' + falha + ' falha(s)' : '') + '.');
         }
         try { renderHistorico(); } catch (eH) { /* ok */ }
         try { renderTudo(); } catch (eR) { /* ok */ }
@@ -816,7 +916,12 @@ async function sincronizarOficinaNuvem(opts) {
         } catch (eFuncUi2) { /* ok */ }
     } finally {
         _syncEmAndamento = false;
+        _syncProgresso = '';
         atualizarStatusNuvemUI();
+        if (_syncDeNovo) {
+            _syncDeNovo = false;
+            agendarSyncAutomatico('salvar');
+        }
     }
 }
 
@@ -824,8 +929,8 @@ async function sincronizarTodosNuvem(opts) {
     opts = opts || {};
     var silencioso = !!opts.silencioso;
     var mostrarToast = opts.mostrarToast != null ? !!opts.mostrarToast : !silencioso;
-    if (_syncEmAndamento) {
-        if (!silencioso) toast('Sincronização já em andamento…');
+    if (syncTravado()) {
+        if (!silencioso) toast('Sincronização já em andamento' + (_syncProgresso ? ' (' + _syncProgresso + ')' : '') + '… aguarde.');
         return;
     }
     var cfg = carregarConfigNuvem();
@@ -833,12 +938,14 @@ async function sincronizarTodosNuvem(opts) {
         if (!silencioso) toast('Modo local — nuvem desativada.');
         return;
     }
-    if (!usuarioNuvemLogado()) {
-        if (!silencioso) toast('Faça login para sincronizar.');
+    if (!usuarioNuvemLogado() && !(await garantirSessaoNuvemQualquer())) {
+        if (!silencioso) toast('Sem conexão com a nuvem. Verifique a internet e entre de novo com e-mail e senha.');
         return;
     }
 
     _syncEmAndamento = true;
+    _syncInicioEm = Date.now();
+    _syncProgresso = '';
     atualizarStatusNuvemUI();
     if (!silencioso) toast('Entrando na nuvem e sincronizando…');
 
@@ -899,14 +1006,18 @@ async function sincronizarTodosNuvem(opts) {
         }
 
         /* 2) Baixa e mescla OS + fotos (respeitando exclusões) */
-        var nuvemLista = await baixarAtendimentosNuvem();
+        _syncProgresso = 'baixando OS…';
+        atualizarStatusNuvemUI();
+        var nuvemLista = await baixarAtendimentosNuvem(db.atendimentos);
         var exAt = garantirExcluidos(db).atendimentos;
         db.atendimentos = mesclarAtendimentosComExcluidos(db.atendimentos, nuvemLista, exAt);
 
         /* 2b) Apaga na nuvem OS que foram excluídas */
         try {
             var sessaoDel = await obterSessaonuvem();
-            var idsEx = Object.keys(exAt || {});
+            var naNuvem = {};
+            (nuvemLista || []).forEach(function (n) { if (n && n.id) naNuvem[n.id] = true; });
+            var idsEx = Object.keys(exAt || {}).filter(function (id) { return naNuvem[id]; });
             for (var di = 0; di < idsEx.length; di++) {
                 try {
                     await sessaoDel.fsMod.deleteDoc(
@@ -917,31 +1028,14 @@ async function sincronizarTodosNuvem(opts) {
         } catch (eDel) { /* ok */ }
 
         /* 3) Envia o resultado mesclado de volta */
+        _syncProgresso = 'enviando caixa e cadastros…';
+        atualizarStatusNuvemUI();
         await enviarBaseNuvem(db);
-        for (var i = 0; i < (db.atendimentos || []).length; i++) {
-            var r = await enviarAtendimentoNuvem(db.atendimentos[i]);
-            if (r.ok) {
-                ok++;
-                if (r.atendimento) {
-                    var locais = db.atendimentos[i].fotos || [];
-                    var nuvFotos = r.atendimento.fotos || [];
-                    db.atendimentos[i].syncNuvemEm = new Date().toISOString();
-                    db.atendimentos[i].fotos = nuvFotos.map(function (fn, idx) {
-                        var fl = locais.find(function (x) { return x && fn && x.id === fn.id; }) || locais[idx] || {};
-                        return {
-                            id: (fn && fn.id) || fl.id || uid(),
-                            data: fl.data || null,
-                            url: fl.url || (fn && fn.url) || null
-                        };
-                    });
-                    if (!db.atendimentos[i].fotos.length && locais.length) {
-                        db.atendimentos[i].fotos = locais;
-                    }
-                }
-            } else falha++;
-        }
+        var envio = await enviarAtendimentosAlterados(db);
+        ok = envio.ok;
+        falha = envio.falha;
 
-        salvar(db);
+        salvar(juntarMudancasDuranteSync(db));
         try { blindarCaixaContraOsBloqueadas(db); salvar(db); } catch (eBl) { /* ok */ }
         canalVendas = canalAntes;
         _syncUltimaOkEm = Date.now();
@@ -957,7 +1051,7 @@ async function sincronizarTodosNuvem(opts) {
             if (silencioso) {
                 toast('Sincronizado na nuvem.');
             } else {
-                toast('Nuvem OK: ' + ok + ' OS · ' + (db.clientes || []).length + ' cliente(s)' +
+                toast('Nuvem OK: caixa e cadastros enviados · ' + ok + ' OS alterada(s) enviada(s)' +
                     (falha ? ' · ' + falha + ' falha(s)' : '') + '.');
             }
         }
@@ -968,7 +1062,12 @@ async function sincronizarTodosNuvem(opts) {
         } catch (eFuncUi) { /* ok */ }
     } finally {
         _syncEmAndamento = false;
+        _syncProgresso = '';
         atualizarStatusNuvemUI();
+        if (_syncDeNovo) {
+            _syncDeNovo = false;
+            agendarSyncAutomatico('salvar');
+        }
     }
 }
 

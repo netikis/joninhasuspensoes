@@ -726,7 +726,9 @@ async function montarElementoRenderNota(html) {
     aplicarEstilosNotaPagina(wrap);
     await aguardarImagensElemento(alvo);
     wrap.style.height = Math.max(alvo.scrollHeight, wrap.scrollHeight, 1123) + 'px';
-    return { wrap: wrap, alvo: alvo };
+    var rolagemAntes = window.scrollY || 0;
+    window.scrollTo(0, 0);
+    return { wrap: wrap, alvo: alvo, rolagemAntes: rolagemAntes };
 }
 
 function optHtml2CanvasNota() {
@@ -737,6 +739,12 @@ function optHtml2CanvasNota() {
         backgroundColor: '#ffffff',
         logging: false,
         imageTimeout: 8000,
+        /* Sem isto, no celular com a tela rolada o PDF sai em branco ou cortado */
+        scrollX: 0,
+        scrollY: 0,
+        x: 0,
+        y: 0,
+        windowWidth: 794,
         onclone: function (doc) {
             var extra = doc.createElement('style');
             extra.textContent = '.html2pdf__container,.html2pdf__container *{box-sizing:border-box!important;overflow:visible!important}' +
@@ -764,6 +772,7 @@ async function gerarPdfBlobDaNota(html, nomeArq) {
         }).from(prep.alvo).outputPdf('blob');
     } finally {
         if (prep.wrap && prep.wrap.parentNode) prep.wrap.parentNode.removeChild(prep.wrap);
+        if (prep.rolagemAntes) window.scrollTo(0, prep.rolagemAntes);
     }
 }
 
@@ -788,6 +797,7 @@ async function gerarJpegBlobDaNota(html) {
         });
     } finally {
         if (prep.wrap && prep.wrap.parentNode) prep.wrap.parentNode.removeChild(prep.wrap);
+        if (prep.rolagemAntes) window.scrollTo(0, prep.rolagemAntes);
     }
 }
 
@@ -1637,9 +1647,10 @@ function atualizarKPIs(db) {
     var saidas = somarMes(db.caixa, 'saida');
     var entBanco = somarMes(db.caixaBanco, 'entrada');
     var saiBanco = somarMes(db.caixaBanco, 'saida');
-    var pendentes = (db.pendentes || []).filter(function (p) { return p.status !== 'pago'; });
-    var totPend = pendentes.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
     var painelKpi = (typeof totaisPainelCaixa === 'function') ? totaisPainelCaixa(db) : null;
+    var pendOcultas = (painelKpi && painelKpi.cfg && painelKpi.cfg.pendOcultasPainel) || {};
+    var pendentes = (db.pendentes || []).filter(function (p) { return p.status !== 'pago' && !pendOcultas[p.id]; });
+    var totPend = pendentes.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
     if (painelKpi) {
         setTxt('kpiInicioEntradas', moeda(painelKpi.balcao.entradas + painelKpi.banco.entradas));
         setTxt('kpiInicioSaidas', moeda(painelKpi.balcao.saidas + painelKpi.banco.saidas));
@@ -1666,6 +1677,9 @@ function atualizarKPIs(db) {
         if (!(custoPecas > 0)) {
             custoPecas = Math.max(0, (Number(ofPainel.pecas) || 0) - (Number(ofPainel.ganho) || 0));
         }
+        var cfgKpi = (painelKpi && painelKpi.cfg) || {};
+        ganhoNosso = Math.max(0, ganhoNosso - (Number(cfgKpi.basePainelGanho) || 0));
+        custoPecas = Math.max(0, custoPecas - (Number(cfgKpi.basePainelCusto) || 0));
         setTxt('kpiInicioGanho', moeda(ganhoNosso));
         setTxt('kpiInicioCusto', moeda(custoPecas));
     }
@@ -8348,11 +8362,42 @@ function totaisOficinaNoCaixaHoje(db, hoje) {
     return total;
 }
 
+function resumoGeralPeriodoOficina(per, r) {
+    var db = carregarMain();
+    var ini = per.inicio, fim = per.fim;
+    var somar = function (lista, tipo) {
+        return (typeof somarListaPeriodo === 'function') ? somarListaPeriodo(lista, tipo, ini, fim) : 0;
+    };
+    var pend = (db.pendentes || []).filter(function (p) {
+        if (!p || p.status === 'pago') return false;
+        var d = String(p.criadoEm || p.data || '').slice(0, 10);
+        return !/^\d{4}-\d{2}-\d{2}$/.test(d) || (d >= ini && d <= fim);
+    });
+    var custo = Number(r.custoPecas);
+    if (!isFinite(custo) || custo <= 0) custo = Math.max(0, (Number(r.pecas) || 0) - (Number(r.ganho) || 0));
+    return {
+        entradas: somar(db.caixa, 'entrada') + somar(db.caixaBanco, 'entrada'),
+        saidas: somar(db.caixa, 'saida') + somar(db.caixaBanco, 'saida'),
+        pendentes: pend.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0),
+        qtdPend: pend.length,
+        ganho: (Number(r.ganho) || 0) + (Number(r.mao) || 0),
+        custo: custo
+    };
+}
+
 function renderRelatorioOficina() {
     var panel = document.getElementById('painelRelatorioOficina');
     if (!panel) return;
     var per = periodoOficina();
     var r = calcularRelatorioOficina(per);
+    var g = resumoGeralPeriodoOficina(per, r);
+    var setG = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+    setG('rofGerEntradas', moeda(g.entradas));
+    setG('rofGerSaidas', moeda(g.saidas));
+    setG('rofGerPend', moeda(g.pendentes));
+    setG('rofGerPendQtd', g.qtdPend + ' em aberto no período');
+    setG('rofGerGanho', moeda(g.ganho));
+    setG('rofGerCusto', moeda(g.custo));
     document.getElementById('rofPecasBruto').textContent = moeda(r.pecas);
     document.getElementById('rofPecasLucro').textContent = moeda(r.ganho);
     document.getElementById('rofMaoBruta').textContent = moeda(r.mao);
@@ -8448,6 +8493,12 @@ function imprimirRelatorioOficina() {
         ' &nbsp;|&nbsp; <b>MO casa:</b> ' + moeda(r.maoCasa) +
         ' &nbsp;|&nbsp; <b>Despesas:</b> ' + moeda(r.despesas) +
         ' &nbsp;|&nbsp; <b>Lucro (casa):</b> ' + moeda(r.resultado) + '</p>';
+    var g = resumoGeralPeriodoOficina(per, r);
+    html += '<p><b>Resumo geral:</b> Entradas ' + moeda(g.entradas) +
+        ' &nbsp;|&nbsp; Saídas ' + moeda(g.saidas) +
+        ' &nbsp;|&nbsp; Contas a receber ' + moeda(g.pendentes) +
+        ' &nbsp;|&nbsp; Ganho nosso ' + moeda(g.ganho) +
+        ' &nbsp;|&nbsp; Despesa (custo peças) ' + moeda(g.custo) + '</p>';
     html += corpo;
     html += '</body></html>';
     var w = window.open('', '_blank');

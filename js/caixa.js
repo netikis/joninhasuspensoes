@@ -15,6 +15,9 @@ function getCaixaConfig(db) {
         baseOficinaPecas: 0,
         baseOficinaGanho: 0,
         baseOficinaMao: 0,
+        basePainelGanho: 0,
+        basePainelCusto: 0,
+        pendOcultasPainel: {},
         atualizadoEm: '',
         zeradoEm: '',
         fechadoEm: '',
@@ -224,17 +227,70 @@ function totaisPainelCaixa(db) {
     };
 }
 
-function aplicarZerarPaineisCaixa(db) {
+var CARDS_ZERAR_PAINEL = ['entradas', 'saidas', 'pendentes', 'ganho', 'custo'];
+
+function normalizarOpcoesZerar(op) {
+    var out = {};
+    CARDS_ZERAR_PAINEL.forEach(function (k) { out[k] = !op || op[k] !== false; });
+    return out;
+}
+
+function algumCardParaZerar(op) {
+    return CARDS_ZERAR_PAINEL.some(function (k) { return op && op[k]; });
+}
+
+/* Ganho nosso e custo de peças acumulados até o dia (mesma conta dos cards do Início) */
+function ganhoCustoAcumulado(fim) {
+    if (typeof calcularRelatorioOficina !== 'function') return { ganho: 0, custo: 0 };
+    var r = calcularRelatorioOficina({ inicio: '2000-01-01', fim: fim || hojeISO(), label: 'tudo' });
+    var custo = Number(r.custoPecas);
+    if (!(custo > 0)) custo = Math.max(0, (Number(r.pecas) || 0) - (Number(r.ganho) || 0));
+    return { ganho: (Number(r.ganho) || 0) + (Number(r.mao) || 0), custo: custo };
+}
+
+function totalPendentesAbertos(db) {
+    return (db.pendentes || []).filter(function (p) { return p && p.status !== 'pago'; })
+        .reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
+}
+
+function pendentesAbertosAte(db, fim) {
+    var mapa = {};
+    (db.pendentes || []).forEach(function (p) {
+        if (!p || !p.id || p.status === 'pago') return;
+        if (fim && String(p.criadoEm || '').slice(0, 10) > fim) return;
+        mapa[p.id] = true;
+    });
+    return mapa;
+}
+
+function aplicarZerarCardsExtras(db, cfg, op, fim) {
+    if (op.ganho || op.custo) {
+        var gc = ganhoCustoAcumulado(fim);
+        if (op.ganho) cfg.basePainelGanho = gc.ganho;
+        if (op.custo) cfg.basePainelCusto = gc.custo;
+    }
+    if (op.pendentes) {
+        cfg.pendOcultasPainel = Object.assign({}, cfg.pendOcultasPainel || {}, pendentesAbertosAte(db, fim));
+    }
+}
+
+function aplicarZerarPaineisCaixa(db, opcoes) {
+    var op = normalizarOpcoesZerar(opcoes);
     var cfg = getCaixaConfig(db);
-    cfg.inicialBalcao = 0;
-    cfg.inicialBanco = 0;
-    cfg.basePainelEntradas = somarLista(db.caixa, 'entrada');
-    cfg.basePainelSaidas = somarLista(db.caixa, 'saida');
-    cfg.basePainelEntradasBanco = somarLista(db.caixaBanco, 'entrada');
-    cfg.basePainelSaidasBanco = somarLista(db.caixaBanco, 'saida');
+    if (op.entradas) {
+        cfg.inicialBalcao = 0;
+        cfg.inicialBanco = 0;
+        cfg.basePainelEntradas = somarLista(db.caixa, 'entrada');
+        cfg.basePainelEntradasBanco = somarLista(db.caixaBanco, 'entrada');
+    }
+    if (op.saidas) {
+        cfg.basePainelSaidas = somarLista(db.caixa, 'saida');
+        cfg.basePainelSaidasBanco = somarLista(db.caixaBanco, 'saida');
+    }
+    aplicarZerarCardsExtras(db, cfg, op, '');
     var hoje = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
     var ym = String(hoje).slice(0, 7);
-    if (typeof calcularRelatorioOficina === 'function') {
+    if ((op.ganho || op.custo) && typeof calcularRelatorioOficina === 'function') {
         var ofLive = calcularRelatorioOficina({ inicio: ym + '-01', fim: hoje, label: ym });
         cfg.baseOficinaMes = ym;
         cfg.baseOficinaInicio = hoje;
@@ -487,7 +543,7 @@ function zerarPainelCaixa() {
         'Os documentos NÃO são apagados — Relatório Caixa e as pastas do mês continuam com tudo.'
     )) return;
     var db = carregarMain();
-    salvarCaixaConfigOficial(aplicarZerarPaineisCaixa(db));
+    salvarCaixaConfigOficial(aplicarZerarPaineisCaixa(db, { pendentes: false }));
     renderCaixa();
     renderCaixaBanco();
     atualizarKPIs(carregarMain());
@@ -3350,7 +3406,20 @@ document.querySelectorAll('[data-rel-mes-ver]').forEach(function (b) {
 });
 /* Pastas Ano→Mês removidas da UI (1.3.1) — listeners desligados de propósito */
 
-function fecharCaixaDoDia() {
+var ROTULOS_CARDS_ZERAR = {
+    entradas: 'Entradas', saidas: 'Saídas', pendentes: 'Contas a receber',
+    ganho: 'Ganho nosso', custo: 'Despesa (custo peças)'
+};
+
+function textoCardsZerados(op) {
+    var l = CARDS_ZERAR_PAINEL.filter(function (k) { return op[k]; }).map(function (k) { return ROTULOS_CARDS_ZERAR[k]; });
+    return l.length ? l.join(', ') : 'nenhum';
+}
+
+/* opcoes = quais cards zerar; vindo do modal do Início já está confirmado */
+function fecharCaixaDoDia(opcoes) {
+    var jaConfirmado = !!opcoes;
+    var opZ = normalizarOpcoesZerar(opcoes);
     if (typeof sincronizarOficinaNoCaixaEmpresa === 'function') {
         try { sincronizarOficinaNoCaixaEmpresa(); } catch (eSyncF) { /* ok */ }
     }
@@ -3365,7 +3434,7 @@ function fecharCaixaDoDia() {
     var of = totaisOficinaPainel(db);
     var snap = snapshotDiscricaoFechamento(db, iniOf, hoje, corte);
     var totalOficina = snap.totalOficina != null ? snap.totalOficina : ((Number(of.pecas) || 0) + (Number(of.mao) || 0));
-    if (!confirm(
+    if (!jaConfirmado && !confirm(
         'Fechar o caixa com o saldo da TELA e zerar balcão + digital + oficina?\n\n' +
         '(Se não fechou os dias anteriores, fecha tudo que está aberto agora.)\n\n' +
         'BALCÃO\n' +
@@ -3412,15 +3481,19 @@ function fecharCaixaDoDia() {
         linhasOficina: snap.linhasOficina,
         entradasCaixaOficina: snap.entradasCaixaOficina,
         entradasCaixaOutras: snap.entradasCaixaOutras,
+        ganhoNosso: (Number(snap.ganho) || 0) + (Number(snap.mao) || 0),
+        custoPecas: Math.max(0, (Number(snap.pecas) || 0) - (Number(snap.ganho) || 0)),
+        contasReceber: totalPendentesAbertos(db),
+        cardsZerados: opZ,
         criadoEm: new Date().toISOString()
     };
     db.fechamentosCaixa.push(rec);
     db.caixa.push(montarLancamentoFechamentoCaixa(rec));
-    db.caixaConfig = aplicarZerarPaineisCaixa(db);
+    db.caixaConfig = aplicarZerarPaineisCaixa(db, opZ);
     db.caixaConfig.atualizadoEm = rec.criadoEm;
     salvarMain(db);
     if (typeof agendarSyncAutomatico === 'function') agendarSyncAutomatico('salvar');
-    toast('Caixa fechado. Linha FECH.CAIXA gravada. Cards do caixa e da oficina zerados.');
+    toast('Caixa fechado. Cards zerados: ' + textoCardsZerados(opZ) + '. O mês continua no Relatório Oficina.');
     renderCaixa();
     renderCaixaBanco();
     if (typeof renderRelatorioCaixa === 'function') renderRelatorioCaixa();
@@ -3450,18 +3523,24 @@ function totaisCaixaPeriodo(db, ini, fim) {
 }
 
 /** Zera os cards do painel considerando só o que foi lançado até o dia final. */
-function aplicarZerarPaineisAte(db, fim) {
+function aplicarZerarPaineisAte(db, fim, opcoes) {
     var hoje = hojeISO();
-    if (!fim || fim >= hoje) return aplicarZerarPaineisCaixa(db);
+    if (!fim || fim >= hoje) return aplicarZerarPaineisCaixa(db, opcoes);
+    var op = normalizarOpcoesZerar(opcoes);
     var cfg = getCaixaConfig(db);
-    cfg.inicialBalcao = 0;
-    cfg.inicialBanco = 0;
-    cfg.basePainelEntradas = somarListaAte(db.caixa, 'entrada', fim);
-    cfg.basePainelSaidas = somarListaAte(db.caixa, 'saida', fim);
-    cfg.basePainelEntradasBanco = somarListaAte(db.caixaBanco, 'entrada', fim);
-    cfg.basePainelSaidasBanco = somarListaAte(db.caixaBanco, 'saida', fim);
+    if (op.entradas) {
+        cfg.inicialBalcao = 0;
+        cfg.inicialBanco = 0;
+        cfg.basePainelEntradas = somarListaAte(db.caixa, 'entrada', fim);
+        cfg.basePainelEntradasBanco = somarListaAte(db.caixaBanco, 'entrada', fim);
+    }
+    if (op.saidas) {
+        cfg.basePainelSaidas = somarListaAte(db.caixa, 'saida', fim);
+        cfg.basePainelSaidasBanco = somarListaAte(db.caixaBanco, 'saida', fim);
+    }
+    aplicarZerarCardsExtras(db, cfg, op, fim);
     var ym = hoje.slice(0, 7);
-    if (typeof calcularRelatorioOficina === 'function') {
+    if ((op.ganho || op.custo) && typeof calcularRelatorioOficina === 'function') {
         var ofAte = fim.slice(0, 7) === ym
             ? calcularRelatorioOficina({ inicio: ym + '-01', fim: fim, label: ym })
             : { pecas: 0, ganho: 0, mao: 0 };
@@ -3476,7 +3555,11 @@ function aplicarZerarPaineisAte(db, fim) {
     return cfg;
 }
 
+/* zerar: true = todos os cards · false = nenhum · objeto = só os marcados */
 function fecharCaixaPeriodo(ini, fim, zerar) {
+    var opZ = zerar === true ? normalizarOpcoesZerar(null)
+        : (zerar && typeof zerar === 'object' ? normalizarOpcoesZerar(zerar) : null);
+    zerar = !!(opZ && algumCardParaZerar(opZ));
     ini = dataISODia(ini);
     fim = dataISODia(fim);
     if (!ini || !fim || ini > fim) {
@@ -3500,7 +3583,7 @@ function fecharCaixaPeriodo(ini, fim, zerar) {
         'BALCÃO\nEntradas: ' + moeda(bal.entradas) + '\nSaídas: ' + moeda(bal.saidas) + '\nBalanço: ' + moeda(bal.saldo) + '\n\n' +
         'DIGITAL / BANCO\nEntradas: ' + moeda(ban.entradas) + '\nSaídas: ' + moeda(ban.saidas) + '\nSaldo: ' + moeda(ban.saldo) + '\n\n' +
         'OFICINA\nPeças: ' + moeda(snap.pecas) + '\nMão de obra: ' + moeda(snap.mao) + '\nTotal oficina: ' + moeda(totalOficina) + '\n\n' +
-        (zerar ? 'Os cards da tela inicial zeram até ' + fmtData(fim) + '.' : 'Os cards da tela inicial NÃO serão zerados.')
+        (zerar ? 'Zeram na tela inicial (até ' + fmtData(fim) + '): ' + textoCardsZerados(opZ) + '.' : 'Os cards da tela inicial NÃO serão zerados.')
     )) return false;
     if (!db.fechamentosCaixa) db.fechamentosCaixa = [];
     if (!db.caixa) db.caixa = [];
@@ -3534,17 +3617,21 @@ function fecharCaixaPeriodo(ini, fim, zerar) {
         linhasOficina: snap.linhasOficina,
         entradasCaixaOficina: entOf,
         entradasCaixaOutras: entOut,
+        ganhoNosso: (Number(snap.ganho) || 0) + (Number(snap.mao) || 0),
+        custoPecas: Math.max(0, (Number(snap.pecas) || 0) - (Number(snap.ganho) || 0)),
+        contasReceber: totalPendentesAbertos(db),
+        cardsZerados: zerar ? opZ : null,
         criadoEm: agora
     };
     db.fechamentosCaixa.push(rec);
     db.caixa.push(montarLancamentoFechamentoCaixa(rec));
     if (zerar) {
-        db.caixaConfig = aplicarZerarPaineisAte(db, fim);
+        db.caixaConfig = aplicarZerarPaineisAte(db, fim, opZ);
         db.caixaConfig.atualizadoEm = agora;
     }
     salvarMain(db);
     if (typeof agendarSyncAutomatico === 'function') agendarSyncAutomatico('salvar');
-    toast('Fechamento de ' + fmtData(ini) + ' a ' + fmtData(fim) + ' gravado' + (zerar ? ' e cards zerados.' : '.'));
+    toast('Fechamento de ' + fmtData(ini) + ' a ' + fmtData(fim) + ' gravado' + (zerar ? '. Zerados: ' + textoCardsZerados(opZ) + '.' : '.'));
     renderCaixa();
     renderCaixaBanco();
     if (typeof renderRelatorioCaixa === 'function') renderRelatorioCaixa();
@@ -3605,15 +3692,50 @@ function abrirModalFecharPeriodo() {
         var ok = fecharCaixaPeriodo(
             document.getElementById('fpIni').value,
             document.getElementById('fpFim').value,
-            document.getElementById('fpZerar').checked
+            lerCardsZerar('fpZerarCards')
         );
         if (ok) fechar();
     });
     var bI = document.getElementById('btnInicioFecharPeriodo');
     if (bI) bI.addEventListener('click', abrirModalFecharPeriodo);
     var bF = document.getElementById('btnInicioFecharCaixa');
-    if (bF) bF.addEventListener('click', function () { fecharCaixaDoDia(); });
+    if (bF) bF.addEventListener('click', abrirModalFecharCaixa);
+
+    var mc = document.getElementById('modalFecharCaixa');
+    if (!mc) return;
+    var fecharMc = function () { mc.classList.remove('aberto'); };
+    mc.addEventListener('click', function (e) { if (e.target === mc) fecharMc(); });
+    document.getElementById('btnFcCancelar').addEventListener('click', fecharMc);
+    document.getElementById('btnFcConfirmar').addEventListener('click', function () {
+        var op = lerCardsZerar('fcZerarCards');
+        fecharMc();
+        fecharCaixaDoDia(op);
+    });
 })();
+
+function lerCardsZerar(idBox) {
+    var op = {};
+    CARDS_ZERAR_PAINEL.forEach(function (k) { op[k] = false; });
+    var box = document.getElementById(idBox);
+    if (box) box.querySelectorAll('[data-zerar]').forEach(function (c) { op[c.getAttribute('data-zerar')] = c.checked; });
+    return op;
+}
+
+function abrirModalFecharCaixa() {
+    var m = document.getElementById('modalFecharCaixa');
+    if (!m) { fecharCaixaDoDia(); return; }
+    var db = carregarMain();
+    var p = totaisPainelCaixa(db);
+    var prev = document.getElementById('fcPrevia');
+    if (prev) {
+        prev.innerHTML = 'Aberto agora — Entradas: <strong>' + moeda(p.balcao.entradas + p.banco.entradas) + '</strong> · ' +
+            'Saídas: <strong>' + moeda(p.balcao.saidas + p.banco.saidas) + '</strong> · ' +
+            'Saldo: <strong>' + moeda(p.balcao.saldo + p.banco.saldo) + '</strong>';
+    }
+    m.querySelectorAll('[data-zerar]').forEach(function (c) { c.checked = true; });
+    m.classList.add('aberto');
+}
+window.abrirModalFecharCaixa = abrirModalFecharCaixa;
 
 function htmlCorpoFechamentoCaixa(f) {
     if (!f) return '';

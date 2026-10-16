@@ -1102,14 +1102,17 @@ function aplicarFotosNuvemNoAtendimento(payload, nuvAt) {
             return {
                 id: (fn && fn.id) || fl.id || uid(),
                 data: fl.data || null,
-                url: fl.url || (fn && fn.url) || null
+                url: fl.url || (fn && fn.url) || null,
+                nuvem: !!(fn && fn.nuvem)
             };
         });
         if (!dbX.atendimentos[ix].fotos.length && locais.length) {
             dbX.atendimentos[ix].fotos = locais;
         }
     }
-    dbX.atendimentos[ix].syncNuvemEm = new Date().toISOString();
+    dbX.atendimentos[ix].syncNuvemEm = nuvAt.syncNuvemEm || new Date().toISOString();
+    if (nuvAt.atualizadoEm) dbX.atendimentos[ix].atualizadoEm = nuvAt.atualizadoEm;
+    if (nuvAt.digitalNuvem) dbX.atendimentos[ix].digitalNuvem = nuvAt.digitalNuvem;
     salvar(dbX);
 }
 

@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=94">
-    <link rel="stylesheet" href="css/tema-m3.css?v=94">
-    <link rel="stylesheet" href="css/telas.css?v=94">
+    <link rel="stylesheet" href="css/app.css?v=95">
+    <link rel="stylesheet" href="css/tema-m3.css?v=95">
+    <link rel="stylesheet" href="css/telas.css?v=95">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -1352,6 +1352,17 @@
                     <div class="card-sub">Toque para ver o detalhe</div>
                 </button>
             </div>
+            <div class="box rof-resumo-geral">
+                <h2>📊 Resumo geral do período</h2>
+                <p class="hint" style="margin-top:0">Mesmo depois de fechar o caixa e zerar a tela inicial, aqui continua o total do período escolhido.</p>
+                <div class="cards">
+                    <div class="card" style="background:#27ae60"><div class="k">Entradas (caixa + banco)</div><div class="v" id="rofGerEntradas">R$ 0</div></div>
+                    <div class="card" style="background:#e74c3c"><div class="k">Saídas (caixa + banco)</div><div class="v" id="rofGerSaidas">R$ 0</div></div>
+                    <div class="card" style="background:#e67e22"><div class="k">Contas a receber</div><div class="v" id="rofGerPend">R$ 0</div><div class="card-sub" id="rofGerPendQtd"></div></div>
+                    <div class="card" style="background:#2980b9"><div class="k">Ganho nosso</div><div class="v" id="rofGerGanho">R$ 0</div><div class="card-sub">Ganho em peças + mão de obra</div></div>
+                    <div class="card" style="background:#8e44ad"><div class="k">Despesa (custo peças)</div><div class="v" id="rofGerCusto">R$ 0</div></div>
+                </div>
+            </div>
             <div class="box" id="rofConteudo">
                 <h2>Detalhamento</h2>
                 <div id="rofDetalhe" class="muted rof-detalhe">Escolha o período e clique em Atualizar.</div>
@@ -1914,6 +1925,25 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modalFecharCaixa">
+        <div class="modal-box" style="width:min(480px,100%)">
+            <h3>🔒 Fechar caixa e zerar</h3>
+            <p class="hint">Fecha tudo que está aberto desde o último fechamento. Marque o que deve voltar para R$ 0,00 na tela inicial. O mês continua inteiro no <strong>Relatório Oficina</strong>.</p>
+            <div class="zerar-cards" id="fcZerarCards">
+                <label><input type="checkbox" data-zerar="entradas" checked> Entradas</label>
+                <label><input type="checkbox" data-zerar="saidas" checked> Saídas</label>
+                <label><input type="checkbox" data-zerar="pendentes" checked> Contas a receber</label>
+                <label><input type="checkbox" data-zerar="ganho" checked> Ganho nosso</label>
+                <label><input type="checkbox" data-zerar="custo" checked> Despesa (custo peças)</label>
+            </div>
+            <div id="fcPrevia" class="hint" style="margin-top:10px"></div>
+            <div class="modal-acoes" style="flex-direction:column;gap:8px;margin-top:10px">
+                <button type="button" class="btn btn-ok" id="btnFcConfirmar" style="width:100%">🔒 Fechar caixa</button>
+                <button type="button" class="btn btn-danger" id="btnFcCancelar" style="width:100%">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modalFecharPeriodo">
         <div class="modal-box" style="width:min(480px,100%)">
             <h3>📅 Fechar caixa por período</h3>
@@ -1928,9 +1958,14 @@
                 <div class="col"><label>De</label><input type="date" id="fpIni"></div>
                 <div class="col"><label>Até</label><input type="date" id="fpFim"></div>
             </div>
-            <label style="display:flex;align-items:center;gap:8px;margin:10px 0 0;cursor:pointer">
-                <input type="checkbox" id="fpZerar" checked style="width:auto"> Zerar os cards da tela inicial até o dia final
-            </label>
+            <p class="hint" style="margin:10px 0 4px"><strong>Zerar na tela inicial (até o dia final):</strong></p>
+            <div class="zerar-cards" id="fpZerarCards">
+                <label><input type="checkbox" data-zerar="entradas" checked> Entradas</label>
+                <label><input type="checkbox" data-zerar="saidas" checked> Saídas</label>
+                <label><input type="checkbox" data-zerar="pendentes" checked> Contas a receber</label>
+                <label><input type="checkbox" data-zerar="ganho" checked> Ganho nosso</label>
+                <label><input type="checkbox" data-zerar="custo" checked> Despesa (custo peças)</label>
+            </div>
             <div id="fpPrevia" class="hint" style="margin-top:10px"></div>
             <div class="modal-acoes" style="flex-direction:column;gap:8px;margin-top:10px">
                 <button type="button" class="btn btn-ok" id="btnFpConfirmar" style="width:100%">🔒 Fechar este período</button>
@@ -2135,18 +2170,18 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=94"></script>
-    <script src="js/storage.js?v=94"></script>
-    <script src="js/ui.js?v=94"></script>
-    <script src="js/auth.js?v=94"></script>
-    <script src="js/os.js?v=94"></script>
-    <script src="js/nuvem.js?v=94"></script>
-    <script src="js/caixa.js?v=94"></script>
-    <script src="js/comissoes.js?v=94"></script>
-    <script src="js/app.js?v=94"></script>
-    <script src="js/func-ponto.js?v=94"></script>
-    <script src="js/perfil-cliente.js?v=94"></script>
-    <script src="js/navegacao.js?v=94"></script>
+    <script src="js/config.js?v=95"></script>
+    <script src="js/storage.js?v=95"></script>
+    <script src="js/ui.js?v=95"></script>
+    <script src="js/auth.js?v=95"></script>
+    <script src="js/os.js?v=95"></script>
+    <script src="js/nuvem.js?v=95"></script>
+    <script src="js/caixa.js?v=95"></script>
+    <script src="js/comissoes.js?v=95"></script>
+    <script src="js/app.js?v=95"></script>
+    <script src="js/func-ponto.js?v=95"></script>
+    <script src="js/perfil-cliente.js?v=95"></script>
+    <script src="js/navegacao.js?v=95"></script>
 </body>
 </html>
 
