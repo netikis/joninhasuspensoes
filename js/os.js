@@ -1127,6 +1127,10 @@ async function extrasPosSalvarAtendimento(payload, resolvido) {
 
     var cfgN = typeof carregarConfigNuvem === 'function' ? carregarConfigNuvem() : null;
     if (!(cfgN && cfgN.apiKey && cfgN.projectId)) return extras;
+    if (typeof nuvemEmPausa === 'function' && nuvemEmPausa()) {
+        extras.push('nuvem sem gravar agora — sobe depois');
+        return extras;
+    }
     try {
         var okSess = (typeof usuarioNuvemLogado === 'function' && usuarioNuvemLogado()) ||
             (typeof garantirSessaoNuvemQualquer === 'function' && await garantirSessaoNuvemQualquer());
@@ -1141,7 +1145,6 @@ async function extrasPosSalvarAtendimento(payload, resolvido) {
                 aplicarFotosNuvemNoAtendimento(payload, nuvF.atendimento);
             } else extras.push('nuvem: ' + ((nuvF && nuvF.motivo) || 'falhou'));
         } else {
-            if (typeof enviarBaseNuvem === 'function') await enviarBaseNuvem(carregar());
             var nuv = await enviarAtendimentoNuvem(payload);
             if (nuv && nuv.ok) {
                 extras.push('nuvem OK');

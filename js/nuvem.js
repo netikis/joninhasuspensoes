@@ -57,7 +57,10 @@ function atualizarStatusNuvemUI() {
         el.innerHTML = '<strong>Nuvem:</strong> faltam chaves — rode <code>npm run build</code> com o arquivo .env.';
         return;
     }
-    if (user) {
+    if (user && nuvemEmPausa()) {
+        el.className = 'config-status aviso';
+        el.innerHTML = '<strong>Nuvem:</strong> ' + esc(MSG_NUVEM_SEM_RESPOSTA) + '. Os dados ficam no aparelho; toque em Sincronizar para tentar de novo.';
+    } else if (user) {
         el.className = 'config-status';
         var syncTxt = _syncUltimaOkEm
             ? ' · última sync ' + esc(fmtHoraSync(_syncUltimaOkEm))
@@ -140,6 +143,7 @@ function agendarSyncAutomatico(motivo) {
 
 async function dispararSyncConformeSessao(opts) {
     opts = opts || {};
+    if (opts.silencioso && nuvemEmPausa()) return;
     var okAuth = usuarioNuvemLogado() || await garantirSessaoNuvemQualquer();
     if (!okAuth) return;
     if (sessaoFuncionarioId && usuarioNuvemEhAnonimo()) {
@@ -311,6 +315,38 @@ async function logoutFirebase() {
 
 async function logoutnuvem() { return logoutFirebase(); }
 
+/* Com a cota diária do Firebase estourada a gravação não dá erro: fica esperando para sempre */
+var MSG_NUVEM_SEM_RESPOSTA = 'a nuvem não confirmou a gravação — o limite diário gratuito do Firebase pode ter acabado (volta depois das 04:00)';
+var NUVEM_PAUSA_KEY = 'joninha_suspensoes_nuvem_pausa_ate';
+
+function gravarNaNuvem(promessa, ms) {
+    return Promise.race([
+        promessa,
+        new Promise(function (_, rej) {
+            setTimeout(function () {
+                var e = new Error(MSG_NUVEM_SEM_RESPOSTA);
+                e.code = 'sem-resposta';
+                try { localStorage.setItem(NUVEM_PAUSA_KEY, String(Date.now() + 15 * 60000)); } catch (eP) { /* ok */ }
+                rej(e);
+            }, ms || 30000);
+        })
+    ]).then(function (v) {
+        try { localStorage.removeItem(NUVEM_PAUSA_KEY); } catch (eP) { /* ok */ }
+        return v;
+    });
+}
+
+function nuvemEmPausa() {
+    try { return Number(localStorage.getItem(NUVEM_PAUSA_KEY) || 0) > Date.now(); } catch (e) { return false; }
+}
+
+function digitalValor(v) {
+    var s = jsonOrdenado(v);
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return h.toString(36) + '.' + s.length;
+}
+
 async function enviarAtendimentoNuvem(atendimento) {
     var sessao = await obterSessaonuvem();
     var fsMod = sessao.fsMod;
@@ -331,24 +367,28 @@ async function enviarAtendimentoNuvem(atendimento) {
             if (!f.data || String(f.data).length > FOTO_MAX_CHARS * 1.35) {
                 return { ok: false, motivo: 'foto ainda grande demais após compressão' };
             }
-            await fsMod.setDoc(fsMod.doc(dbFs, 'joninha_suspensoes_midia', atendimento.id + '_' + fotoId), {
+            await gravarNaNuvem(fsMod.setDoc(fsMod.doc(dbFs, 'joninha_suspensoes_midia', atendimento.id + '_' + fotoId), {
                 atendimentoId: atendimento.id,
                 fotoId: fotoId,
                 data: f.data,
                 comprimida: true,
                 atualizadoEm: new Date().toISOString()
-            });
+            }), 45000);
             delete f.data;
             f.nuvem = true;
         } catch (midErr) {
-            return { ok: false, motivo: 'falha ao enviar foto: ' + (midErr.message || midErr.code || '') };
+            return { ok: false, semResposta: midErr.code === 'sem-resposta', motivo: 'falha ao enviar foto: ' + (midErr.message || midErr.code || '') };
         }
     }
     docOut.fotos = fotos;
     docOut.atualizadoEm = new Date().toISOString();
     docOut.syncNuvemEm = docOut.atualizadoEm;
     docOut.digitalNuvem = digitalAtendimento(docOut);
-    await fsMod.setDoc(fsMod.doc(dbFs, 'joninha_suspensoes_atendimentos', atendimento.id), docOut);
+    try {
+        await gravarNaNuvem(fsMod.setDoc(fsMod.doc(dbFs, 'joninha_suspensoes_atendimentos', atendimento.id), docOut));
+    } catch (osErr) {
+        return { ok: false, semResposta: osErr.code === 'sem-resposta', motivo: osErr.message || osErr.code || 'falha' };
+    }
     return { ok: true, atendimento: docOut };
 }
 
@@ -373,17 +413,42 @@ async function hidratarFotosDaNuvem(atendimento) {
     return atendimento;
 }
 
-async function baixarAtendimentosNuvem(localLista) {
+var OS_MARCA_KEY = 'joninha_suspensoes_os_marca_nuvem';
+var OS_FULL_KEY = 'joninha_suspensoes_os_full_em';
+
+/* Leitura completa só no botão, na 1ª vez e a cada 30 min; no automático baixa só as OS alteradas */
+async function baixarAtendimentosNuvem(localLista, opts) {
+    opts = opts || {};
     var sessao = await obterSessaonuvem();
     var fsMod = sessao.fsMod;
     var dbFs = sessao.dbFs;
-    var snap = await fsMod.getDocs(fsMod.collection(dbFs, 'joninha_suspensoes_atendimentos'));
+    var marca = '', fullEm = 0;
+    try {
+        marca = localStorage.getItem(OS_MARCA_KEY) || '';
+        fullEm = Number(localStorage.getItem(OS_FULL_KEY) || 0);
+    } catch (eM) { /* ok */ }
+    var completo = !!opts.completo || !marca || (Date.now() - fullEm > 30 * 60000);
+    var col = fsMod.collection(dbFs, 'joninha_suspensoes_atendimentos');
+    var snap;
+    if (completo) {
+        snap = await fsMod.getDocs(col);
+    } else {
+        /* margem de 15 min para relógio de aparelho um pouco atrasado */
+        var desde = new Date(new Date(marca).getTime() - 15 * 60000).toISOString();
+        snap = await fsMod.getDocs(fsMod.query(col, fsMod.where('atualizadoEm', '>', desde)));
+    }
     var lista = [];
+    var maior = marca;
     snap.forEach(function (docSnap) {
         var a = docSnap.data() || {};
         if (!a.id) a.id = docSnap.id;
+        if (a.atualizadoEm && String(a.atualizadoEm) > maior) maior = String(a.atualizadoEm);
         lista.push(a);
     });
+    try {
+        if (maior) localStorage.setItem(OS_MARCA_KEY, maior);
+        if (completo) localStorage.setItem(OS_FULL_KEY, String(Date.now()));
+    } catch (eS) { /* ok */ }
     /* Só baixa a foto que este aparelho ainda não tem */
     var fotosLocais = {};
     (localLista || []).forEach(function (a) {
@@ -417,10 +482,7 @@ function digitalAtendimento(a) {
         if (!CAMPOS_FORA_DA_DIGITAL[k]) base[k] = a[k];
     });
     base.fotos = (a.fotos || []).map(function (f) { return f && f.id; });
-    var s = jsonOrdenado(base);
-    var h = 5381;
-    for (var i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
-    return h.toString(36) + '.' + s.length;
+    return digitalValor(base);
 }
 
 function atendimentoPrecisaEnviar(a) {
@@ -430,7 +492,7 @@ function atendimentoPrecisaEnviar(a) {
 }
 
 async function enviarAtendimentosAlterados(db) {
-    var ok = 0, falha = 0, motivo = '';
+    var ok = 0, falha = 0, motivo = '', semResposta = false;
     var lista = db.atendimentos || [];
     var idx = [];
     lista.forEach(function (a, i) { if (atendimentoPrecisaEnviar(a)) idx.push(i); });
@@ -453,6 +515,11 @@ async function enviarAtendimentosAlterados(db) {
         if (!r.ok) {
             falha++;
             if (!motivo) motivo = r.motivo || 'erro';
+            if (r.semResposta) {
+                semResposta = true;
+                falha += idx.length - k - 1;
+                break;
+            }
             continue;
         }
         ok++;
@@ -474,7 +541,7 @@ async function enviarAtendimentosAlterados(db) {
         }
     }
     _syncProgresso = '';
-    return { ok: ok, falha: falha, total: idx.length, motivo: motivo };
+    return { ok: ok, falha: falha, total: idx.length, motivo: motivo, semResposta: semResposta };
 }
 
 /* O que foi salvo no aparelho enquanto a sync rodava não pode ser apagado pelo salvar(db) final */
@@ -662,21 +729,30 @@ function mesclarPastasMes(localMap, nuvemMap) {
     return out;
 }
 
+var LOGO_NUVEM_KEY = 'joninha_suspensoes_logo_nuvem_dig';
+
+/* Só grava/apaga quando a logo deste aparelho mudou desde o último envio */
 async function enviarLogoEmpresaNuvem(logoDataUrl) {
+    var temData = !!(logoDataUrl && String(logoDataUrl).startsWith('data:'));
+    var dig = temData ? digitalValor(String(logoDataUrl)) : '';
+    var antes = '';
+    try { antes = localStorage.getItem(LOGO_NUVEM_KEY) || ''; } catch (eL) { /* ok */ }
+    if (dig === antes) return temData;
     var sessao = await obterSessaonuvem();
     var fsMod = sessao.fsMod;
     var dbFs = sessao.dbFs;
-    if (logoDataUrl && String(logoDataUrl).startsWith('data:')) {
-        await fsMod.setDoc(fsMod.doc(dbFs, 'joninha_suspensoes_midia', 'logo_empresa'), {
+    if (temData) {
+        await gravarNaNuvem(fsMod.setDoc(fsMod.doc(dbFs, 'joninha_suspensoes_midia', 'logo_empresa'), {
             data: logoDataUrl,
             atualizadoEm: new Date().toISOString()
-        });
-        return true;
+        }));
+    } else {
+        try {
+            await gravarNaNuvem(fsMod.deleteDoc(fsMod.doc(dbFs, 'joninha_suspensoes_midia', 'logo_empresa')));
+        } catch (e) { /* ok se não existir */ }
     }
-    try {
-        await fsMod.deleteDoc(fsMod.doc(dbFs, 'joninha_suspensoes_midia', 'logo_empresa'));
-    } catch (e) { /* ok se não existir */ }
-    return false;
+    try { localStorage.setItem(LOGO_NUVEM_KEY, dig); } catch (eS) { /* ok */ }
+    return temData;
 }
 
 async function hidratarLogoEmpresa(emp) {
@@ -770,7 +846,16 @@ async function puxarConfigEmpresaNuvemSilencioso() {
     }
 }
 
-async function enviarBaseNuvem(db) {
+var BASE_NUVEM_DIG_KEY = 'joninha_suspensoes_base_nuvem_dig';
+
+function digitalBaseNuvem(base, campos) {
+    var o = {};
+    campos.forEach(function (k) { o[k] = base ? base[k] : undefined; });
+    return digitalValor(cloneParaNuvem(o));
+}
+
+/* baseNuv = o que acabou de vir da nuvem: se o resultado é igual, não grava (economiza a cota diária) */
+async function enviarBaseNuvem(db, baseNuv) {
     var sessao = await obterSessaonuvem();
     var fsMod = sessao.fsMod;
     var dbFs = sessao.dbFs;
@@ -789,11 +874,31 @@ async function enviarBaseNuvem(db) {
         pastasMes: cloneParaNuvem(db.pastasMes || {}),
         contagemAtendimentosMes: cloneParaNuvem(db.contagemAtendimentosMes || {}),
         excluidos: garantirExcluidos(db),
-        funcionarios: listarFuncionariosInterno(),
-        atualizadoEm: new Date().toISOString()
+        funcionarios: listarFuncionariosInterno()
     };
-    await fsMod.setDoc(fsMod.doc(dbFs, 'joninha_suspensoes_base', 'principal'), base);
-    try { await enviarLoginsFuncNuvem(); } catch (eLog) { /* ok */ }
+    var campos = Object.keys(base);
+    var dig = digitalBaseNuvem(base, campos);
+    var ultimo = '';
+    try { ultimo = localStorage.getItem(BASE_NUVEM_DIG_KEY) || ''; } catch (eD) { /* ok */ }
+    var igualNuvem = baseNuv ? digitalBaseNuvem(baseNuv, campos) === dig : dig === ultimo;
+    if (igualNuvem) {
+        try { localStorage.setItem(BASE_NUVEM_DIG_KEY, dig); } catch (eD2) { /* ok */ }
+        base.enviado = false;
+        return base;
+    }
+    base.atualizadoEm = new Date().toISOString();
+    await gravarNaNuvem(fsMod.setDoc(fsMod.doc(dbFs, 'joninha_suspensoes_base', 'principal'), base));
+    try { localStorage.setItem(BASE_NUVEM_DIG_KEY, dig); } catch (eD3) { /* ok */ }
+    var digFunc = digitalValor(cloneParaNuvem(base.funcionarios || []));
+    var funcAntes = '';
+    try { funcAntes = localStorage.getItem(BASE_NUVEM_DIG_KEY + '_func') || ''; } catch (eF) { /* ok */ }
+    if (digFunc !== funcAntes) {
+        try {
+            var rLog = await enviarLoginsFuncNuvem();
+            if (rLog && rLog.ok) localStorage.setItem(BASE_NUVEM_DIG_KEY + '_func', digFunc);
+        } catch (eLog) { /* ok */ }
+    }
+    base.enviado = true;
     return base;
 }
 
@@ -851,9 +956,11 @@ async function sincronizarOficinaNuvem(opts) {
         canalVendas = 'normal';
         var db = carregar();
         var ok = 0, falha = 0;
+        var baseNuvOf = null;
 
         try {
             var baseNuv = await baixarBaseNuvem();
+            baseNuvOf = baseNuv;
             if (baseNuv) {
                 db.excluidos = mesclarExcluidos(db.excluidos, baseNuv.excluidos);
                 var ex = garantirExcluidos(db);
@@ -875,7 +982,7 @@ async function sincronizarOficinaNuvem(opts) {
             }
         } catch (eBase) { /* offline parcial */ }
 
-        var nuvemLista = await baixarAtendimentosNuvem(db.atendimentos);
+        var nuvemLista = await baixarAtendimentosNuvem(db.atendimentos, { completo: !silencioso });
         var exAt = garantirExcluidos(db).atendimentos;
         db.atendimentos = mesclarAtendimentosComExcluidos(db.atendimentos, nuvemLista, exAt);
 
@@ -883,17 +990,20 @@ async function sincronizarOficinaNuvem(opts) {
         ok = envio.ok;
         falha = envio.falha;
 
-        /* Sobe só clientes (merge), sem reescrever caixa */
+        /* Sobe só clientes (merge), sem reescrever caixa — e só se mudou */
         try {
-            var sessao = await obterSessaonuvem();
-            await sessao.fsMod.setDoc(
-                sessao.fsMod.doc(sessao.dbFs, 'joninha_suspensoes_base', 'principal'),
-                {
-                    clientes: db.clientes || [],
-                    atualizadoEm: new Date().toISOString()
-                },
-                { merge: true }
-            );
+            var cliNuv = baseNuvOf ? digitalValor(cloneParaNuvem(baseNuvOf.clientes || [])) : '';
+            if (!envio.semResposta && digitalValor(cloneParaNuvem(db.clientes || [])) !== cliNuv) {
+                var sessao = await obterSessaonuvem();
+                await gravarNaNuvem(sessao.fsMod.setDoc(
+                    sessao.fsMod.doc(sessao.dbFs, 'joninha_suspensoes_base', 'principal'),
+                    {
+                        clientes: db.clientes || [],
+                        atualizadoEm: new Date().toISOString()
+                    },
+                    { merge: true }
+                ));
+            }
         } catch (eCli) { /* ok */ }
 
         salvar(juntarMudancasDuranteSync(db));
@@ -907,7 +1017,9 @@ async function sincronizarOficinaNuvem(opts) {
             }
         } catch (eAss) { /* ok */ }
 
-        if (mostrarToast) {
+        if (envio.semResposta) {
+            toast('Nuvem NÃO está gravando: ' + MSG_NUVEM_SEM_RESPOSTA + '. Tudo continua salvo neste aparelho e sobe sozinho quando a nuvem voltar.', 9000);
+        } else if (mostrarToast) {
             toast('Oficina nuvem: ' + ok + ' OS alterada(s) enviada(s)' + (falha ? ' · ' + falha + ' falha(s) (' + envio.motivo + ')' : '') + '.');
         } else if (falha) {
             toast('Nuvem: ' + falha + ' OS não foram enviadas (' + envio.motivo + '). Toque em Sincronizar.');
@@ -1011,7 +1123,7 @@ async function sincronizarTodosNuvem(opts) {
         /* 2) Baixa e mescla OS + fotos (respeitando exclusões) */
         _syncProgresso = 'baixando OS…';
         atualizarStatusNuvemUI();
-        var nuvemLista = await baixarAtendimentosNuvem(db.atendimentos);
+        var nuvemLista = await baixarAtendimentosNuvem(db.atendimentos, { completo: !silencioso });
         var exAt = garantirExcluidos(db).atendimentos;
         db.atendimentos = mesclarAtendimentosComExcluidos(db.atendimentos, nuvemLista, exAt);
 
@@ -1038,7 +1150,8 @@ async function sincronizarTodosNuvem(opts) {
         atualizarStatusNuvemUI();
         var erroBase = '';
         try {
-            await enviarBaseNuvem(db);
+            if (envio.semResposta) throw new Error(MSG_NUVEM_SEM_RESPOSTA);
+            await enviarBaseNuvem(db, baseNuv);
         } catch (eBaseEnv) {
             erroBase = (eBaseEnv && (eBaseEnv.message || eBaseEnv.code)) || 'erro';
             console.warn('enviarBaseNuvem:', eBaseEnv);
@@ -1056,7 +1169,9 @@ async function sincronizarTodosNuvem(opts) {
             }
         } catch (eAss2) { /* ok */ }
 
-        if (erroBase || falha) {
+        if (envio.semResposta) {
+            toast('Nuvem NÃO está gravando: ' + MSG_NUVEM_SEM_RESPOSTA + '. Tudo continua salvo neste aparelho e sobe sozinho quando a nuvem voltar.', 9000);
+        } else if (erroBase || falha) {
             toast('Nuvem: ' + ok + ' OS enviada(s)' +
                 (falha ? ' · ' + falha + ' OS com falha (' + envio.motivo + ')' : '') +
                 (erroBase ? ' · caixa/cadastros NÃO foram (' + erroBase + ')' : '') + '. Toque em Sincronizar de novo.');

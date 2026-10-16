@@ -70,12 +70,12 @@ function atualizarBadgeCanal() {
 }
 
 
-function toast(msg) {
+function toast(msg, ms) {
     var el = document.getElementById('toast');
     el.textContent = msg;
     el.classList.add('show');
     clearTimeout(toast._t);
-    toast._t = setTimeout(function () { el.classList.remove('show'); }, 2600);
+    toast._t = setTimeout(function () { el.classList.remove('show'); }, ms || 2600);
 }
 
 document.addEventListener('input', function (e) {
