@@ -430,7 +430,7 @@ function atendimentoPrecisaEnviar(a) {
 }
 
 async function enviarAtendimentosAlterados(db) {
-    var ok = 0, falha = 0;
+    var ok = 0, falha = 0, motivo = '';
     var lista = db.atendimentos || [];
     var idx = [];
     lista.forEach(function (a, i) { if (atendimentoPrecisaEnviar(a)) idx.push(i); });
@@ -452,6 +452,7 @@ async function enviarAtendimentosAlterados(db) {
         }
         if (!r.ok) {
             falha++;
+            if (!motivo) motivo = r.motivo || 'erro';
             continue;
         }
         ok++;
@@ -473,7 +474,7 @@ async function enviarAtendimentosAlterados(db) {
         }
     }
     _syncProgresso = '';
-    return { ok: ok, falha: falha, total: idx.length };
+    return { ok: ok, falha: falha, total: idx.length, motivo: motivo };
 }
 
 /* O que foi salvo no aparelho enquanto a sync rodava não pode ser apagado pelo salvar(db) final */
@@ -907,7 +908,9 @@ async function sincronizarOficinaNuvem(opts) {
         } catch (eAss) { /* ok */ }
 
         if (mostrarToast) {
-            toast('Oficina nuvem: ' + ok + ' OS alterada(s) enviada(s)' + (falha ? ' · ' + falha + ' falha(s)' : '') + '.');
+            toast('Oficina nuvem: ' + ok + ' OS alterada(s) enviada(s)' + (falha ? ' · ' + falha + ' falha(s) (' + envio.motivo + ')' : '') + '.');
+        } else if (falha) {
+            toast('Nuvem: ' + falha + ' OS não foram enviadas (' + envio.motivo + '). Toque em Sincronizar.');
         }
         try { renderHistorico(); } catch (eH) { /* ok */ }
         try { renderTudo(); } catch (eR) { /* ok */ }
@@ -1027,13 +1030,19 @@ async function sincronizarTodosNuvem(opts) {
             }
         } catch (eDel) { /* ok */ }
 
-        /* 3) Envia o resultado mesclado de volta */
-        _syncProgresso = 'enviando caixa e cadastros…';
-        atualizarStatusNuvemUI();
-        await enviarBaseNuvem(db);
+        /* 3) OS primeiro: falha no envio do caixa não pode segurar os carros */
         var envio = await enviarAtendimentosAlterados(db);
         ok = envio.ok;
         falha = envio.falha;
+        _syncProgresso = 'enviando caixa e cadastros…';
+        atualizarStatusNuvemUI();
+        var erroBase = '';
+        try {
+            await enviarBaseNuvem(db);
+        } catch (eBaseEnv) {
+            erroBase = (eBaseEnv && (eBaseEnv.message || eBaseEnv.code)) || 'erro';
+            console.warn('enviarBaseNuvem:', eBaseEnv);
+        }
 
         salvar(juntarMudancasDuranteSync(db));
         try { blindarCaixaContraOsBloqueadas(db); salvar(db); } catch (eBl) { /* ok */ }
@@ -1047,12 +1056,15 @@ async function sincronizarTodosNuvem(opts) {
             }
         } catch (eAss2) { /* ok */ }
 
-        if (mostrarToast) {
+        if (erroBase || falha) {
+            toast('Nuvem: ' + ok + ' OS enviada(s)' +
+                (falha ? ' · ' + falha + ' OS com falha (' + envio.motivo + ')' : '') +
+                (erroBase ? ' · caixa/cadastros NÃO foram (' + erroBase + ')' : '') + '. Toque em Sincronizar de novo.');
+        } else if (mostrarToast) {
             if (silencioso) {
                 toast('Sincronizado na nuvem.');
             } else {
-                toast('Nuvem OK: caixa e cadastros enviados · ' + ok + ' OS alterada(s) enviada(s)' +
-                    (falha ? ' · ' + falha + ' falha(s)' : '') + '.');
+                toast('Nuvem OK: caixa e cadastros enviados · ' + ok + ' OS alterada(s) enviada(s).');
             }
         }
         preencherFormEmpresa();
