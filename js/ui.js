@@ -372,17 +372,23 @@ function rolarParaTopoTela() {
 }
 window.rolarParaTopoTela = rolarParaTopoTela;
 
+var SEL_SEM_ROLAGEM = '.nota-espelho, #hmPdfRenderTemp, [aria-hidden="true"]';
+
 function envolverTabelasRolagem(raiz) {
-    (raiz || document).querySelectorAll('table').forEach(function (t) {
+    (raiz || document).querySelectorAll('section.panel table').forEach(function (t) {
         var pai = t.parentElement;
-        if (!pai || t.closest('td, th')) return;
+        if (!pai || t.closest('td, th') || t.closest(SEL_SEM_ROLAGEM) || t.closest('.rof-detalhe')) return;
         if (pai.classList.contains('table-wrap') || pai.classList.contains('tbl-wrap')) return;
         var w = document.createElement('div');
         w.className = 'table-wrap tbl-rolagem';
         pai.insertBefore(w, t);
         w.appendChild(t);
     });
-    (raiz || document).querySelectorAll('.table-wrap, .tbl-wrap').forEach(ligarArrasteLateral);
+    (raiz || document).querySelectorAll('section.panel .table-wrap, section.panel .tbl-wrap, section.panel .rof-detalhe').forEach(function (w) {
+        var pai = w.parentElement;
+        if (w.closest(SEL_SEM_ROLAGEM) || (pai && pai.closest('.table-wrap, .tbl-wrap, .rof-detalhe'))) return;
+        ligarArrasteLateral(w);
+    });
 }
 
 function atualizarSetasTabela(w) {
@@ -446,10 +452,26 @@ window.envolverTabelasRolagem = envolverTabelasRolagem;
 window.atualizarSetasTabelas = function () {
     document.querySelectorAll('.table-wrap, .tbl-wrap').forEach(atualizarSetasTabela);
 };
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { envolverTabelasRolagem(); });
-} else {
+function iniciarTabelasRolagem() {
     envolverTabelasRolagem();
+    if (!window.MutationObserver) return;
+    var pendente = false;
+    new MutationObserver(function (muts) {
+        if (pendente) return;
+        var temTabela = muts.some(function (m) {
+            return [].some.call(m.addedNodes, function (n) {
+                return n.nodeType === 1 && (n.tagName === 'TABLE' || (n.querySelector && n.querySelector('table')));
+            });
+        });
+        if (!temTabela) return;
+        pendente = true;
+        setTimeout(function () { pendente = false; envolverTabelasRolagem(); }, 0);
+    }).observe(document.body, { childList: true, subtree: true });
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', iniciarTabelasRolagem);
+} else {
+    iniciarTabelasRolagem();
 }
 
 function campoAceitaFoco(el) {

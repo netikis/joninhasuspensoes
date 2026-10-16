@@ -108,6 +108,20 @@ img, video, canvas, svg, iframe {
     .os-totais-grid {
         grid-template-columns: 1fr;
     }
+    .grid-2,
+    .venda-layout {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+    .grid-2 > *,
+    .venda-layout > *,
+    .cards > *,
+    .cards-oficina > *,
+    .os-totais-grid > *,
+    .panel > *,
+    .box > *,
+    .modal-box > * {
+        min-width: 0;
+    }
 
     .table-wrap,
     .tbl-wrap,
