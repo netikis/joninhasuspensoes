@@ -382,8 +382,70 @@ function envolverTabelasRolagem(raiz) {
         pai.insertBefore(w, t);
         w.appendChild(t);
     });
+    (raiz || document).querySelectorAll('.table-wrap, .tbl-wrap').forEach(ligarArrasteLateral);
+}
+
+function atualizarSetasTabela(w) {
+    var barra = w._setas;
+    if (!barra) return;
+    var sobra = w.scrollWidth - w.clientWidth;
+    var celular = document.body.classList.contains('tela-celular');
+    barra.style.display = (celular && sobra > 4 && w.offsetParent) ? '' : 'none';
+    barra.querySelector('[data-seta="-1"]').disabled = w.scrollLeft <= 2;
+    barra.querySelector('[data-seta="1"]').disabled = w.scrollLeft >= sobra - 2;
+}
+
+/* Arraste lateral feito no JS: alguns celulares não rolam a tabela para o lado sozinhos */
+function ligarArrasteLateral(w) {
+    if (!w || w._arrasteLigado) return;
+    w._arrasteLigado = true;
+    var barra = document.createElement('div');
+    barra.className = 'tbl-setas';
+    barra.innerHTML = '<button type="button" class="btn btn-secondary" data-seta="-1" aria-label="Rolar tabela para a esquerda">◀</button>' +
+        '<span>arraste a tabela para o lado</span>' +
+        '<button type="button" class="btn btn-secondary" data-seta="1" aria-label="Rolar tabela para a direita">▶</button>';
+    w.parentNode.insertBefore(barra, w);
+    w._setas = barra;
+    barra.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-seta]');
+        if (!b) return;
+        var passo = Math.max(120, Math.round(w.clientWidth * 0.8)) * Number(b.getAttribute('data-seta'));
+        try { w.scrollBy({ left: passo, behavior: 'smooth' }); } catch (e1) { w.scrollLeft += passo; }
+    });
+    w.addEventListener('scroll', function () { atualizarSetasTabela(w); }, { passive: true });
+    if (window.ResizeObserver) {
+        var ro = new ResizeObserver(function () { atualizarSetasTabela(w); });
+        ro.observe(w);
+        var t = w.querySelector('table');
+        if (t) ro.observe(t);
+    }
+    atualizarSetasTabela(w);
+
+    var x0 = 0, y0 = 0, s0 = 0, modo = '';
+    w.addEventListener('touchstart', function (e) {
+        if (e.touches.length !== 1) { modo = 'x'; return; }
+        x0 = e.touches[0].clientX;
+        y0 = e.touches[0].clientY;
+        s0 = w.scrollLeft;
+        modo = '';
+    }, { passive: true });
+    w.addEventListener('touchmove', function (e) {
+        if (modo === 'x' || e.touches.length !== 1) return;
+        var dx = e.touches[0].clientX - x0;
+        var dy = e.touches[0].clientY - y0;
+        if (!modo) {
+            if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+            modo = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+        }
+        if (modo !== 'h') return;
+        if (e.cancelable) e.preventDefault();
+        w.scrollLeft = s0 - dx;
+    }, { passive: false });
 }
 window.envolverTabelasRolagem = envolverTabelasRolagem;
+window.atualizarSetasTabelas = function () {
+    document.querySelectorAll('.table-wrap, .tbl-wrap').forEach(atualizarSetasTabela);
+};
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () { envolverTabelasRolagem(); });
 } else {

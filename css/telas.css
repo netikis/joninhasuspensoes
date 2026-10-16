@@ -126,8 +126,26 @@ img, video, canvas, svg, iframe {
     .tbl-wrap {
         width: 100%;
         max-width: 100%;
-        touch-action: pan-x pan-y;
+        touch-action: pan-y;
         scrollbar-width: thin;
+    }
+    .tbl-setas {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 4px 0 6px;
+        font-size: 0.78rem;
+        color: #64748b;
+    }
+    .tbl-setas .btn {
+        min-width: 44px;
+        min-height: 36px;
+        padding: 4px 12px;
+        font-size: 1rem;
+    }
+    .tbl-setas .btn:disabled {
+        opacity: 0.35;
     }
     .table-wrap td.actions,
     .table-wrap td.cx-acoes-cell,
