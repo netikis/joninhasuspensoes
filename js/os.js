@@ -250,10 +250,15 @@ document.getElementById('btnLimparFotos').addEventListener('click', function () 
     if (!fotosAtuais.length) return;
     if (!confirm('Remover todas as fotos deste atendimento?')) return;
     fotosAtuais = [];
+    window._fotosFormSemData = [];
     renderGaleriaFotos();
 });
 
 function carregarFotosNoForm(lista) {
+    /* fotos que ainda não carregaram (IndexedDB / nuvem): guardadas para não sumirem ao salvar */
+    window._fotosFormSemData = (lista || []).filter(function (f) {
+        return f && f.id && !f.data && !f.url;
+    }).map(function (f) { return f.id; });
     fotosAtuais = (lista || []).map(function (f) {
         return { id: f.id || uid(), data: f.data || null, url: f.url || null };
     }).filter(function (f) { return f.data || f.url; });
@@ -1159,6 +1164,9 @@ async function extrasPosSalvarAtendimento(payload, resolvido) {
 
 async function salvarAtendimentoAtual() {
     if (window._osSalvando) return;
+    if (window.fotosLocaisProntas) {
+        try { await window.fotosLocaisProntas; } catch (eF) { /* ok */ }
+    }
     var errEl = document.getElementById('atSalvarErro');
     if (errEl) {
         errEl.style.display = 'none';
@@ -1245,6 +1253,13 @@ async function salvarAtendimentoAtual() {
         criadoEm: isoComDataLocal(dataEntrada)
     };
     payload = preservarFinanceiroOs(payload, existente);
+    if (existente && (window._fotosFormSemData || []).length) {
+        var idsForm = {};
+        payload.fotos.forEach(function (f) { idsForm[f.id] = true; });
+        (existente.fotos || []).forEach(function (f) {
+            if (f && f.id && !idsForm[f.id] && window._fotosFormSemData.indexOf(f.id) >= 0) payload.fotos.push(f);
+        });
+    }
 
     var btn = document.getElementById('btnSalvarAt');
     var txtBtn = btn ? btn.textContent : '';
@@ -1298,7 +1313,10 @@ async function salvarAtendimentoAtual() {
         }).catch(function () { /* ok */ });
     } catch (errSave) {
         console.warn('salvarAtendimentoAtual', errSave);
-        mostrarErroSalvarOs('Não deu para salvar. Tente de novo.', null);
+        var cheio = errSave && (errSave.name === 'QuotaExceededError' || /quota/i.test(String(errSave.message || '')));
+        mostrarErroSalvarOs(cheio
+            ? 'Não deu para salvar: a memória do navegador deste aparelho está cheia. Feche e abra o app e tente de novo.'
+            : 'Não deu para salvar (' + ((errSave && (errSave.message || errSave.name)) || 'erro') + '). Tente de novo.', null);
     } finally {
         window._osSalvando = false;
         if (btn) {

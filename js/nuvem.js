@@ -952,6 +952,7 @@ async function sincronizarOficinaNuvem(opts) {
 
     try {
         await obterSessaonuvem();
+        if (window.fotosLocaisProntas) await window.fotosLocaisProntas;
         var canalAntes = canalVendas;
         canalVendas = 'normal';
         var db = carregar();
@@ -1066,6 +1067,7 @@ async function sincronizarTodosNuvem(opts) {
 
     try {
         await obterSessaonuvem();
+        if (window.fotosLocaisProntas) await window.fotosLocaisProntas;
 
         var canalAntes = canalVendas;
         canalVendas = 'normal';
