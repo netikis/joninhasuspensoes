@@ -423,7 +423,19 @@ function abrirViewerPdf(html, titulo) {
     _htmlNotaImpressaoAtual = html || '';
     _tituloNotaImpressao = titulo || 'Espelho de Atendimento';
     var corpo = document.getElementById('viewerPdfCorpo');
-    if (corpo) corpo.innerHTML = html || '';
+    if (corpo) {
+        corpo.innerHTML = html || '';
+        corpo.querySelectorAll('.nota-fotos img').forEach(function (img) {
+            img.style.cursor = 'zoom-in';
+            img.addEventListener('click', function () {
+                var z = document.getElementById('fotoZoomImg');
+                var m = document.getElementById('modalFotoZoom');
+                if (!z || !m) return;
+                z.src = img.src;
+                m.classList.add('aberto');
+            });
+        });
+    }
     var viewer = document.getElementById('viewerPdfNota');
     if (viewer) {
         viewer.classList.add('aberto');
