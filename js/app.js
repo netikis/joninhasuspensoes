@@ -2883,20 +2883,40 @@ async function enviarPackAssinaturaNuvem(pack) {
         }
         await fsMod.setDoc(fsMod.doc(dbFs, col, pack.token), payload, { merge: true });
         var fotosSrc = (pack.documento && pack.documento.fotos) || [];
+        if (fotosSrc.length && pack.atendimentoId && typeof hidratarFotosDaNuvem === 'function') {
+            var falta = fotosSrc.some(function (x) { return x && !x.data && !x.url; });
+            if (falta) {
+                try {
+                    var aHid = { id: pack.atendimentoId, fotos: fotosSrc };
+                    await hidratarFotosDaNuvem(aHid);
+                    fotosSrc = aHid.fotos || fotosSrc;
+                    if (payload.documento) payload.documento.fotos = fotosSrc.map(function (f, i) {
+                        return { id: (f && f.id) || ('f' + i) };
+                    });
+                    await fsMod.setDoc(fsMod.doc(dbFs, col, pack.token), payload, { merge: true });
+                } catch (eHid) { /* segue com o que tiver */ }
+            }
+        }
         for (var fi = 0; fi < fotosSrc.length; fi++) {
             var f = fotosSrc[fi];
-            if (!f || !(f.data || f.url) || !f.id) continue;
+            if (!f) continue;
+            if (!f.id) f.id = 'f' + fi;
+            if (!(f.data || f.url)) continue;
             var dataFoto = f.data;
             if (dataFoto && typeof garantirFotoComprimida === 'function') {
                 try { dataFoto = await garantirFotoComprimida(dataFoto); } catch (eC) { /* usa original */ }
             }
-            await fsMod.setDoc(fsMod.doc(dbFs, col, pack.token + '_foto_' + f.id), {
-                token: pack.token,
-                fotoId: f.id,
-                data: dataFoto || null,
-                url: f.url || null,
-                atualizadoEm: new Date().toISOString()
-            });
+            try {
+                await fsMod.setDoc(fsMod.doc(dbFs, col, pack.token + '_foto_' + String(f.id).replace(/[\/.#\[\]]/g, '_')), {
+                    token: pack.token,
+                    fotoId: f.id,
+                    data: dataFoto || null,
+                    url: f.url || null,
+                    atualizadoEm: new Date().toISOString()
+                });
+            } catch (eFoto) {
+                console.warn('foto assinatura', eFoto);
+            }
         }
         return { ok: true, pack: payload };
     } catch (e) {
@@ -3553,9 +3573,14 @@ function documentoAssinatura(db, a, incluirFotos, vis) {
         empresaLogo: logoSrc(emp)
     };
     if (incluirFotos && a.fotos && a.fotos.length) {
-        doc.fotos = a.fotos.map(function (f) {
-            return { id: f.id, url: f.url || null, data: f.data || null };
-        }).filter(function (f) { return f.data || f.url; });
+        doc.fotos = a.fotos.map(function (f, i) {
+            return {
+                id: (f && f.id) || ('f' + i),
+                url: (f && f.url) || null,
+                data: (f && f.data) || null
+            };
+        }).filter(function (f) { return f.id; });
+        if (!doc.fotos.length) delete doc.fotos;
     }
     return doc;
 }
@@ -3611,8 +3636,6 @@ async function prepararPackLinkAssinatura(id, opts) {
     }
     if (comFotos) {
         a = await garantirFotosCarregadas(a);
-        var okFoto = (a.fotos || []).some(function (f) { return f && (f.data || f.url); });
-        if (!okFoto) comFotos = false;
     }
     if (!a.tokenAssinatura) a.tokenAssinatura = gerarTokenAssinatura();
 
@@ -7949,7 +7972,7 @@ async function copiarLinkOsEnvio() {
     var salvo = salvarAtendimentoRapidoParaEnvio();
     if (!salvo) return;
     toast('Gerando link…');
-    var r = await prepararPackLinkAssinatura(salvo.id, { perguntarFotos: false });
+    var r = await prepararPackLinkAssinatura(salvo.id, { perguntarFotos: false, incluirFotos: true });
     if (!r || !r.link) return;
     var ok = false;
     try {
@@ -7993,7 +8016,8 @@ async function prepararNotaOsDoFormulario() {
     var db = carregar();
     var a = (db.atendimentos || []).find(function (x) { return x && x.id === salvo.id; }) || salvo;
     atendimentoNotaAtual = a;
-    var html = htmlNotaEspelho(db, a, { incluirFotos: false, tituloDoc: 'ESPELHO DE ATENDIMENTO', vis: vis });
+    if (typeof garantirFotosCarregadas === 'function') a = await garantirFotosCarregadas(a);
+    var html = htmlNotaEspelho(db, a, { incluirFotos: true, tituloDoc: 'ESPELHO DE ATENDIMENTO', vis: vis });
     _htmlNotaImpressaoAtual = html;
     _htmlClientePronto = true;
     _tituloNotaImpressao = 'OS · ' + (a.placa || '') + ' · ' + (a.clienteNome || '');

@@ -98,7 +98,9 @@ function renderGaleriaFotos() {
     box.innerHTML = fotosAtuais.map(function (f, idx) {
         var src = srcFoto(f);
         return '<div class="foto-thumb">' +
-            '<img src="' + src + '" alt="Foto ' + (idx + 1) + '" data-foto-zoom="' + idx + '">' +
+            (src
+                ? '<img src="' + src + '" alt="Foto ' + (idx + 1) + '" data-foto-zoom="' + idx + '">'
+                : '<div class="foto-thumb-vazia">Foto ' + (idx + 1) + '</div>') +
             '<button type="button" title="Remover" data-foto-rm="' + idx + '">×</button>' +
             '</div>';
     }).join('');
@@ -261,8 +263,23 @@ function carregarFotosNoForm(lista) {
     }).map(function (f) { return f.id; });
     fotosAtuais = (lista || []).map(function (f) {
         return { id: f.id || uid(), data: f.data || null, url: f.url || null };
-    }).filter(function (f) { return f.data || f.url; });
+    });
     renderGaleriaFotos();
+}
+
+async function hidratarFotosDoFormulario(idOs) {
+    if (window.fotosLocaisProntas) {
+        try { await window.fotosLocaisProntas; } catch (eF) { /* ok */ }
+    }
+    if (document.getElementById('atId').value !== String(idOs || '')) return;
+    var db = typeof carregar === 'function' ? carregar() : null;
+    var a = db && (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(idOs); });
+    if (!a) return;
+    if (typeof hidratarFotosDaNuvem === 'function') {
+        try { await hidratarFotosDaNuvem(a); } catch (eN) { /* ok */ }
+    }
+    if (document.getElementById('atId').value !== String(idOs)) return;
+    carregarFotosNoForm(a.fotos);
 }
 
 
@@ -1446,6 +1463,7 @@ function editarAtendimento(id, placaHint) {
     }
     renderItens();
     carregarFotosNoForm(a.fotos);
+    hidratarFotosDoFormulario(a.id);
     atualizarPlaca();
     setTimeout(function () {
         var alvo = document.getElementById('listaItens');

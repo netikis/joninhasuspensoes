@@ -268,7 +268,7 @@
                 }).join('');
             } else if ((doc.fotos || []).length) {
                 cardFotos.style.display = '';
-                boxFotos.innerHTML = '<p class="hint">Carregando fotos…</p>';
+                boxFotos.innerHTML = '<p class="hint">' + (doc._fotosTentou ? 'Fotos ainda não chegaram neste link. Peça à oficina para enviar o orçamento de novo.' : 'Carregando fotos…') + '</p>';
             } else {
                 cardFotos.style.display = 'none';
                 boxFotos.innerHTML = '';
@@ -283,7 +283,8 @@
                 var f = doc.fotos[i];
                 if (!f || f.data || f.url || !f.id) continue;
                 try {
-                    var snap = await sess.fsMod.getDoc(sess.fsMod.doc(sess.dbFs, COL_ASSIN, token + '_foto_' + f.id));
+                    var idFoto = String(f.id).replace(/[\/.#\[\]]/g, '_');
+                    var snap = await sess.fsMod.getDoc(sess.fsMod.doc(sess.dbFs, COL_ASSIN, token + '_foto_' + idFoto));
                     if (snap.exists()) {
                         var d = snap.data() || {};
                         if (d.data) f.data = d.data;
@@ -577,13 +578,17 @@
 
         var mapa = carregarMapa();
         pack = mapa[token];
-        if (!pack || !pack.documento) {
-            document.getElementById('hintTopo').textContent = 'Buscando documento na nuvem…';
-            pack = await baixarPackNuvem();
-            if (pack && pack.documento) {
-                mapa[token] = pack;
-                salvarMapa(mapa);
+        document.getElementById('hintTopo').textContent = 'Buscando documento na nuvem…';
+        var nuv = await baixarPackNuvem();
+        if (nuv && nuv.documento) {
+            var localAssin = pack && pack.assinaturaCliente;
+            pack = nuv;
+            if (localAssin && !pack.assinaturaCliente) {
+                pack.assinaturaCliente = localAssin;
+                pack.assinadoEm = (mapa[token] && mapa[token].assinadoEm) || pack.assinadoEm;
             }
+            mapa[token] = pack;
+            salvarMapa(mapa);
         }
 
         if (!pack || !pack.documento) {
@@ -599,6 +604,7 @@
         document.getElementById('hintTopo').textContent = 'Confira o espelho e assine abaixo com o dedo ou o mouse.';
         renderDoc(pack.documento || {});
         await hidratarFotosDoc(pack.documento || {});
+        if (pack.documento) pack.documento._fotosTentou = true;
         pintarFotos(pack.documento || {});
 
         if (pack.assinaturaCliente) {
