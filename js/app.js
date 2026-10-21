@@ -7347,13 +7347,71 @@ function telWa(telefone) {
     return d;
 }
 
-function abrirWhatsApp(telefone, texto) {
+function urlWhatsApp(telefone, texto) {
     var tel = telWa(telefone);
-    var url = tel
+    return tel
         ? ('https://api.whatsapp.com/send?phone=' + tel + '&text=' + encodeURIComponent(texto))
         : ('https://wa.me/?text=' + encodeURIComponent(texto));
-    window.open(url, '_blank');
 }
+
+function fmtTelefoneWa(telefone) {
+    var d = String(telefone || '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '');
+    if (d.length === 11) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
+    if (d.length === 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6);
+    return d;
+}
+
+/* Depois de await (gerar link, salvar) o celular bloqueia window.open sem avisar.
+   No celular (ou se bloquear no PC) abre uma tela final: o toque do usuário abre o WhatsApp. */
+function abrirWhatsApp(telefone, texto) {
+    var url = urlWhatsApp(telefone, texto);
+    if (!ehCelular()) {
+        var w = window.open(url, '_blank');
+        if (w) return;
+    }
+    abrirModalEnviarWhatsApp(telefone, texto);
+}
+
+function abrirModalEnviarWhatsApp(telefone, texto) {
+    var m = document.getElementById('modalEnviarWa');
+    if (!m) { location.href = urlWhatsApp(telefone, texto); return; }
+    var tel = telWa(telefone);
+    var link = document.getElementById('btnEwaAbrir');
+    link.href = urlWhatsApp(telefone, texto);
+    link.textContent = tel ? '📲 Abrir conversa do cliente · ' + fmtTelefoneWa(tel) : '📲 Abrir WhatsApp e escolher o contato';
+    document.getElementById('ewaPrevia').textContent = texto;
+    m._texto = texto;
+    document.getElementById('btnEwaCompartilhar').style.display = navigator.share ? '' : 'none';
+    m.classList.add('aberto');
+}
+
+(function ligarModalEnviarWhatsApp() {
+    var m = document.getElementById('modalEnviarWa');
+    if (!m) return;
+    var fechar = function () { m.classList.remove('aberto'); };
+    m.addEventListener('click', function (e) { if (e.target === m) fechar(); });
+    document.getElementById('btnEwaCancelar').addEventListener('click', fechar);
+    document.getElementById('btnEwaAbrir').addEventListener('click', function () {
+        setTimeout(fechar, 400);
+    });
+    document.getElementById('btnEwaCompartilhar').addEventListener('click', function () {
+        navigator.share({ text: m._texto || '' }).then(fechar).catch(function () { /* cancelou */ });
+    });
+    document.getElementById('btnEwaCopiar').addEventListener('click', function () {
+        var t = m._texto || '';
+        var ok = function () { toast('Mensagem copiada. Cole no WhatsApp.'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(t).then(ok).catch(function () { toast('Não deu para copiar.'); });
+        } else {
+            var ta = document.createElement('textarea');
+            ta.value = t;
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); ok(); } catch (eC) { toast('Não deu para copiar.'); }
+            ta.remove();
+        }
+    });
+})();
 
 function lerChecklistUI() {
     var out = {};
@@ -7792,7 +7850,6 @@ async function enviarWhatsAppOsSalvo(id, tipo) {
     }
     msg += '\n\n*Abra o link para ver e assinar:*\n' + r.link;
     abrirWhatsApp(tel, msg);
-    toast('WhatsApp aberto no número do cliente, com o link do documento.');
 }
 
 async function enviarWhatsAppOs(tipo) {
@@ -7808,7 +7865,6 @@ async function enviarWhatsAppOs(tipo) {
     var m = tipo === 'checklist' ? montarMsgChecklistAtual() : montarMsgOrcamentoAtual(vis);
     var msg = (m && m.msg ? m.msg : '') + '\n\n*Abra o link para ver e assinar:*\n' + r.link;
     abrirWhatsApp(tel, msg);
-    toast('WhatsApp aberto no número informado, com o link do documento.');
 }
 
 async function copiarLinkOsEnvio() {

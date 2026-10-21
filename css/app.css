@@ -1683,6 +1683,27 @@
             margin: 0;
         }
         .zerar-cards input { width: auto; margin: 0; }
+        #modalEnviarWa { z-index: 260; }
+        #modalEnviarWa .modal-box {
+            background: #fff;
+            color: #1e293b;
+            border: 3px solid #25d366;
+        }
+        #modalEnviarWa .modal-box h3 { color: #152642; font-weight: 800; }
+        #modalEnviarWa .hint { color: #334155; }
+        .ewa-previa {
+            max-height: 30vh;
+            overflow: auto;
+            white-space: pre-wrap;
+            font-size: 0.85rem;
+            background: #e7f8ee;
+            border: 1px solid #b7e4c7;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            color: #0f172a;
+        }
+        #btnEwaAbrir { background: #25d366; color: #fff; display: block; }
         #modalFecharCaixa .modal-box,
         #modalFecharPeriodo .modal-box {
             background: #fff;

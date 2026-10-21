@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=99">
-    <link rel="stylesheet" href="css/tema-m3.css?v=99">
-    <link rel="stylesheet" href="css/telas.css?v=99">
+    <link rel="stylesheet" href="css/app.css?v=100">
+    <link rel="stylesheet" href="css/tema-m3.css?v=100">
+    <link rel="stylesheet" href="css/telas.css?v=100">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -2065,6 +2065,20 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modalEnviarWa">
+        <div class="modal-box" style="width:min(460px,100%)">
+            <h3>📲 Enviar pelo WhatsApp</h3>
+            <p class="hint" style="margin-top:0">A mensagem com o link do documento está pronta. Toque para enviar:</p>
+            <div class="ewa-previa" id="ewaPrevia"></div>
+            <div class="modal-acoes" style="flex-direction:column;gap:8px">
+                <a class="btn btn-ok" id="btnEwaAbrir" href="#" target="_blank" rel="noopener" style="width:100%;text-align:center;text-decoration:none">📲 Abrir conversa do cliente</a>
+                <button type="button" class="btn btn-primary" id="btnEwaCompartilhar" style="width:100%">📤 Compartilhar (escolher o app / contato)</button>
+                <button type="button" class="btn btn-secondary" id="btnEwaCopiar" style="width:100%">📋 Copiar mensagem</button>
+                <button type="button" class="btn btn-danger" id="btnEwaCancelar" style="width:100%">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Viewer PDF em tela cheia (celular) -->
     <div id="viewerPdfNota" aria-hidden="true">
         <div id="viewerPdfBarra">
@@ -2170,18 +2184,18 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=99"></script>
-    <script src="js/storage.js?v=99"></script>
-    <script src="js/ui.js?v=99"></script>
-    <script src="js/auth.js?v=99"></script>
-    <script src="js/os.js?v=99"></script>
-    <script src="js/nuvem.js?v=99"></script>
-    <script src="js/caixa.js?v=99"></script>
-    <script src="js/comissoes.js?v=99"></script>
-    <script src="js/app.js?v=99"></script>
-    <script src="js/func-ponto.js?v=99"></script>
-    <script src="js/perfil-cliente.js?v=99"></script>
-    <script src="js/navegacao.js?v=99"></script>
+    <script src="js/config.js?v=100"></script>
+    <script src="js/storage.js?v=100"></script>
+    <script src="js/ui.js?v=100"></script>
+    <script src="js/auth.js?v=100"></script>
+    <script src="js/os.js?v=100"></script>
+    <script src="js/nuvem.js?v=100"></script>
+    <script src="js/caixa.js?v=100"></script>
+    <script src="js/comissoes.js?v=100"></script>
+    <script src="js/app.js?v=100"></script>
+    <script src="js/func-ponto.js?v=100"></script>
+    <script src="js/perfil-cliente.js?v=100"></script>
+    <script src="js/navegacao.js?v=100"></script>
 </body>
 </html>
 
