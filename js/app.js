@@ -3668,7 +3668,7 @@ function documentoAssinatura(db, a, incluirFotos, vis) {
         empresaTelefone: emp.telefone || '',
         empresaCnpj: emp.cnpj || '',
         empresaIe: emp.ie || '',
-        empresaLogo: logoSrc(emp)
+        empresaLogo: 'logo-joninha.jpg'
     };
     if (incluirFotos && a.fotos && a.fotos.length) {
         doc.fotos = a.fotos.map(function (f, i) {
@@ -3874,7 +3874,7 @@ function documentoAssinaturaVenda(db, o, vis) {
         empresaTelefone: emp.telefone || '',
         empresaCnpj: emp.cnpj || '',
         empresaIe: emp.ie || '',
-        empresaLogo: logoSrc(emp)
+        empresaLogo: 'logo-joninha.jpg'
     };
 }
 
@@ -8072,7 +8072,8 @@ async function enviarWhatsAppOsSalvo(id, tipo) {
         msg += '\n\nAguardamos sua aprovação. Obrigado!';
     }
     msg += '\n\n*Abra o link para ver e assinar:*\n' + r.link;
-    abrirWhatsApp(tel, msg, a.fotos);
+    /* Sem anexar foto: o WhatsApp usa a foto como fundo do link. Foto fica só no orçamento. */
+    abrirWhatsApp(tel, msg);
 }
 
 async function enviarWhatsAppOs(tipo) {
@@ -8087,7 +8088,7 @@ async function enviarWhatsAppOs(tipo) {
     if (!r || !r.link) return;
     var m = tipo === 'checklist' ? montarMsgChecklistAtual() : montarMsgOrcamentoAtual(vis);
     var msg = (m && m.msg ? m.msg : '') + '\n\n*Abra o link para ver e assinar:*\n' + r.link;
-    abrirWhatsApp(tel, msg, (typeof fotosAtuais !== 'undefined' && fotosAtuais.length) ? fotosAtuais : salvo.fotos);
+    abrirWhatsApp(tel, msg);
 }
 
 async function copiarLinkOsEnvio() {

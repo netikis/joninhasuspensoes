@@ -278,9 +278,7 @@ function packAssinaturaLeveParaNuvem(pack) {
     };
     if (pack.documento && typeof pack.documento === 'object') {
         var doc = Object.assign({}, pack.documento);
-        if (doc.empresaLogo && String(doc.empresaLogo).indexOf('data:') === 0) {
-            doc.empresaLogo = 'logo-joninha.jpg';
-        }
+        doc.empresaLogo = 'logo-joninha.jpg';
         if (Array.isArray(doc.fotos)) {
             /* Só o id no documento principal (base64 estoura 1 MB). A foto vai em {token}_foto_{id} */
             doc.fotos = doc.fotos.map(function (f, i) {
