@@ -1149,25 +1149,24 @@ async function extrasPosSalvarAtendimento(payload, resolvido) {
 
     var cfgN = typeof carregarConfigNuvem === 'function' ? carregarConfigNuvem() : null;
     if (!(cfgN && cfgN.apiKey && cfgN.projectId)) return extras;
-    if (typeof nuvemEmPausa === 'function' && nuvemEmPausa()) {
-        extras.push('nuvem sem gravar agora — sobe depois');
-        return extras;
-    }
     try {
+        if (typeof limparPausaNuvem === 'function') limparPausaNuvem();
         var okSess = (typeof usuarioNuvemLogado === 'function' && usuarioNuvemLogado()) ||
             (typeof garantirSessaoNuvemQualquer === 'function' && await garantirSessaoNuvemQualquer());
         if (!okSess) {
             extras.push('nuvem: sem auth');
             return extras;
         }
+        var dbEnv = (typeof carregar === 'function') ? carregar() : null;
+        var aEnv = (dbEnv && dbEnv.atendimentos || []).find(function (x) { return x && x.id === payload.id; }) || payload;
         if (sessaoFuncionarioId) {
-            var nuvF = await enviarAtendimentoNuvem(payload);
+            var nuvF = await enviarAtendimentoNuvem(aEnv);
             if (nuvF && nuvF.ok) {
                 extras.push('nuvem OK');
                 aplicarFotosNuvemNoAtendimento(payload, nuvF.atendimento);
             } else extras.push('nuvem: ' + ((nuvF && nuvF.motivo) || 'falhou'));
         } else {
-            var nuv = await enviarAtendimentoNuvem(payload);
+            var nuv = await enviarAtendimentoNuvem(aEnv);
             if (nuv && nuv.ok) {
                 extras.push('nuvem OK');
                 aplicarFotosNuvemNoAtendimento(payload, nuv.atendimento);
@@ -1270,6 +1269,13 @@ async function salvarAtendimentoAtual() {
         criadoEm: isoComDataLocal(dataEntrada)
     };
     payload = preservarFinanceiroOs(payload, existente);
+    if (existente) {
+        if (existente.tokenAssinatura) payload.tokenAssinatura = existente.tokenAssinatura;
+        if (existente.assinaturaCliente) {
+            payload.assinaturaCliente = existente.assinaturaCliente;
+            payload.assinadoEm = existente.assinadoEm;
+        }
+    }
     if (existente && (window._fotosFormSemData || []).length) {
         var idsForm = {};
         payload.fotos.forEach(function (f) { idsForm[f.id] = true; });

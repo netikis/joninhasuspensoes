@@ -320,20 +320,37 @@ async function logoutnuvem() { return logoutFirebase(); }
 var MSG_NUVEM_SEM_RESPOSTA = 'a nuvem não confirmou a gravação — o limite diário gratuito do Firebase pode ter acabado (volta depois das 04:00)';
 var NUVEM_PAUSA_KEY = 'joninha_suspensoes_nuvem_pausa_ate';
 
+function erroEhCotaNuvem(err) {
+    var t = String((err && (err.code || err.message)) || '').toLowerCase();
+    return t.indexOf('resource-exhausted') >= 0 || t.indexOf('quota') >= 0 || t.indexOf('429') >= 0;
+}
+
+function marcarPausaNuvem(ms) {
+    try { localStorage.setItem(NUVEM_PAUSA_KEY, String(Date.now() + (ms || 15 * 60000))); } catch (eP) { /* ok */ }
+}
+
+function limparPausaNuvem() {
+    try { localStorage.removeItem(NUVEM_PAUSA_KEY); } catch (eP) { /* ok */ }
+}
+
 function gravarNaNuvem(promessa, ms) {
+    var timer;
     return Promise.race([
-        promessa,
+        Promise.resolve(promessa).then(function (v) {
+            if (timer) clearTimeout(timer);
+            limparPausaNuvem();
+            return v;
+        }),
         new Promise(function (_, rej) {
-            setTimeout(function () {
+            timer = setTimeout(function () {
                 var e = new Error(MSG_NUVEM_SEM_RESPOSTA);
                 e.code = 'sem-resposta';
-                try { localStorage.setItem(NUVEM_PAUSA_KEY, String(Date.now() + 15 * 60000)); } catch (eP) { /* ok */ }
                 rej(e);
-            }, ms || 30000);
+            }, ms || 45000);
         })
-    ]).then(function (v) {
-        try { localStorage.removeItem(NUVEM_PAUSA_KEY); } catch (eP) { /* ok */ }
-        return v;
+    ]).catch(function (err) {
+        if (erroEhCotaNuvem(err)) marcarPausaNuvem(60 * 60000);
+        throw err;
     });
 }
 
@@ -382,6 +399,40 @@ async function enviarAtendimentoNuvem(atendimento) {
         }
     }
     docOut.fotos = fotos;
+    if (!docOut.assinaturaCliente && atendimento.assinaturaCliente) {
+        docOut.assinaturaCliente = atendimento.assinaturaCliente;
+        docOut.assinadoEm = atendimento.assinadoEm || docOut.assinadoEm;
+    }
+    try {
+        var snapEx = await fsMod.getDoc(fsMod.doc(dbFs, 'joninha_suspensoes_atendimentos', atendimento.id));
+        if (snapEx.exists()) {
+            var ex = snapEx.data() || {};
+            if (ex.assinaturaCliente && !docOut.assinaturaCliente) {
+                docOut.assinaturaCliente = ex.assinaturaCliente;
+                docOut.assinadoEm = ex.assinadoEm || docOut.assinadoEm || null;
+            }
+            if (ex.tokenAssinatura && !docOut.tokenAssinatura) docOut.tokenAssinatura = ex.tokenAssinatura;
+        }
+    } catch (eEx) { /* segue */ }
+    if (!docOut.assinaturaCliente && docOut.tokenAssinatura && typeof puxarAssinaturaNuvem === 'function') {
+        try {
+            var packAss = await puxarAssinaturaNuvem(docOut.tokenAssinatura);
+            if (packAss && packAss.assinaturaCliente) {
+                docOut.assinaturaCliente = packAss.assinaturaCliente;
+                docOut.assinadoEm = packAss.assinadoEm || docOut.assinadoEm || null;
+            }
+        } catch (ePack) { /* segue */ }
+    }
+    if (!docOut.assinaturaCliente && docOut.id && typeof puxarAssinaturaNuvemPorAtendimentoId === 'function') {
+        try {
+            var packIdAss = await puxarAssinaturaNuvemPorAtendimentoId(docOut.id);
+            if (packIdAss && packIdAss.assinaturaCliente) {
+                docOut.assinaturaCliente = packIdAss.assinaturaCliente;
+                docOut.assinadoEm = packIdAss.assinadoEm || docOut.assinadoEm || null;
+                if (packIdAss.token && !docOut.tokenAssinatura) docOut.tokenAssinatura = packIdAss.token;
+            }
+        } catch (eIdAss) { /* segue */ }
+    }
     docOut.atualizadoEm = new Date().toISOString();
     docOut.syncNuvemEm = docOut.atualizadoEm;
     docOut.digitalNuvem = digitalAtendimento(docOut);
@@ -572,6 +623,16 @@ function syncTravado() {
     return true;
 }
 
+function herdarAssinaturaOs(dest, outro) {
+    if (!dest || !outro) return dest;
+    if (!dest.assinaturaCliente && outro.assinaturaCliente) {
+        dest.assinaturaCliente = outro.assinaturaCliente;
+        dest.assinadoEm = outro.assinadoEm || dest.assinadoEm || null;
+    }
+    if (!dest.tokenAssinatura && outro.tokenAssinatura) dest.tokenAssinatura = outro.tokenAssinatura;
+    return dest;
+}
+
 function mesclarAtendimentosLocalNuvem(localLista, nuvemLista) {
     var map = {};
     (localLista || []).forEach(function (a) {
@@ -590,14 +651,8 @@ function mesclarAtendimentosLocalNuvem(localLista, nuvemLista) {
             var fotosLoc = L.fotos || [];
             var fotosNuv = n.fotos || [];
             map[n.id] = Object.assign({}, L, n);
-            /* Assinatura do celular (coleção própria) não pode sumir se a OS na nuvem for mais nova sem o campo */
-            if (!map[n.id].assinaturaCliente && L.assinaturaCliente) {
-                map[n.id].assinaturaCliente = L.assinaturaCliente;
-                map[n.id].assinadoEm = L.assinadoEm || map[n.id].assinadoEm || null;
-            }
-            if (!map[n.id].tokenAssinatura && L.tokenAssinatura) {
-                map[n.id].tokenAssinatura = L.tokenAssinatura;
-            }
+            herdarAssinaturaOs(map[n.id], L);
+            herdarAssinaturaOs(map[n.id], n);
             if (fotosNuv.length) {
                 map[n.id].fotos = fotosNuv.map(function (fn, idx) {
                     if (fn.data || fn.url) return fn;
@@ -609,6 +664,7 @@ function mesclarAtendimentosLocalNuvem(localLista, nuvemLista) {
                 map[n.id].fotos = fotosLoc;
             }
         } else {
+            herdarAssinaturaOs(L, n);
             (n.fotos || []).forEach(function (fn) {
                 if (!fn.id) return;
                 var fl = (L.fotos || []).find(function (x) { return x.id === fn.id; });
@@ -649,6 +705,8 @@ function mesclarListaPorId(localLista, nuvemLista, mapaEx) {
         var tL = tempoRegistro(L, Date.now());
         var tN = tempoRegistro(n, 0);
         map[n.id] = tN > tL ? Object.assign({}, L, n) : Object.assign({}, n, L);
+        herdarAssinaturaOs(map[n.id], L);
+        herdarAssinaturaOs(map[n.id], n);
     });
     return aplicarExcluidosNaLista(Object.keys(map).map(function (k) { return map[k]; }), mapaEx);
 }
@@ -928,6 +986,7 @@ async function sincronizarOficinaNuvem(opts) {
     opts = opts || {};
     var silencioso = !!opts.silencioso;
     var mostrarToast = opts.mostrarToast != null ? !!opts.mostrarToast : !silencioso;
+    if (!silencioso) limparPausaNuvem();
     if (syncTravado()) {
         if (!silencioso) toast('Sincronização já em andamento' + (_syncProgresso ? ' (' + _syncProgresso + ')' : '') + '… aguarde.');
         return;
@@ -1046,6 +1105,7 @@ async function sincronizarTodosNuvem(opts) {
     opts = opts || {};
     var silencioso = !!opts.silencioso;
     var mostrarToast = opts.mostrarToast != null ? !!opts.mostrarToast : !silencioso;
+    if (!silencioso) limparPausaNuvem();
     if (syncTravado()) {
         if (!silencioso) toast('Sincronização já em andamento' + (_syncProgresso ? ' (' + _syncProgresso + ')' : '') + '… aguarde.');
         return;

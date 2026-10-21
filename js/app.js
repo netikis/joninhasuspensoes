@@ -181,6 +181,7 @@ function cssNotaCaberPagina() {
         '.nota-topo-linha tr{display:table-row!important}' +
         '.nota-topo-logo,.nota-topo-dados{display:table-cell!important;overflow:visible!important}' +
         'img,table,canvas,svg{max-width:100%!important;height:auto}' +
+        '.nota-sig img{max-height:22mm!important;height:auto!important;display:block!important;margin:0 auto!important}' +
         '.nota-itens{width:100%!important;max-width:100%!important}';
 }
 
@@ -218,9 +219,9 @@ function cssDocumentoImpressao() {
         '.nota-total{text-align:right;font-size:11pt;font-weight:800;margin-top:4pt}' +
         '.nota-sigs{display:block;margin-top:12pt}' +
         '.nota-sig{display:inline-block;width:48%;vertical-align:top;text-align:center;font-size:9pt}' +
-        '.nota-sig-espaco{min-height:16mm;border-bottom:1px solid #000}' +
+        '.nota-sig-espaco{min-height:22mm;border-bottom:1px solid #000;overflow:visible}' +
         '.nota-sig-base{padding-top:4pt;font-weight:700}' +
-        '.nota-sig img{max-height:16mm;max-width:100%}' +
+        '.nota-sig img{max-height:22mm;max-width:100%;background:#fff;display:block;margin:0 auto}' +
         '.nota-fotos{display:block;padding:6pt}' +
         '.nota-fotos img{width:42%;max-width:80mm;height:auto;max-height:32mm;object-fit:cover;margin:0 4pt 4pt 0}' +
         'img,table,canvas{max-width:100%}' +
@@ -2833,7 +2834,10 @@ async function sincronizarAssinaturaDoAtendimento(id) {
     }
     db = carregar();
     a = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(id); }) || a;
-    if (a.assinaturaCliente) return true;
+    if (a.assinaturaCliente) {
+        try { await espelharAssinaturaNaOsNuvem(a); } catch (eEspTok) { /* ok */ }
+        return true;
+    }
 
     /* Fallback: busca na nuvem pelo id da OS (token antigo / reenviado) */
     try {
@@ -2847,10 +2851,62 @@ async function sincronizarAssinaturaDoAtendimento(id) {
             a.assinaturaCliente = packId.assinaturaCliente;
             a.assinadoEm = packId.assinadoEm || null;
             salvar(db);
+            try { await espelharAssinaturaNaOsNuvem(a); } catch (eEsp) { /* ok */ }
             return true;
         }
     } catch (eId) { /* ok */ }
+    if (a.assinaturaCliente) {
+        try { await espelharAssinaturaNaOsNuvem(a); } catch (eEsp2) { /* ok */ }
+        return true;
+    }
     return !!mudou;
+}
+
+async function espelharAssinaturaNaOsNuvem(a) {
+    if (!a || !a.id || !a.assinaturaCliente) return;
+    try {
+        var okAuth = (typeof usuarioNuvemLogado === 'function' && usuarioNuvemLogado()) ||
+            (typeof garantirSessaoNuvemQualquer === 'function' && await garantirSessaoNuvemQualquer());
+        if (!okAuth) return;
+        var sessao = await obterSessaoFirebase();
+        if (!sessao || !sessao.fsMod) return;
+        await sessao.fsMod.setDoc(
+            sessao.fsMod.doc(sessao.dbFs, 'joninha_suspensoes_atendimentos', a.id),
+            {
+                tokenAssinatura: a.tokenAssinatura || null,
+                assinaturaCliente: a.assinaturaCliente,
+                assinadoEm: a.assinadoEm || null
+            },
+            { merge: true }
+        );
+    } catch (eEsp) { /* ok */ }
+}
+
+async function sincronizarAssinaturaDaVenda(id) {
+    if (!id) return false;
+    var db = carregar();
+    var o = (db.orcamentos || []).find(function (x) { return x && String(x.id) === String(id); });
+    if (!o) return false;
+    if (o.assinaturaCliente) return true;
+    var pack = null;
+    if (o.tokenAssinatura) {
+        try { pack = await puxarAssinaturaNuvem(o.tokenAssinatura); } catch (eTok) { pack = null; }
+    }
+    if (!(pack && pack.assinaturaCliente)) {
+        try { pack = await puxarAssinaturaNuvemPorCampo('vendaId', id); } catch (eVd) { pack = null; }
+    }
+    if (!(pack && pack.assinaturaCliente)) return false;
+    var tok = pack.token || o.tokenAssinatura;
+    if (tok) {
+        var mapa = carregarAssinaturas();
+        mapa[tok] = Object.assign({}, mapa[tok] || {}, pack, { token: tok, vendaId: id });
+        salvarAssinaturas(mapa);
+        o.tokenAssinatura = tok;
+    }
+    o.assinaturaCliente = pack.assinaturaCliente;
+    o.assinadoEm = pack.assinadoEm || null;
+    salvar(db);
+    return true;
 }
 
 function gerarTokenAssinatura() {
@@ -2961,8 +3017,8 @@ async function puxarAssinaturaNuvem(token) {
     }
 }
 
-async function puxarAssinaturaNuvemPorAtendimentoId(atendimentoId) {
-    if (!atendimentoId) return null;
+async function puxarAssinaturaNuvemPorCampo(campo, valor) {
+    if (!campo || valor == null || valor === '') return null;
     var col = (typeof COL_ASSINATURAS_NUVEM !== 'undefined') ? COL_ASSINATURAS_NUVEM : 'joninha_assinaturas';
     try {
         var sessao = typeof obterFirestoreAssinaturasPublico === 'function'
@@ -2971,7 +3027,7 @@ async function puxarAssinaturaNuvemPorAtendimentoId(atendimentoId) {
         if (!sessao) return null;
         var q = sessao.fsMod.query(
             sessao.fsMod.collection(sessao.dbFs, col),
-            sessao.fsMod.where('atendimentoId', '==', String(atendimentoId)),
+            sessao.fsMod.where(campo, '==', String(valor)),
             sessao.fsMod.limit(8)
         );
         var snap = await sessao.fsMod.getDocs(q);
@@ -2985,9 +3041,13 @@ async function puxarAssinaturaNuvemPorAtendimentoId(atendimentoId) {
         });
         return melhor;
     } catch (e) {
-        console.warn('puxarAssinaturaNuvemPorAtendimentoId:', e);
+        console.warn('puxarAssinaturaNuvemPorCampo:', campo, e);
         return null;
     }
+}
+
+async function puxarAssinaturaNuvemPorAtendimentoId(atendimentoId) {
+    return puxarAssinaturaNuvemPorCampo('atendimentoId', atendimentoId);
 }
 
 function badgeAssinatura(a) {
@@ -3187,6 +3247,35 @@ function textoChecklistLinhas(mapa) {
     return linhas;
 }
 
+function dadosAssinaturaCliente(reg) {
+    if (!reg) return { img: '', em: null };
+    var img = reg.assinaturaCliente || '';
+    var em = reg.assinadoEm || null;
+    if (!img && reg.tokenAssinatura && typeof carregarAssinaturas === 'function') {
+        try {
+            var pack = carregarAssinaturas()[reg.tokenAssinatura];
+            if (pack && pack.assinaturaCliente) {
+                img = pack.assinaturaCliente;
+                em = pack.assinadoEm || em;
+            }
+        } catch (ePack) { /* ok */ }
+    }
+    return { img: img, em: em };
+}
+
+function htmlBlocoAssinaturasNota(reg) {
+    var info = dadosAssinaturaCliente(reg);
+    var sigEspaco = info.img ? '<img src="' + info.img + '" alt="Assinatura">' : '';
+    var sigBase = 'Assinatura do Cliente';
+    if (info.img) {
+        sigBase = 'Assinado em ' + esc(fmtData(info.em) + (info.em && String(info.em).length > 10 ? ' ' + String(info.em).slice(11, 16) : ''));
+    }
+    return '<div class="nota-sigs compacto">' +
+        '<div class="nota-sig"><div class="nota-sig-espaco"></div><div class="nota-sig-base">Assinatura do Responsável</div></div>' +
+        '<div class="nota-sig"><div class="nota-sig-espaco">' + sigEspaco + '</div><div class="nota-sig-base">' + sigBase + '</div></div>' +
+        '</div>';
+}
+
 function htmlNotaEspelho(db, a, opts) {
     opts = opts || {};
     var incluirFotos = !!opts.incluirFotos;
@@ -3195,12 +3284,6 @@ function htmlNotaEspelho(db, a, opts) {
     var emp = getEmpresa(db);
     var cad = dadosClienteDoAtendimento(db, a);
     var nome = cad.nome || nomeAtendimento(db, a);
-    var sigEspaco = '';
-    var sigBase = 'Assinatura do Cliente';
-    if (a.assinaturaCliente) {
-        sigEspaco = '<img src="' + a.assinaturaCliente + '" alt="Assinatura">';
-        sigBase = 'Assinado em ' + esc(fmtData(a.assinadoEm) + (a.assinadoEm && a.assinadoEm.length > 10 ? ' ' + String(a.assinadoEm).slice(11, 16) : ''));
-    }
     var endCli = [cad.endereco, cad.numero].filter(Boolean).join(', ');
     var blocoFotos = '';
     if (incluirFotos && a.fotos && a.fotos.length) {
@@ -3250,10 +3333,8 @@ function htmlNotaEspelho(db, a, opts) {
         '</div></div>' +
         blocoFotos +
         '<div class="nota-bloco compacto"><div class="tit verde">Valores</div><div class="nota-valores-pad compacto">' + htmlItensNota(a.itens, vis) + htmlPagamentoOs(a, vis) + '</div></div>' +
-        '<div class="nota-sigs compacto">' +
-        '<div class="nota-sig"><div class="nota-sig-espaco"></div><div class="nota-sig-base">Assinatura do Responsável</div></div>' +
-        '<div class="nota-sig"><div class="nota-sig-espaco">' + sigEspaco + '</div><div class="nota-sig-base">' + sigBase + '</div></div>' +
-        '</div></div>';
+        htmlBlocoAssinaturasNota(a) +
+        '</div>';
 }
 
 function atendimentoTemFotos(a) {
@@ -3473,6 +3554,11 @@ async function gerarHtmlClienteOs(a, opts) {
     if (!a) { toast('Selecione um atendimento.'); return null; }
     var vis = opts.vis != null ? visClienteDe(opts.vis) : await perguntarCamposCliente();
     if (!vis) return null;
+    if (a.id && typeof sincronizarAssinaturaDoAtendimento === 'function' && !a.assinaturaCliente) {
+        try { await sincronizarAssinaturaDoAtendimento(a.id); } catch (eAss) { /* ok */ }
+        var dbAss = carregar();
+        a = (dbAss.atendimentos || []).find(function (x) { return x && x.id === a.id; }) || a;
+    }
     var db = carregar();
     var comFotos = !!opts.incluirFotos;
     if (opts.perguntarFotos) {
@@ -5758,13 +5844,20 @@ function htmlDocumentoVenda(db, o, vis) {
         (foot.length ? '<div class="nota-subtotais compacto">' + foot.join('<br>') + '</div>' : '') +
         (vis.total ? '<div class="nota-total compacto">Total: ' + moeda(o.valor) + '</div>' : '') +
         blocoPgto +
-        '</div></div>';
+        '</div>' +
+        htmlBlocoAssinaturasNota(o) +
+        '</div>';
 }
 
-function abrirDocumentoVenda(id) {
+async function abrirDocumentoVenda(id) {
     var db = carregar();
     var o = obterDocumentoVendaPorId(id);
     if (!o) { toast('Documento de venda não encontrado.'); return; }
+    if (!o.assinaturaCliente) {
+        try { await sincronizarAssinaturaDaVenda(id); } catch (eAss) { /* ok */ }
+        db = carregar();
+        o = obterDocumentoVendaPorId(id) || o;
+    }
     documentoVendaAtual = o;
     atendimentoNotaAtual = null;
     var titulo = (o.tipo || 'VENDA') + ' Nº ' + (o.numero || '—') + ' · ' + (o.clienteNome || o.funcionarioNome || '');
@@ -5785,10 +5878,15 @@ function abrirDocumentoVenda(id) {
     if (modal) modal.classList.add('aberto');
 }
 
-function imprimirDocumentoVenda(id) {
+async function imprimirDocumentoVenda(id) {
     var db = carregar();
     var o = id ? obterDocumentoVendaPorId(id) : documentoVendaAtual;
     if (!o) { toast('Documento não encontrado.'); return; }
+    if (o.id && !o.assinaturaCliente) {
+        try { await sincronizarAssinaturaDaVenda(o.id); } catch (eAss) { /* ok */ }
+        db = carregar();
+        o = obterDocumentoVendaPorId(o.id) || o;
+    }
     documentoVendaAtual = o;
     perguntarCamposCliente().then(function (vis) {
         if (!vis) return;
@@ -5809,6 +5907,11 @@ async function salvarPdfDocumentoVenda(id) {
     var db = carregar();
     var o = id ? obterDocumentoVendaPorId(id) : documentoVendaAtual;
     if (!o) { toast('Documento não encontrado.'); return; }
+    if (o.id && !o.assinaturaCliente) {
+        try { await sincronizarAssinaturaDaVenda(o.id); } catch (eAss) { /* ok */ }
+        db = carregar();
+        o = obterDocumentoVendaPorId(o.id) || o;
+    }
     documentoVendaAtual = o;
     var vis = await perguntarCamposCliente();
     if (!vis) return;
@@ -7723,6 +7826,13 @@ async function prepararHtmlWaEnvio(incluirFotos) {
         return null;
     }
     var a = info.a;
+    if (a.id && typeof sincronizarAssinaturaDoAtendimento === 'function' && !a.assinaturaCliente) {
+        try { await sincronizarAssinaturaDoAtendimento(a.id); } catch (eAss) { /* ok */ }
+        var dbWa = carregar();
+        a = (dbWa.atendimentos || []).find(function (x) { return x && x.id === a.id; }) || a;
+        info.a = a;
+        info.db = dbWa;
+    }
     if (incluirFotos) {
         a = await garantirFotosCarregadas(a);
     }
@@ -8025,6 +8135,9 @@ async function prepararNotaOsDoFormulario() {
     if (!vis) return null;
     var salvo = salvarAtendimentoRapidoParaEnvio();
     if (!salvo) return null;
+    if (typeof sincronizarAssinaturaDoAtendimento === 'function') {
+        try { await sincronizarAssinaturaDoAtendimento(salvo.id); } catch (eAss) { /* ok */ }
+    }
     var db = carregar();
     var a = (db.atendimentos || []).find(function (x) { return x && x.id === salvo.id; }) || salvo;
     atendimentoNotaAtual = a;

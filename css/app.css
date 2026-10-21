@@ -2821,6 +2821,7 @@
             align-items: flex-end;
             justify-content: center;
             padding-bottom: 4px;
+            overflow: visible;
         }
         .nota-sig-base {
             padding-top: 6px;
@@ -2838,7 +2839,7 @@
         .nota-sigs.compacto .nota-sig-base {
             font-size: 0.8rem;
         }
-        .nota-sig img { max-height: 70px; max-width: 100%; background: #fff; }
+        .nota-sig img { max-height: 88px; max-width: 100%; background: #fff; display: block; margin: 0 auto; }
 
         .mirror-print-section { display: none; }
 

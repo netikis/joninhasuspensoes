@@ -1,5 +1,5 @@
 /* Joninha Suspensões — PWA com atualização automática (PC + celular) */
-var CACHE = 'joninha-suspensoes-v105';
+var CACHE = 'joninha-suspensoes-v107';
 var ASSETS = [
   './',
   './index.html',
