@@ -7363,25 +7363,58 @@ function fmtTelefoneWa(telefone) {
 
 /* Depois de await (gerar link, salvar) o celular bloqueia window.open sem avisar.
    No celular (ou se bloquear no PC) abre uma tela final: o toque do usuário abre o WhatsApp. */
-function abrirWhatsApp(telefone, texto) {
+function abrirWhatsApp(telefone, texto, fotos) {
     var url = urlWhatsApp(telefone, texto);
     if (!ehCelular()) {
         var w = window.open(url, '_blank');
         if (w) return;
     }
-    abrirModalEnviarWhatsApp(telefone, texto);
+    abrirModalEnviarWhatsApp(telefone, texto, fotos);
 }
 
-function abrirModalEnviarWhatsApp(telefone, texto) {
+/* Arquivos prontos antes do toque: o share precisa ser chamado direto no clique */
+function fotosParaArquivosShare(fotos, prefixo) {
+    var out = [];
+    (fotos || []).forEach(function (f, i) {
+        var d = f && f.data ? String(f.data) : '';
+        var m = d.match(/^data:([^;]+);base64,(.*)$/);
+        if (!m) return;
+        try {
+            var bin = atob(m[2]);
+            var arr = new Uint8Array(bin.length);
+            for (var j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
+            var ext = /png/i.test(m[1]) ? 'png' : 'jpg';
+            out.push(new File([arr], (prefixo || 'FOTO') + ' ' + (i + 1) + '.' + ext, { type: m[1] }));
+        } catch (e) { /* foto inválida: pula */ }
+    });
+    return out;
+}
+
+function abrirModalEnviarWhatsApp(telefone, texto, fotos) {
     var m = document.getElementById('modalEnviarWa');
     if (!m) { location.href = urlWhatsApp(telefone, texto); return; }
     var tel = telWa(telefone);
     var link = document.getElementById('btnEwaAbrir');
     link.href = urlWhatsApp(telefone, texto);
-    link.textContent = tel ? '📲 Abrir conversa do cliente · ' + fmtTelefoneWa(tel) : '📲 Abrir WhatsApp e escolher o contato';
+    link.textContent = tel ? '📲 Abrir conversa do cliente · ' + fmtTelefoneWa(tel) + ' (só texto)' : '📲 Abrir WhatsApp e escolher o contato (só texto)';
     document.getElementById('ewaPrevia').textContent = texto;
     m._texto = texto;
-    document.getElementById('btnEwaCompartilhar').style.display = navigator.share ? '' : 'none';
+    var arquivos = fotosParaArquivosShare(fotos, 'FOTO');
+    if (arquivos.length && !(navigator.canShare && navigator.canShare({ files: arquivos }))) arquivos = [];
+    m._arquivos = arquivos;
+    var btnSh = document.getElementById('btnEwaCompartilhar');
+    btnSh.style.display = navigator.share ? '' : 'none';
+    if (arquivos.length) link.parentNode.insertBefore(btnSh, link);
+    else link.parentNode.insertBefore(link, btnSh);
+    btnSh.textContent = arquivos.length
+        ? '📤 Enviar com ' + arquivos.length + ' foto(s) — escolha WhatsApp e o contato'
+        : '📤 Compartilhar (escolher o app / contato)';
+    var dica = document.getElementById('ewaDicaFotos');
+    if (dica) {
+        dica.style.display = arquivos.length ? '' : 'none';
+        dica.textContent = 'Fotos vão pelo botão azul: o celular abre o Compartilhar, você toca no WhatsApp e escolhe o cliente' +
+            (tel ? ' (' + fmtTelefoneWa(tel) + ')' : '') + '. A mensagem e o link vão junto.';
+    }
     m.classList.add('aberto');
 }
 
@@ -7395,7 +7428,19 @@ function abrirModalEnviarWhatsApp(telefone, texto) {
         setTimeout(fechar, 400);
     });
     document.getElementById('btnEwaCompartilhar').addEventListener('click', function () {
-        navigator.share({ text: m._texto || '' }).then(fechar).catch(function () { /* cancelou */ });
+        var dados = { text: m._texto || '' };
+        if (m._arquivos && m._arquivos.length) dados.files = m._arquivos;
+        navigator.share(dados).then(fechar).catch(function (e) {
+            if (e && e.name === 'AbortError') return;
+            /* alguns aparelhos recusam texto + arquivos juntos: manda as fotos e copia o texto */
+            if (dados.files) {
+                try { if (navigator.clipboard) navigator.clipboard.writeText(dados.text); } catch (eC) { /* ok */ }
+                navigator.share({ files: dados.files }).then(function () {
+                    toast('Fotos enviadas. A mensagem foi copiada: cole na conversa.');
+                    fechar();
+                }).catch(function () { /* cancelou */ });
+            }
+        });
     });
     document.getElementById('btnEwaCopiar').addEventListener('click', function () {
         var t = m._texto || '';
@@ -7849,7 +7894,7 @@ async function enviarWhatsAppOsSalvo(id, tipo) {
         msg += '\n\nAguardamos sua aprovação. Obrigado!';
     }
     msg += '\n\n*Abra o link para ver e assinar:*\n' + r.link;
-    abrirWhatsApp(tel, msg);
+    abrirWhatsApp(tel, msg, a.fotos);
 }
 
 async function enviarWhatsAppOs(tipo) {
@@ -7864,7 +7909,7 @@ async function enviarWhatsAppOs(tipo) {
     if (!r || !r.link) return;
     var m = tipo === 'checklist' ? montarMsgChecklistAtual() : montarMsgOrcamentoAtual(vis);
     var msg = (m && m.msg ? m.msg : '') + '\n\n*Abra o link para ver e assinar:*\n' + r.link;
-    abrirWhatsApp(tel, msg);
+    abrirWhatsApp(tel, msg, (typeof fotosAtuais !== 'undefined' && fotosAtuais.length) ? fotosAtuais : salvo.fotos);
 }
 
 async function copiarLinkOsEnvio() {
