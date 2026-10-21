@@ -3953,6 +3953,7 @@ function imprimirFechamentoDia(f) {
     if (!w) return;
     w.document.write(doc);
     w.document.close();
+    if (typeof inserirBarraFecharImpressao === 'function') inserirBarraFecharImpressao(w);
     setTimeout(function () { try { w.print(); } catch (e) {} }, 300);
 }
 

@@ -239,6 +239,38 @@ function montarHtmlDocumentoImpressao(htmlCorpo) {
         '</body></html>';
 }
 
+/* No app instalado do celular a janela de impressão abre sem barra do navegador: sem isto não tem como sair */
+function inserirBarraFecharImpressao(w) {
+    try {
+        var d = w.document;
+        if (!d || !d.body || d.getElementById('barraFecharImpressao')) return;
+        var st = d.createElement('style');
+        st.textContent =
+            '#barraFecharImpressao{position:sticky;top:0;left:0;right:0;z-index:99999;display:flex;gap:8px;padding:10px;' +
+            'background:#152642;box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:Segoe UI,Roboto,sans-serif}' +
+            '#barraFecharImpressao button{flex:1;padding:14px 10px;border:0;border-radius:10px;font-size:16px;font-weight:700;color:#fff}' +
+            '@media print{#barraFecharImpressao{display:none!important}}';
+        d.head.appendChild(st);
+        var bar = d.createElement('div');
+        bar.id = 'barraFecharImpressao';
+        bar.innerHTML = '<button type="button" id="bfiFechar" style="background:#c0392b">✕ Fechar e voltar</button>' +
+            '<button type="button" id="bfiImprimir" style="background:#27ae60">🖨️ Imprimir / Salvar PDF</button>';
+        d.body.insertBefore(bar, d.body.firstChild);
+        d.getElementById('bfiImprimir').addEventListener('click', function () {
+            try { w.focus(); w.print(); } catch (e) { /* ok */ }
+        });
+        d.getElementById('bfiFechar').addEventListener('click', function () {
+            try { if (w.opener && !w.opener.closed) w.opener.focus(); } catch (e1) { /* ok */ }
+            try { w.close(); } catch (e2) { /* ok */ }
+            setTimeout(function () {
+                if (w.closed) return;
+                try { if (w.history.length > 1) { w.history.back(); return; } } catch (e3) { /* ok */ }
+                try { w.location.href = location.href.split('#')[0]; } catch (e4) { /* ok */ }
+            }, 300);
+        });
+    } catch (e) { /* ok */ }
+}
+
 function limparAposImpressao() {
     document.body.classList.remove('imprimindo');
     document.body.classList.remove('dialogo-impressao');
@@ -294,6 +326,7 @@ function executarImpressaoHtml(html) {
         w.document.open();
         w.document.write(docHtml);
         w.document.close();
+        inserirBarraFecharImpressao(w);
         aguardarImagensDoc(w.document, function () {
             try {
                 ligarFimImpressao(w);
@@ -327,6 +360,7 @@ function executarImpressaoHtml(html) {
         w2.document.open();
         w2.document.write(docHtml);
         w2.document.close();
+        inserirBarraFecharImpressao(w2);
         aguardarImagensDoc(w2.document, function () {
             try {
                 ligarFimImpressao(w2);
@@ -5512,6 +5546,7 @@ function imprimirEtiquetasEstoque() {
     }
     janela.document.write(htmlEtiquetas);
     janela.document.close();
+    inserirBarraFecharImpressao(janela);
 }
 
 document.getElementById('buscaProd').addEventListener('input', renderProdutos);
@@ -8505,6 +8540,7 @@ function imprimirRelatorioOficina() {
     if (!w) { toast('Permita pop-up para imprimir.'); return; }
     w.document.write(html);
     w.document.close();
+    inserirBarraFecharImpressao(w);
     setTimeout(function () { try { w.print(); } catch (e) {} }, 300);
 }
 
