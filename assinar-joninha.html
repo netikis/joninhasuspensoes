@@ -257,6 +257,42 @@
             return { fsMod: fs, dbFs: dbFs };
         }
 
+        function pintarFotos(doc) {
+            var cardFotos = document.getElementById('cardFotos');
+            var boxFotos = document.getElementById('dFotos');
+            var fotos = (doc.fotos || []).filter(function (f) { return f && (f.data || f.url); });
+            if (fotos.length) {
+                cardFotos.style.display = '';
+                boxFotos.innerHTML = fotos.map(function (f) {
+                    return '<img src="' + (f.url || f.data) + '" alt="Foto do veículo">';
+                }).join('');
+            } else if ((doc.fotos || []).length) {
+                cardFotos.style.display = '';
+                boxFotos.innerHTML = '<p class="hint">Carregando fotos…</p>';
+            } else {
+                cardFotos.style.display = 'none';
+                boxFotos.innerHTML = '';
+            }
+        }
+
+        async function hidratarFotosDoc(doc) {
+            if (!doc || !Array.isArray(doc.fotos) || !doc.fotos.length) return;
+            var sess = await initFirestorePublico();
+            if (!sess) return;
+            for (var i = 0; i < doc.fotos.length; i++) {
+                var f = doc.fotos[i];
+                if (!f || f.data || f.url || !f.id) continue;
+                try {
+                    var snap = await sess.fsMod.getDoc(sess.fsMod.doc(sess.dbFs, COL_ASSIN, token + '_foto_' + f.id));
+                    if (snap.exists()) {
+                        var d = snap.data() || {};
+                        if (d.data) f.data = d.data;
+                        if (d.url) f.url = d.url;
+                    }
+                } catch (e) { /* segue */ }
+            }
+        }
+
         async function baixarPackNuvem() {
             try {
                 var sess = await initFirestorePublico();
@@ -356,18 +392,7 @@
             document.getElementById('dDiagnostico').textContent = doc.diagnostico || '—';
             document.getElementById('dServicos').textContent = doc.servicos || '—';
 
-            var cardFotos = document.getElementById('cardFotos');
-            var boxFotos = document.getElementById('dFotos');
-            var fotos = (doc.fotos || []).filter(function (f) { return f && (f.data || f.url); });
-            if (fotos.length) {
-                cardFotos.style.display = '';
-                boxFotos.innerHTML = fotos.map(function (f) {
-                    return '<img src="' + (f.url || f.data) + '" alt="Foto do veículo">';
-                }).join('');
-            } else {
-                cardFotos.style.display = 'none';
-                boxFotos.innerHTML = '';
-            }
+            pintarFotos(doc);
 
             var itens = doc.itens || [];
             var vis = doc.vis || { pecas: true, mao: true, total: true, custo: false, ganho: false };
@@ -573,6 +598,8 @@
         document.getElementById('areaDoc').style.display = '';
         document.getElementById('hintTopo').textContent = 'Confira o espelho e assine abaixo com o dedo ou o mouse.';
         renderDoc(pack.documento || {});
+        await hidratarFotosDoc(pack.documento || {});
+        pintarFotos(pack.documento || {});
 
         if (pack.assinaturaCliente) {
             document.getElementById('boxAssinar').style.display = 'none';

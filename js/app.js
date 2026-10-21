@@ -2882,6 +2882,22 @@ async function enviarPackAssinaturaNuvem(pack) {
             }
         }
         await fsMod.setDoc(fsMod.doc(dbFs, col, pack.token), payload, { merge: true });
+        var fotosSrc = (pack.documento && pack.documento.fotos) || [];
+        for (var fi = 0; fi < fotosSrc.length; fi++) {
+            var f = fotosSrc[fi];
+            if (!f || !(f.data || f.url) || !f.id) continue;
+            var dataFoto = f.data;
+            if (dataFoto && typeof garantirFotoComprimida === 'function') {
+                try { dataFoto = await garantirFotoComprimida(dataFoto); } catch (eC) { /* usa original */ }
+            }
+            await fsMod.setDoc(fsMod.doc(dbFs, col, pack.token + '_foto_' + f.id), {
+                token: pack.token,
+                fotoId: f.id,
+                data: dataFoto || null,
+                url: f.url || null,
+                atualizadoEm: new Date().toISOString()
+            });
+        }
         return { ok: true, pack: payload };
     } catch (e) {
         return { ok: false, motivo: (e && (e.message || e.code)) || 'falha' };
@@ -3546,6 +3562,10 @@ function documentoAssinatura(db, a, incluirFotos, vis) {
 
 async function garantirFotosCarregadas(a) {
     if (!a || !a.fotos || !a.fotos.length) return a;
+    if (window.fotosLocaisProntas) {
+        try { await window.fotosLocaisProntas; } catch (eF) { /* ok */ }
+    }
+    if (typeof preencherFotosDoCache === 'function') preencherFotosDoCache({ atendimentos: [a] });
     var precisa = a.fotos.some(function (f) { return f && f.id && !f.data && !f.url; });
     if (!precisa) return a;
     var cfgN = carregarConfigNuvem();
@@ -3564,16 +3584,29 @@ async function garantirFotosCarregadas(a) {
 
 async function prepararPackLinkAssinatura(id, opts) {
     opts = opts || {};
+    if (window.fotosLocaisProntas) {
+        try { await window.fotosLocaisProntas; } catch (eF) { /* ok */ }
+    }
     var db = carregar();
     var a = db.atendimentos.find(function (x) { return x.id === id; });
     if (!a) { toast('Atendimento não encontrado.'); return null; }
+    if (typeof fotosAtuais !== 'undefined' && fotosAtuais.length) {
+        if (!(a.fotos || []).length) a.fotos = fotosAtuais.slice();
+        else {
+            a.fotos.forEach(function (f) {
+                if (!f || f.data || f.url || !f.id) return;
+                var fl = fotosAtuais.find(function (x) { return x && x.id === f.id; });
+                if (fl && fl.data) f.data = fl.data;
+            });
+        }
+    }
     var vis = opts.vis != null ? visClienteDe(opts.vis) : await perguntarCamposCliente();
     if (!vis) return null;
     var comFotos = false;
-    if (opts.perguntarFotos !== false) {
+    if (opts.perguntarFotos !== false && opts.incluirFotos !== true) {
         comFotos = await perguntarEnviarComFotos(a, { forcarPergunta: true });
         if (comFotos === null) return null;
-    } else if ((a.fotos || []).length) {
+    } else if (opts.incluirFotos === true || (a.fotos || []).length) {
         comFotos = true;
     }
     if (comFotos) {
@@ -7871,7 +7904,7 @@ async function enviarWhatsAppOsSalvo(id, tipo) {
     toast('Gerando link e abrindo o WhatsApp…');
     var vis = await perguntarCamposCliente();
     if (!vis) return;
-    var r = await prepararPackLinkAssinatura(id, { perguntarFotos: false, vis: vis });
+    var r = await prepararPackLinkAssinatura(id, { perguntarFotos: false, vis: vis, incluirFotos: true });
     if (!r || !r.link) return;
     var msg;
     if (tipo === 'checklist') {
@@ -7905,7 +7938,7 @@ async function enviarWhatsAppOs(tipo) {
     toast('Gerando link e abrindo o WhatsApp…');
     var salvo = salvarAtendimentoRapidoParaEnvio();
     if (!salvo) return;
-    var r = await prepararPackLinkAssinatura(salvo.id, { perguntarFotos: false, vis: vis });
+    var r = await prepararPackLinkAssinatura(salvo.id, { perguntarFotos: false, vis: vis, incluirFotos: true });
     if (!r || !r.link) return;
     var m = tipo === 'checklist' ? montarMsgChecklistAtual() : montarMsgOrcamentoAtual(vis);
     var msg = (m && m.msg ? m.msg : '') + '\n\n*Abra o link para ver e assinar:*\n' + r.link;

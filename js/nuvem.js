@@ -282,9 +282,10 @@ function packAssinaturaLeveParaNuvem(pack) {
             doc.empresaLogo = 'logo-joninha.jpg';
         }
         if (Array.isArray(doc.fotos)) {
-            doc.fotos = doc.fotos.map(function (f) {
-                return { id: f && f.id, url: f && f.url ? f.url : null };
-            }).filter(function (f) { return f && f.url; });
+            /* Só o id no documento principal (base64 estoura 1 MB). A foto vai em {token}_foto_{id} */
+            doc.fotos = doc.fotos.map(function (f, i) {
+                return { id: (f && f.id) || ('f' + i) };
+            }).filter(function (f) { return f.id; });
             if (!doc.fotos.length) delete doc.fotos;
         }
         out.documento = doc;
