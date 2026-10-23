@@ -4697,72 +4697,73 @@ function alvoHoldEhAcao(t) {
     return !!(t && t.closest && t.closest('.actions, .cx-acoes-cell, .cx-opcoes-wrap, button, select, a, input, label'));
 }
 
-function ligarHoldResumo(el, onHold, opts) {
+function ligarHoldResumo(el, onHold) {
     if (!el || el.getAttribute('data-hold-resumo')) return;
     el.setAttribute('data-hold-resumo', '1');
-    opts = opts || {};
     var timer = null;
-    var holding = false;
+    var viaToque = false;
     var startX = 0;
     var startY = 0;
     function limpa() {
         if (timer) { clearTimeout(timer); timer = null; }
-        holding = false;
+        viaToque = false;
         el.classList.remove('hold-aguardando');
     }
     function dispara() {
         timer = null;
-        holding = false;
+        viaToque = false;
         el.classList.remove('hold-aguardando');
         if (typeof onHold === 'function') onHold();
     }
-    function pontoEv(ev) {
-        if (ev.touches && ev.touches[0]) return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
-        return { x: ev.clientX || 0, y: ev.clientY || 0 };
-    }
-    function comeca(ev) {
-        if (alvoHoldEhAcao(ev.target)) return;
-        if (ev.type === 'mousedown' && ev.button !== 0) return;
-        if (ev.pointerType === 'mouse' && ev.button != null && ev.button !== 0) return;
-        limpa();
-        holding = true;
-        var p = pontoEv(ev);
-        startX = p.x;
-        startY = p.y;
-        if (ev.pointerId != null && el.setPointerCapture) {
-            try { el.setPointerCapture(ev.pointerId); } catch (err) {}
+    function comeca(ev, toque) {
+        if (alvoHoldEhAcao(ev.target)) {
+            limpa();
+            return;
+        }
+        if (!toque && ev.type !== 'mouseenter' && ev.button != null && ev.button !== 0) return;
+        if (toque) {
+            window._holdResumoToqueEm = Date.now();
+            viaToque = true;
+        } else if (Date.now() - (window._holdResumoToqueEm || 0) < 1200) {
+            return;
+        }
+        if (timer) clearTimeout(timer);
+        if (ev.touches && ev.touches[0]) {
+            startX = ev.touches[0].clientX;
+            startY = ev.touches[0].clientY;
+        } else {
+            startX = ev.clientX || 0;
+            startY = ev.clientY || 0;
         }
         el.classList.add('hold-aguardando');
         timer = setTimeout(dispara, HOLD_RESUMO_MS);
     }
-    function move(ev) {
-        if (!holding) return;
-        var p = pontoEv(ev);
-        if (Math.abs(p.x - startX) > 18 || Math.abs(p.y - startY) > 18) limpa();
+    function moveToque(ev) {
+        if (!timer || !viaToque) return;
+        var t = ev.touches && ev.touches[0];
+        if (!t) return;
+        if (Math.abs(t.clientX - startX) > 28 || Math.abs(t.clientY - startY) > 28) limpa();
     }
-    el.addEventListener('pointerdown', comeca);
-    el.addEventListener('pointerup', limpa);
-    el.addEventListener('pointercancel', limpa);
-    el.addEventListener('pointerleave', limpa);
-    el.addEventListener('pointermove', move);
-    if (opts.hover) {
-        el.addEventListener('mouseenter', function (e) {
-            if (e.buttons) return;
-            comeca(e);
-        });
-        el.addEventListener('mouseleave', limpa);
-    }
-    el.addEventListener('contextmenu', function (e) {
-        e.preventDefault();
-    });
+    el.addEventListener('mouseenter', function (e) { comeca(e, false); });
+    el.addEventListener('mouseleave', limpa);
+    el.addEventListener('touchstart', function (e) { comeca(e, true); }, { passive: true });
+    el.addEventListener('touchend', limpa);
+    el.addEventListener('touchcancel', limpa);
+    el.addEventListener('touchmove', moveToque, { passive: true });
+    el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 }
 
 function ligarHoldResumoHistorico() {
     var th = document.getElementById('thHistTotal');
-    ligarHoldResumo(th, abrirResumoGeralHistorico, { hover: true });
+    ligarHoldResumo(th, abrirResumoGeralHistorico);
     document.querySelectorAll('#tabelaAtend tr.hist-linha-hold').forEach(function (tr) {
         ligarHoldResumo(tr, function () {
             abrirResumoDocumentoHistorico(tr.getAttribute('data-hist-kind'), tr.getAttribute('data-hist-id'));
+        });
+    });
+    document.querySelectorAll('#tabelaAtend td.hist-total-hold').forEach(function (td) {
+        ligarHoldResumo(td, function () {
+            abrirResumoDocumentoHistorico(td.getAttribute('data-hist-kind'), td.getAttribute('data-hist-id'));
         });
     });
 }
