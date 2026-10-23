@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=116">
-    <link rel="stylesheet" href="css/tema-m3.css?v=116">
-    <link rel="stylesheet" href="css/telas.css?v=116">
+    <link rel="stylesheet" href="css/app.css?v=117">
+    <link rel="stylesheet" href="css/tema-m3.css?v=117">
+    <link rel="stylesheet" href="css/telas.css?v=117">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -335,6 +335,10 @@
         <!-- OFICINA -->
         <section id="painelVeiculo" class="panel">
             <form id="formAtendimento" onsubmit="return false;">
+            <div class="os-acoes-topo">
+                <button type="button" class="btn btn-primary js-salvar-at" id="btnSalvarAtTopo">Salvar Atendimento</button>
+                <button type="button" class="btn btn-secondary js-nova-os" id="btnLimparAtTopo">Nova OS</button>
+            </div>
             <div class="grid-2">
                 <div class="box box-cliente-atendimento">
                     <h2>Cliente do atendimento</h2>
@@ -564,8 +568,8 @@
                         <button type="button" class="btn btn-secondary" id="btnAtImprimir">🖨️ Imprimir</button>
                         <button type="button" class="btn btn-pdf" id="btnAtSalvarPdf">💾 Salvar PDF</button>
                         <button type="button" class="btn btn-ok" id="btnAtMandarCaixa">💰 Mandar ao caixa</button>
-                        <button type="button" class="btn btn-primary" id="btnSalvarAt">Salvar Atendimento</button>
-                        <button type="button" class="btn btn-secondary" id="btnLimparAt">Nova OS</button>
+                        <button type="button" class="btn btn-primary js-salvar-at" id="btnSalvarAt">Salvar Atendimento</button>
+                        <button type="button" class="btn btn-secondary js-nova-os" id="btnLimparAt">Nova OS</button>
                     </div>
                     <p class="hint" style="margin-top:8px;font-weight:600;color:#333">Ao salvar, a OS continua nesta tela. <strong>Imprimir</strong> e <strong>Salvar PDF</strong> abrem a escolha (impressora ou arquivo). Use <strong>Nova OS</strong> só quando for começar outro carro.</p>
                 </div>
@@ -601,13 +605,13 @@
                             <th>Cliente</th>
                             <th>Veículo</th>
                             <th>Placa</th>
-                            <th id="thHistTotal" class="hist-total-hold" title="Segure 2 segundos em Total para ver o relatório geral">Total</th>
+                            <th id="thHistTotal" class="hist-total-hold" title="Botão direito: mostrar painel do serviço realizado">Total</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody id="tabelaAtend"></tbody>
                 </table>
-                <p class="hint" style="margin:10px 0 0">No celular ou no PC, <strong>segure 2 segundos na linha da OS</strong> para ver peças e mão de obra daquela ordem. No título <strong>Total</strong> da coluna, 2 segundos mostram o resumo da lista.</p>
+                <p class="hint" style="margin:10px 0 0">No PC, <strong>botão direito</strong> na linha da OS e clique em <strong>Mostrar painel do serviço realizado?</strong> No celular, segure 2 segundos na linha.</p>
                 <div id="listaAtendVazia" class="empty" style="display:none;margin-top:12px">Nenhuma OS ou venda neste histórico.</div>
             </div>
         </section>
@@ -1827,6 +1831,10 @@
         </div>
     </div>
 
+    <div id="menuServicoRealizado" class="menu-servico-realizado" hidden>
+        <button type="button" id="btnMenuMostrarServico">Mostrar painel do serviço realizado?</button>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <div class="modal-overlay" id="modalAtendimentosMes">
@@ -2205,18 +2213,18 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=116"></script>
-    <script src="js/storage.js?v=116"></script>
-    <script src="js/ui.js?v=116"></script>
-    <script src="js/auth.js?v=116"></script>
-    <script src="js/os.js?v=116"></script>
-    <script src="js/nuvem.js?v=116"></script>
-    <script src="js/caixa.js?v=116"></script>
-    <script src="js/comissoes.js?v=116"></script>
-    <script src="js/app.js?v=116"></script>
-    <script src="js/func-ponto.js?v=116"></script>
-    <script src="js/perfil-cliente.js?v=116"></script>
-    <script src="js/navegacao.js?v=116"></script>
+    <script src="js/config.js?v=117"></script>
+    <script src="js/storage.js?v=117"></script>
+    <script src="js/ui.js?v=117"></script>
+    <script src="js/auth.js?v=117"></script>
+    <script src="js/os.js?v=117"></script>
+    <script src="js/nuvem.js?v=117"></script>
+    <script src="js/caixa.js?v=117"></script>
+    <script src="js/comissoes.js?v=117"></script>
+    <script src="js/app.js?v=117"></script>
+    <script src="js/func-ponto.js?v=117"></script>
+    <script src="js/perfil-cliente.js?v=117"></script>
+    <script src="js/navegacao.js?v=117"></script>
 </body>
 </html>
 

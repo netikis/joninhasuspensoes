@@ -1018,14 +1018,14 @@ window._osSalvando = false;
             window.focarProximoCampo(cadeia.slice(0, -1), t.id)) return;
         clicarAdd(botaoId, e);
     }, true);
-    var btnS = document.getElementById('btnSalvarAt');
-    if (btnS && !btnS.getAttribute('data-os-save')) {
+    document.querySelectorAll('.js-salvar-at').forEach(function (btnS) {
+        if (btnS.getAttribute('data-os-save')) return;
         btnS.setAttribute('data-os-save', '1');
         btnS.addEventListener('click', function (e) {
             e.preventDefault();
             if (typeof salvarAtendimentoAtual === 'function') salvarAtendimentoAtual();
         });
-    }
+    });
     var formS = document.getElementById('formAtendimento');
     if (formS && !formS.getAttribute('data-os-save')) {
         formS.setAttribute('data-os-save', '1');
@@ -1089,7 +1089,9 @@ function limparAtendimento() {
     preencherSelectMaoFunc();
 }
 
-document.getElementById('btnLimparAt').addEventListener('click', limparAtendimento);
+document.querySelectorAll('.js-nova-os').forEach(function (btnN) {
+    btnN.addEventListener('click', limparAtendimento);
+});
 document.getElementById('atStatus').addEventListener('change', atualizarCampoAgendamentoUI);
 
 function teclaEnterOs(e) {
@@ -1290,13 +1292,13 @@ async function salvarAtendimentoAtual() {
         });
     }
 
-    var btn = document.getElementById('btnSalvarAt');
-    var txtBtn = btn ? btn.textContent : '';
+    var btnsSalvar = document.querySelectorAll('.js-salvar-at');
+    var txtBtn = 'Salvar Atendimento';
     window._osSalvando = true;
-    if (btn) {
+    btnsSalvar.forEach(function (btn) {
         btn.disabled = true;
         btn.textContent = 'Salvando...';
-    }
+    });
     try {
         if (payload.fotos && payload.fotos.length) {
             for (var pf = 0; pf < payload.fotos.length; pf++) {
@@ -1348,22 +1350,22 @@ async function salvarAtendimentoAtual() {
             : 'Não deu para salvar (' + ((errSave && (errSave.message || errSave.name)) || 'erro') + '). Tente de novo.', null);
     } finally {
         window._osSalvando = false;
-        if (btn) {
+        document.querySelectorAll('.js-salvar-at').forEach(function (btn) {
             btn.disabled = false;
             btn.textContent = txtBtn || 'Salvar Atendimento';
-        }
+        });
     }
 }
 
 (function ligarSalvarAtendimentoOs() {
-    var btn = document.getElementById('btnSalvarAt');
-    if (btn && !btn.getAttribute('data-os-save')) {
+    document.querySelectorAll('.js-salvar-at').forEach(function (btn) {
+        if (btn.getAttribute('data-os-save')) return;
         btn.setAttribute('data-os-save', '1');
         btn.addEventListener('click', function (e) {
             e.preventDefault();
             salvarAtendimentoAtual();
         });
-    }
+    });
     var form = document.getElementById('formAtendimento');
     if (form && !form.getAttribute('data-os-save')) {
         form.setAttribute('data-os-save', '1');

@@ -4697,73 +4697,80 @@ function alvoHoldEhAcao(t) {
     return !!(t && t.closest && t.closest('.actions, .cx-acoes-cell, .cx-opcoes-wrap, button, select, a, input, label'));
 }
 
-function ligarHoldResumo(el, onHold) {
+function fecharMenuServicoRealizado() {
+    var m = document.getElementById('menuServicoRealizado');
+    if (m) m.hidden = true;
+}
+
+function abrirMenuServicoRealizado(ev, kind, id) {
+    var m = document.getElementById('menuServicoRealizado');
+    if (!m || !id) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    m.setAttribute('data-hist-kind', kind || 'os');
+    m.setAttribute('data-hist-id', id);
+    m.hidden = false;
+    var x = ev.clientX || 12;
+    var y = ev.clientY || 12;
+    m.style.left = x + 'px';
+    m.style.top = y + 'px';
+    requestAnimationFrame(function () {
+        var r = m.getBoundingClientRect();
+        if (r.right > window.innerWidth - 8) m.style.left = Math.max(8, window.innerWidth - r.width - 8) + 'px';
+        if (r.bottom > window.innerHeight - 8) m.style.top = Math.max(8, window.innerHeight - r.height - 8) + 'px';
+    });
+}
+
+function ligarToqueResumo(el, onHold) {
     if (!el || el.getAttribute('data-hold-resumo')) return;
     el.setAttribute('data-hold-resumo', '1');
     var timer = null;
-    var viaToque = false;
     var startX = 0;
     var startY = 0;
     function limpa() {
         if (timer) { clearTimeout(timer); timer = null; }
-        viaToque = false;
         el.classList.remove('hold-aguardando');
     }
     function dispara() {
         timer = null;
-        viaToque = false;
         el.classList.remove('hold-aguardando');
         if (typeof onHold === 'function') onHold();
     }
-    function comeca(ev, toque) {
-        if (alvoHoldEhAcao(ev.target)) {
-            limpa();
-            return;
-        }
-        if (!toque && ev.type !== 'mouseenter' && ev.button != null && ev.button !== 0) return;
-        if (toque) {
-            window._holdResumoToqueEm = Date.now();
-            viaToque = true;
-        } else if (Date.now() - (window._holdResumoToqueEm || 0) < 1200) {
-            return;
-        }
-        if (timer) clearTimeout(timer);
-        if (ev.touches && ev.touches[0]) {
-            startX = ev.touches[0].clientX;
-            startY = ev.touches[0].clientY;
-        } else {
-            startX = ev.clientX || 0;
-            startY = ev.clientY || 0;
-        }
+    el.addEventListener('touchstart', function (e) {
+        if (alvoHoldEhAcao(e.target)) { limpa(); return; }
+        window._holdResumoToqueEm = Date.now();
+        limpa();
+        var t = e.touches && e.touches[0];
+        startX = t ? t.clientX : 0;
+        startY = t ? t.clientY : 0;
         el.classList.add('hold-aguardando');
         timer = setTimeout(dispara, HOLD_RESUMO_MS);
-    }
-    function moveToque(ev) {
-        if (!timer || !viaToque) return;
-        var t = ev.touches && ev.touches[0];
-        if (!t) return;
-        if (Math.abs(t.clientX - startX) > 28 || Math.abs(t.clientY - startY) > 28) limpa();
-    }
-    el.addEventListener('mouseenter', function (e) { comeca(e, false); });
-    el.addEventListener('mouseleave', limpa);
-    el.addEventListener('touchstart', function (e) { comeca(e, true); }, { passive: true });
+    }, { passive: true });
     el.addEventListener('touchend', limpa);
     el.addEventListener('touchcancel', limpa);
-    el.addEventListener('touchmove', moveToque, { passive: true });
-    el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    el.addEventListener('touchmove', function (e) {
+        if (!timer) return;
+        var t = e.touches && e.touches[0];
+        if (!t) return;
+        if (Math.abs(t.clientX - startX) > 28 || Math.abs(t.clientY - startY) > 28) limpa();
+    }, { passive: true });
 }
 
 function ligarHoldResumoHistorico() {
-    var th = document.getElementById('thHistTotal');
-    ligarHoldResumo(th, abrirResumoGeralHistorico);
     document.querySelectorAll('#tabelaAtend tr.hist-linha-hold').forEach(function (tr) {
-        ligarHoldResumo(tr, function () {
+        if (!tr.getAttribute('data-ctx-resumo')) {
+            tr.setAttribute('data-ctx-resumo', '1');
+            tr.addEventListener('contextmenu', function (e) {
+                if (alvoHoldEhAcao(e.target)) return;
+                if (Date.now() - (window._holdResumoToqueEm || 0) < 1200) {
+                    e.preventDefault();
+                    return;
+                }
+                abrirMenuServicoRealizado(e, tr.getAttribute('data-hist-kind'), tr.getAttribute('data-hist-id'));
+            });
+        }
+        ligarToqueResumo(tr, function () {
             abrirResumoDocumentoHistorico(tr.getAttribute('data-hist-kind'), tr.getAttribute('data-hist-id'));
-        });
-    });
-    document.querySelectorAll('#tabelaAtend td.hist-total-hold').forEach(function (td) {
-        ligarHoldResumo(td, function () {
-            abrirResumoDocumentoHistorico(td.getAttribute('data-hist-kind'), td.getAttribute('data-hist-id'));
         });
     });
 }
@@ -4775,6 +4782,24 @@ function ligarHoldResumoHistorico() {
     if (m) m.addEventListener('click', function (e) {
         if (e.target === m) fecharResumoGeralHistorico();
     });
+    var menu = document.getElementById('menuServicoRealizado');
+    var btnMenu = document.getElementById('btnMenuMostrarServico');
+    if (btnMenu) {
+        btnMenu.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var kind = menu ? menu.getAttribute('data-hist-kind') : 'os';
+            var id = menu ? menu.getAttribute('data-hist-id') : '';
+            fecharMenuServicoRealizado();
+            abrirResumoDocumentoHistorico(kind, id);
+        });
+    }
+    document.addEventListener('click', function () { fecharMenuServicoRealizado(); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') fecharMenuServicoRealizado();
+    });
+    var main = document.querySelector('.main');
+    if (main) main.addEventListener('scroll', fecharMenuServicoRealizado, { passive: true });
 })();
 
 /* ---------- Receber OS (total, desconto, parcial, formas mistas) ---------- */

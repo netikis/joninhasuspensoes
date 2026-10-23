@@ -1308,15 +1308,55 @@
         #painelHistorico .box h2 {
             color: #fff;
         }
-        #painelHistorico .hist-total-hold {
+        .os-acoes-topo {
+            position: sticky;
+            top: 64px;
+            z-index: 28;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin: 0 0 14px;
+            padding: 10px 12px;
+            background: #162233;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(0,0,0,.18);
+        }
+        .menu-servico-realizado {
+            position: fixed;
+            z-index: 5000;
+            min-width: 280px;
+            max-width: calc(100vw - 16px);
+            padding: 6px;
+            background: #fff;
+            color: #0f172a;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            box-shadow: 0 10px 28px rgba(0,0,0,.28);
+        }
+        .menu-servico-realizado button {
+            width: 100%;
+            text-align: left;
+            background: #fff;
+            color: #0f172a;
+            border: 0;
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            font-weight: 800;
             cursor: pointer;
+        }
+        .menu-servico-realizado button:hover {
+            background: #e2e8f0;
+        }
+        #painelHistorico .hist-total-hold {
+            cursor: context-menu;
             user-select: none;
             -webkit-user-select: none;
             -webkit-touch-callout: none;
             position: relative;
             color: #fff;
-            text-decoration: underline dotted rgba(255,255,255,.45);
-            text-underline-offset: 4px;
         }
         #painelHistorico .hist-total-hold.hold-aguardando {
             color: #f1c40f;
@@ -1325,7 +1365,7 @@
             text-decoration: none;
         }
         #painelHistorico tr.hist-linha-hold {
-            cursor: pointer;
+            cursor: context-menu;
             user-select: none;
             -webkit-user-select: none;
             -webkit-touch-callout: none;
@@ -3334,6 +3374,8 @@
             body.menu-aberto .sidebar { transform: translateX(0); }
             body.menu-aberto .sidebar-overlay { display: block; }
             body.menu-aberto { overflow: hidden; }
+
+            .os-acoes-topo { top: 56px; }
 
             .main {
                 width: 100%;

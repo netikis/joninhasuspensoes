@@ -808,6 +808,11 @@ tr.row-click:hover { background: #e2e8f0; }
     font-weight: 800 !important;
 }
 
+.os-acoes-topo {
+    background: var(--m3-navy);
+    border-color: var(--m3-navy-2);
+}
+
 .badge-pago-os {
     margin-left: 12px;
     vertical-align: middle;
