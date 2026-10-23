@@ -4368,7 +4368,7 @@ function renderHistorico() {
             '<td style="color:#fff;font-weight:800">' + badgeAg + esc(nome) + tagAvulso + badgeAssinatura(a) + badgePago + '</td>' +
             '<td style="color:#fff;font-weight:600">' + esc(a.carro || '—') + '</td>' +
             '<td style="color:#fff;font-weight:700">' + esc(a.placa || '—') + '</td>' +
-            '<td class="hist-total-hold" style="color:#fff;font-weight:700">' + moeda(a.total) + '</td>' +
+            '<td class="hist-total-hold" data-hist-kind="os" data-hist-id="' + esc(a.id) + '" style="color:#fff;font-weight:700">' + moeda(a.total) + '</td>' +
             '<td class="actions cx-acoes-cell">' + acoesOs + '</td>';
         tb.appendChild(tr);
             return;
@@ -4393,7 +4393,7 @@ function renderHistorico() {
             '</td>' +
             '<td style="color:#fff;font-weight:600">' + esc(nro) + '</td>' +
             '<td style="color:#fff;font-weight:700">' + esc(o.placa || '—') + '</td>' +
-            '<td class="hist-total-hold" style="color:#fff;font-weight:700">' + moeda(o.valor || o.total || 0) + '</td>' +
+            '<td class="hist-total-hold" data-hist-kind="vd" data-hist-id="' + esc(o.id) + '" style="color:#fff;font-weight:700">' + moeda(o.valor || o.total || 0) + '</td>' +
             '<td class="actions cx-acoes-cell">' + acoesVd + '</td>';
         tb.appendChild(trv);
     });
@@ -4516,33 +4516,115 @@ function montarResumoGeralHistorico() {
     };
 }
 
+function htmlResumoHistCard(k, v, s, extra) {
+    return '<div class="resumo-hist-card' + (extra ? ' ' + extra : '') + '"><div class="k">' + k + '</div>' +
+        '<div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>';
+}
+
 function htmlResumoGeralHistorico(r) {
-    function card(k, v, s, extra) {
-        return '<div class="resumo-hist-card' + (extra ? ' ' + extra : '') + '"><div class="k">' + k + '</div>' +
-            '<div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>';
-    }
     return '<div class="resumo-hist-grid">' +
-        card('Peças', moeda(r.pecas), r.qOs + ' OS · ' + r.qVd + ' venda(s) de balcão') +
-        card('Mão de obra', moeda(r.mao), 'OS ' + moeda(r.maoOs) + ' · vendas ' + moeda(r.maoVd)) +
-        card('Vendas (balcão)', moeda(r.vendas), r.qVd + ' venda(s) · peças ' + moeda(r.pecasVd)) +
-        card('Ordens de serviço', moeda(r.totOs), r.qOs + ' OS · peças ' + moeda(r.pecasOs)) +
-        (r.qOrc ? card('Orçamentos', moeda(r.totOrc), r.qOrc + ' documento(s)') : '') +
-        card('Total geral', moeda(r.geral), 'Pago ' + moeda(r.pago) + ' · em aberto ' + moeda(r.aberto), 'full destaque') +
+        htmlResumoHistCard('Peças', moeda(r.pecas), r.qOs + ' OS · ' + r.qVd + ' venda(s) de balcão') +
+        htmlResumoHistCard('Mão de obra', moeda(r.mao), 'OS ' + moeda(r.maoOs) + ' · vendas ' + moeda(r.maoVd)) +
+        htmlResumoHistCard('Vendas (balcão)', moeda(r.vendas), r.qVd + ' venda(s) · peças ' + moeda(r.pecasVd)) +
+        htmlResumoHistCard('Ordens de serviço', moeda(r.totOs), r.qOs + ' OS · peças ' + moeda(r.pecasOs)) +
+        (r.qOrc ? htmlResumoHistCard('Orçamentos', moeda(r.totOrc), r.qOrc + ' documento(s)') : '') +
+        htmlResumoHistCard('Total da lista', moeda(r.geral), 'Valores do documento, não do caixa', 'full destaque') +
         '</div>';
+}
+
+function htmlListaItensResumoHist(itens, venda) {
+    if (!itens || !itens.length) {
+        return '<p class="hint" style="margin-top:12px">Nenhum item lançado neste documento.</p>';
+    }
+    var rows = itens.map(function (it) {
+        if (!it) return '';
+        var ehMao = venda
+            ? ((it.origem || it.tipo) === 'mao')
+            : ((it.tipo || 'peca') === 'mao');
+        var desc = (typeof rotuloLinhaPeca === 'function' ? rotuloLinhaPeca(it) : (it.desc || '')) || '—';
+        var val = venda
+            ? (Number(it.total != null ? it.total : ((Number(it.venda) || 0) * (Number(it.qtd) || 1))) || 0)
+            : (Number(it.valor) || 0);
+        return '<tr><td>' + (ehMao ? 'Mão de obra' : 'Peça') + '</td><td>' + esc(desc) +
+            '</td><td style="text-align:right;white-space:nowrap">' + moeda(val) + '</td></tr>';
+    }).join('');
+    return '<table class="resumo-hist-itens"><thead><tr><th>Tipo</th><th>Serviço realizado</th><th style="text-align:right">Valor</th></tr></thead><tbody>' +
+        rows + '</tbody></table>';
+}
+
+function htmlResumoOsHistorico(a, db) {
+    var t = totaisOsParaResumo(a);
+    var nome = (typeof nomeAtendimento === 'function' ? nomeAtendimento(db, a) : a.clienteNome) || '—';
+    var serv = String(a.servicos || '').trim();
+    var diag = String(a.diagnostico || '').trim();
+    var extra = '';
+    if (serv) extra += '<p class="resumo-hist-serv"><strong>Serviço realizado:</strong> ' + esc(serv) + '</p>';
+    if (diag) extra += '<p class="resumo-hist-serv"><strong>Diagnóstico:</strong> ' + esc(diag) + '</p>';
+    return '<p class="hint" style="margin:0 0 10px">' + esc(nome) +
+        (a.placa ? ' · ' + esc(String(a.placa).toUpperCase()) : '') +
+        (a.carro ? ' · ' + esc(a.carro) : '') +
+        '</p>' + extra +
+        '<div class="resumo-hist-grid">' +
+        htmlResumoHistCard('Peças', moeda(t.pecas), 'Itens da OS') +
+        htmlResumoHistCard('Mão de obra', moeda(t.mao), 'Serviços da OS') +
+        htmlResumoHistCard('Total da OS', moeda(t.total), 'Do documento desta ordem, não do caixa', 'full destaque') +
+        '</div>' +
+        htmlListaItensResumoHist(a.itens || [], false);
+}
+
+function htmlResumoVendaHistorico(o) {
+    var t = typeof totaisDocVenda === 'function' ? totaisDocVenda(o) : { pecas: 0, mao: 0, total: Number(o.valor) || 0 };
+    var tipo = String(o.tipo || 'VENDA').toUpperCase() === 'ORCAMENTO' ? 'Orçamento' : 'Venda';
+    return '<p class="hint" style="margin:0 0 10px">' + esc(o.clienteNome || '—') +
+        (o.numero ? ' · ' + tipo + ' Nº ' + esc(String(o.numero)) : '') +
+        (o.placa ? ' · ' + esc(String(o.placa).toUpperCase()) : '') +
+        '</p>' +
+        '<div class="resumo-hist-grid">' +
+        htmlResumoHistCard('Peças', moeda(t.pecas), 'Itens do documento') +
+        htmlResumoHistCard('Mão de obra', moeda(t.mao), 'Serviços do documento') +
+        htmlResumoHistCard('Total', moeda(t.total), 'Do documento, não do caixa', 'full destaque') +
+        '</div>' +
+        htmlListaItensResumoHist(o.itens || [], true);
 }
 
 function abrirResumoGeralHistorico() {
     var r = montarResumoGeralHistorico();
     var hint = document.getElementById('resumoHistHint');
     var corpo = document.getElementById('resumoHistCorpo');
+    var tit = document.querySelector('#modalResumoHist h3');
     var modal = document.getElementById('modalResumoHist');
     if (!corpo || !modal) return;
+    if (tit) tit.textContent = '📊 Resumo da lista';
     if (hint) {
         hint.textContent = r.busca
-            ? 'Lista filtrada por “' + r.busca + '”.'
-            : 'Tudo que está no histórico da oficina agora.';
+            ? 'Lista filtrada por “' + r.busca + '”. Valores dos documentos, não do caixa.'
+            : 'Soma dos documentos visíveis. Para uma OS, segure o Total da linha.';
     }
     corpo.innerHTML = htmlResumoGeralHistorico(r);
+    modal.classList.add('aberto');
+}
+
+function abrirResumoDocumentoHistorico(kind, id) {
+    var db = carregar();
+    var hint = document.getElementById('resumoHistHint');
+    var corpo = document.getElementById('resumoHistCorpo');
+    var tit = document.querySelector('#modalResumoHist h3');
+    var modal = document.getElementById('modalResumoHist');
+    if (!corpo || !modal || !id) return;
+    if (kind === 'vd') {
+        var o = (db.orcamentos || []).find(function (x) { return x && String(x.id) === String(id); });
+        if (!o) { toast('Documento não encontrado.'); return; }
+        if (tit) tit.textContent = '📊 Serviço deste documento';
+        if (hint) hint.textContent = 'Peças e mão de obra lançadas neste documento — não entra valor de caixa.';
+        corpo.innerHTML = htmlResumoVendaHistorico(o);
+    } else {
+        var a = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(id); });
+        if (!a && typeof acharAtendimentoPorId === 'function') a = acharAtendimentoPorId(id);
+        if (!a) { toast('OS não encontrada.'); return; }
+        if (tit) tit.textContent = '📊 Serviço realizado nesta OS';
+        if (hint) hint.textContent = 'Peças e mão de obra desta ordem de serviço — não entra valor de caixa.';
+        corpo.innerHTML = htmlResumoOsHistorico(a, db);
+    }
     modal.classList.add('aberto');
 }
 
@@ -4579,7 +4661,9 @@ function ligarHoldResumoHistorico() {
     var th = document.getElementById('thHistTotal');
     ligarHold3s(th, abrirResumoGeralHistorico);
     document.querySelectorAll('#tabelaAtend td.hist-total-hold').forEach(function (td) {
-        ligarHold3s(td, abrirResumoGeralHistorico);
+        ligarHold3s(td, function () {
+            abrirResumoDocumentoHistorico(td.getAttribute('data-hist-kind'), td.getAttribute('data-hist-id'));
+        });
     });
 }
 

@@ -1356,6 +1356,32 @@
         }
         .resumo-hist-card.full { grid-column: 1 / -1; }
         .resumo-hist-card.destaque { border-color: #27ae60; background: rgba(39,174,96,.18); }
+        .resumo-hist-serv {
+            margin: 0 0 10px;
+            color: #e8eef5;
+            font-weight: 600;
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+        .resumo-hist-itens {
+            width: 100%;
+            margin-top: 12px;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+        }
+        .resumo-hist-itens th,
+        .resumo-hist-itens td {
+            padding: 7px 6px;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+            color: #fff;
+            text-align: left;
+        }
+        .resumo-hist-itens th {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: #9fb3c8;
+        }
         @media (max-width: 520px) {
             .resumo-hist-grid { grid-template-columns: 1fr; }
         }

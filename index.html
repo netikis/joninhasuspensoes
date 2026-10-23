@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=110">
-    <link rel="stylesheet" href="css/tema-m3.css?v=110">
-    <link rel="stylesheet" href="css/telas.css?v=110">
+    <link rel="stylesheet" href="css/app.css?v=111">
+    <link rel="stylesheet" href="css/tema-m3.css?v=111">
+    <link rel="stylesheet" href="css/telas.css?v=111">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -607,7 +607,7 @@
                     </thead>
                     <tbody id="tabelaAtend"></tbody>
                 </table>
-                <p class="hint" style="margin:10px 0 0">Fique <strong>3 segundos</strong> com o mouse (ou o dedo) em <strong>Total</strong> para ver peças, mão de obra e vendas de tudo que está nesta lista.</p>
+                <p class="hint" style="margin:10px 0 0">Fique <strong>3 segundos</strong> no <strong>Total da linha</strong> para ver peças e mão de obra <em>daquela OS</em> (serviço realizado no documento, não o caixa). No título <strong>Total</strong> da coluna, 3 segundos mostram o resumo da lista.</p>
                 <div id="listaAtendVazia" class="empty" style="display:none;margin-top:12px">Nenhuma OS ou venda neste histórico.</div>
             </div>
         </section>
@@ -1818,8 +1818,8 @@
 
     <div class="modal-overlay" id="modalResumoHist">
         <div class="modal-box" style="width:min(520px,100%)">
-            <h3>📊 Relatório geral do histórico</h3>
-            <p class="hint" id="resumoHistHint">Tudo que aparece na lista agora (busca inclusa).</p>
+            <h3>📊 Serviço realizado nesta OS</h3>
+            <p class="hint" id="resumoHistHint">Peças e mão de obra desta ordem de serviço.</p>
             <div id="resumoHistCorpo"></div>
             <div class="modal-acoes" style="margin-top:14px">
                 <button type="button" class="btn btn-primary" id="btnResumoHistFechar">Fechar</button>
@@ -2205,18 +2205,18 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=110"></script>
-    <script src="js/storage.js?v=110"></script>
-    <script src="js/ui.js?v=110"></script>
-    <script src="js/auth.js?v=110"></script>
-    <script src="js/os.js?v=110"></script>
-    <script src="js/nuvem.js?v=110"></script>
-    <script src="js/caixa.js?v=110"></script>
-    <script src="js/comissoes.js?v=110"></script>
-    <script src="js/app.js?v=110"></script>
-    <script src="js/func-ponto.js?v=110"></script>
-    <script src="js/perfil-cliente.js?v=110"></script>
-    <script src="js/navegacao.js?v=110"></script>
+    <script src="js/config.js?v=111"></script>
+    <script src="js/storage.js?v=111"></script>
+    <script src="js/ui.js?v=111"></script>
+    <script src="js/auth.js?v=111"></script>
+    <script src="js/os.js?v=111"></script>
+    <script src="js/nuvem.js?v=111"></script>
+    <script src="js/caixa.js?v=111"></script>
+    <script src="js/comissoes.js?v=111"></script>
+    <script src="js/app.js?v=111"></script>
+    <script src="js/func-ponto.js?v=111"></script>
+    <script src="js/perfil-cliente.js?v=111"></script>
+    <script src="js/navegacao.js?v=111"></script>
 </body>
 </html>
 
