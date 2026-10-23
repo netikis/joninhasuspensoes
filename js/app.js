@@ -4281,7 +4281,13 @@ function renderHistorico() {
     var tb = document.getElementById('tabelaAtend');
     var vazio = document.getElementById('listaAtendVazia');
     tb.innerHTML = '';
-    if (!listaOs.length && !listaVendas.length) { vazio.style.display = ''; renderCarrosEmAberto(db); return; }
+    if (!listaOs.length && !listaVendas.length) {
+        vazio.style.display = '';
+        renderCarrosEmAberto(db);
+        window._histListasAtuais = { os: listaOs, vendas: listaVendas, busca: q };
+        ligarHoldResumoHistorico();
+        return;
+    }
     vazio.style.display = 'none';
     var linhasHist = [];
     listaOs.forEach(function (a) {
@@ -4362,7 +4368,7 @@ function renderHistorico() {
             '<td style="color:#fff;font-weight:800">' + badgeAg + esc(nome) + tagAvulso + badgeAssinatura(a) + badgePago + '</td>' +
             '<td style="color:#fff;font-weight:600">' + esc(a.carro || '—') + '</td>' +
             '<td style="color:#fff;font-weight:700">' + esc(a.placa || '—') + '</td>' +
-            '<td style="color:#fff;font-weight:700">' + moeda(a.total) + '</td>' +
+            '<td class="hist-total-hold" style="color:#fff;font-weight:700">' + moeda(a.total) + '</td>' +
             '<td class="actions cx-acoes-cell">' + acoesOs + '</td>';
         tb.appendChild(tr);
             return;
@@ -4387,7 +4393,7 @@ function renderHistorico() {
             '</td>' +
             '<td style="color:#fff;font-weight:600">' + esc(nro) + '</td>' +
             '<td style="color:#fff;font-weight:700">' + esc(o.placa || '—') + '</td>' +
-            '<td style="color:#fff;font-weight:700">' + moeda(o.valor || o.total || 0) + '</td>' +
+            '<td class="hist-total-hold" style="color:#fff;font-weight:700">' + moeda(o.valor || o.total || 0) + '</td>' +
             '<td class="actions cx-acoes-cell">' + acoesVd + '</td>';
         tb.appendChild(trv);
     });
@@ -4441,7 +4447,150 @@ function renderHistorico() {
     });
     ligarCliquesEngrenagemGlobal();
     renderCarrosEmAberto(db);
+    window._histListasAtuais = { os: listaOs, vendas: listaVendas, busca: q };
+    ligarHoldResumoHistorico();
 }
+
+function totaisOsParaResumo(a) {
+    var t = typeof totaisItens === 'function' ? totaisItens(a && a.itens || []) : { pecas: 0, mao: 0, total: 0 };
+    if (!(a && a.itens && a.itens.length)) {
+        t.pecas = Number(a && a.totalPecas) || t.pecas || 0;
+        t.mao = Number(a && a.maoObra) || t.mao || 0;
+        t.total = Number(a && a.total) || (t.pecas + t.mao);
+    } else {
+        t.total = Number(a && a.total) || t.total;
+    }
+    return t;
+}
+
+function montarResumoGeralHistorico() {
+    var listas = window._histListasAtuais || { os: [], vendas: [] };
+    var os = listas.os || [];
+    var docs = listas.vendas || [];
+    var pecasOs = 0, maoOs = 0, totOs = 0, qOs = os.length;
+    var pecasVd = 0, maoVd = 0, totVd = 0, qVd = 0, totOrc = 0, qOrc = 0;
+    var pago = 0, aberto = 0;
+    os.forEach(function (a) {
+        var t = totaisOsParaResumo(a);
+        pecasOs += Number(t.pecas) || 0;
+        maoOs += Number(t.mao) || 0;
+        var tot = Number(t.total) || 0;
+        totOs += tot;
+        if (String(a.statusPagamento || '').toUpperCase() === 'PAGO') pago += tot;
+        else aberto += tot;
+    });
+    docs.forEach(function (o) {
+        var t = typeof totaisDocVenda === 'function' ? totaisDocVenda(o) : { pecas: 0, mao: 0, total: Number(o.valor) || 0 };
+        var tot = Number(t.total != null ? t.total : (o.valor || o.total)) || 0;
+        var tipo = String(o.tipo || 'VENDA').toUpperCase();
+        if (tipo === 'ORCAMENTO') {
+            qOrc += 1;
+            totOrc += tot;
+        } else {
+            qVd += 1;
+            pecasVd += Number(t.pecas) || 0;
+            maoVd += Number(t.mao) || 0;
+            totVd += tot;
+        }
+        if (String(o.statusPagamento || '').toUpperCase() === 'PAGO') pago += tot;
+        else aberto += tot;
+    });
+    return {
+        busca: listas.busca || '',
+        qOs: qOs,
+        pecasOs: pecasOs,
+        maoOs: maoOs,
+        totOs: totOs,
+        qVd: qVd,
+        pecasVd: pecasVd,
+        maoVd: maoVd,
+        totVd: totVd,
+        qOrc: qOrc,
+        totOrc: totOrc,
+        pecas: pecasOs + pecasVd,
+        mao: maoOs + maoVd,
+        vendas: totVd,
+        geral: totOs + totVd + totOrc,
+        pago: pago,
+        aberto: aberto
+    };
+}
+
+function htmlResumoGeralHistorico(r) {
+    function card(k, v, s, extra) {
+        return '<div class="resumo-hist-card' + (extra ? ' ' + extra : '') + '"><div class="k">' + k + '</div>' +
+            '<div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>';
+    }
+    return '<div class="resumo-hist-grid">' +
+        card('Peças', moeda(r.pecas), r.qOs + ' OS · ' + r.qVd + ' venda(s) de balcão') +
+        card('Mão de obra', moeda(r.mao), 'OS ' + moeda(r.maoOs) + ' · vendas ' + moeda(r.maoVd)) +
+        card('Vendas (balcão)', moeda(r.vendas), r.qVd + ' venda(s) · peças ' + moeda(r.pecasVd)) +
+        card('Ordens de serviço', moeda(r.totOs), r.qOs + ' OS · peças ' + moeda(r.pecasOs)) +
+        (r.qOrc ? card('Orçamentos', moeda(r.totOrc), r.qOrc + ' documento(s)') : '') +
+        card('Total geral', moeda(r.geral), 'Pago ' + moeda(r.pago) + ' · em aberto ' + moeda(r.aberto), 'full destaque') +
+        '</div>';
+}
+
+function abrirResumoGeralHistorico() {
+    var r = montarResumoGeralHistorico();
+    var hint = document.getElementById('resumoHistHint');
+    var corpo = document.getElementById('resumoHistCorpo');
+    var modal = document.getElementById('modalResumoHist');
+    if (!corpo || !modal) return;
+    if (hint) {
+        hint.textContent = r.busca
+            ? 'Lista filtrada por “' + r.busca + '”.'
+            : 'Tudo que está no histórico da oficina agora.';
+    }
+    corpo.innerHTML = htmlResumoGeralHistorico(r);
+    modal.classList.add('aberto');
+}
+
+function fecharResumoGeralHistorico() {
+    var modal = document.getElementById('modalResumoHist');
+    if (modal) modal.classList.remove('aberto');
+}
+
+function ligarHold3s(el, onHold) {
+    if (!el || el.getAttribute('data-hold3')) return;
+    el.setAttribute('data-hold3', '1');
+    var timer = null;
+    function limpa() {
+        if (timer) { clearTimeout(timer); timer = null; }
+        el.classList.remove('hold-aguardando');
+    }
+    function comeca() {
+        limpa();
+        el.classList.add('hold-aguardando');
+        timer = setTimeout(function () {
+            timer = null;
+            el.classList.remove('hold-aguardando');
+            if (typeof onHold === 'function') onHold();
+        }, 3000);
+    }
+    el.addEventListener('mouseenter', comeca);
+    el.addEventListener('mouseleave', limpa);
+    el.addEventListener('touchstart', comeca, { passive: true });
+    el.addEventListener('touchend', limpa);
+    el.addEventListener('touchcancel', limpa);
+}
+
+function ligarHoldResumoHistorico() {
+    var th = document.getElementById('thHistTotal');
+    ligarHold3s(th, abrirResumoGeralHistorico);
+    document.querySelectorAll('#tabelaAtend td.hist-total-hold').forEach(function (td) {
+        ligarHold3s(td, abrirResumoGeralHistorico);
+    });
+}
+
+(function ligarModalResumoHist() {
+    var m = document.getElementById('modalResumoHist');
+    var b = document.getElementById('btnResumoHistFechar');
+    if (b) b.addEventListener('click', fecharResumoGeralHistorico);
+    if (m) m.addEventListener('click', function (e) {
+        if (e.target === m) fecharResumoGeralHistorico();
+    });
+})();
 
 /* ---------- Receber OS (total, desconto, parcial, formas mistas) ---------- */
 var receberOsIdAtual = null;

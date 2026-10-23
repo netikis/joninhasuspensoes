@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=109">
-    <link rel="stylesheet" href="css/tema-m3.css?v=109">
-    <link rel="stylesheet" href="css/telas.css?v=109">
+    <link rel="stylesheet" href="css/app.css?v=110">
+    <link rel="stylesheet" href="css/tema-m3.css?v=110">
+    <link rel="stylesheet" href="css/telas.css?v=110">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -596,10 +596,18 @@
                 </div>
                 <table>
                     <thead>
-                        <tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Placa</th><th>Total</th><th>Ações</th></tr>
+                        <tr>
+                            <th>Data</th>
+                            <th>Cliente</th>
+                            <th>Veículo</th>
+                            <th>Placa</th>
+                            <th id="thHistTotal" class="hist-total-hold" title="Fique 3 segundos em Total para ver o relatório geral">Total</th>
+                            <th>Ações</th>
+                        </tr>
                     </thead>
                     <tbody id="tabelaAtend"></tbody>
                 </table>
+                <p class="hint" style="margin:10px 0 0">Fique <strong>3 segundos</strong> com o mouse (ou o dedo) em <strong>Total</strong> para ver peças, mão de obra e vendas de tudo que está nesta lista.</p>
                 <div id="listaAtendVazia" class="empty" style="display:none;margin-top:12px">Nenhuma OS ou venda neste histórico.</div>
             </div>
         </section>
@@ -1808,6 +1816,17 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modalResumoHist">
+        <div class="modal-box" style="width:min(520px,100%)">
+            <h3>📊 Relatório geral do histórico</h3>
+            <p class="hint" id="resumoHistHint">Tudo que aparece na lista agora (busca inclusa).</p>
+            <div id="resumoHistCorpo"></div>
+            <div class="modal-acoes" style="margin-top:14px">
+                <button type="button" class="btn btn-primary" id="btnResumoHistFechar">Fechar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <div class="modal-overlay" id="modalAtendimentosMes">
@@ -2186,18 +2205,18 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=109"></script>
-    <script src="js/storage.js?v=109"></script>
-    <script src="js/ui.js?v=109"></script>
-    <script src="js/auth.js?v=109"></script>
-    <script src="js/os.js?v=109"></script>
-    <script src="js/nuvem.js?v=109"></script>
-    <script src="js/caixa.js?v=109"></script>
-    <script src="js/comissoes.js?v=109"></script>
-    <script src="js/app.js?v=109"></script>
-    <script src="js/func-ponto.js?v=109"></script>
-    <script src="js/perfil-cliente.js?v=109"></script>
-    <script src="js/navegacao.js?v=109"></script>
+    <script src="js/config.js?v=110"></script>
+    <script src="js/storage.js?v=110"></script>
+    <script src="js/ui.js?v=110"></script>
+    <script src="js/auth.js?v=110"></script>
+    <script src="js/os.js?v=110"></script>
+    <script src="js/nuvem.js?v=110"></script>
+    <script src="js/caixa.js?v=110"></script>
+    <script src="js/comissoes.js?v=110"></script>
+    <script src="js/app.js?v=110"></script>
+    <script src="js/func-ponto.js?v=110"></script>
+    <script src="js/perfil-cliente.js?v=110"></script>
+    <script src="js/navegacao.js?v=110"></script>
 </body>
 </html>
 

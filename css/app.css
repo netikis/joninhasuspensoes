@@ -1308,6 +1308,57 @@
         #painelHistorico .box h2 {
             color: #fff;
         }
+        #painelHistorico .hist-total-hold {
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            position: relative;
+            color: #fff;
+            text-decoration: underline dotted rgba(255,255,255,.45);
+            text-underline-offset: 4px;
+        }
+        #painelHistorico .hist-total-hold.hold-aguardando {
+            color: #f1c40f;
+        }
+        #painelHistorico td.hist-total-hold {
+            text-decoration: none;
+        }
+        .resumo-hist-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .resumo-hist-card {
+            background: rgba(0,0,0,.22);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 12px;
+        }
+        .resumo-hist-card .k {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: #9fb3c8;
+            font-weight: 800;
+        }
+        .resumo-hist-card .v {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: #fff;
+            margin-top: 4px;
+        }
+        .resumo-hist-card .s {
+            font-size: 0.78rem;
+            color: #c5d4e3;
+            margin-top: 4px;
+            font-weight: 600;
+        }
+        .resumo-hist-card.full { grid-column: 1 / -1; }
+        .resumo-hist-card.destaque { border-color: #27ae60; background: rgba(39,174,96,.18); }
+        @media (max-width: 520px) {
+            .resumo-hist-grid { grid-template-columns: 1fr; }
+        }
 
         /* Despesas por OS: textos legíveis no fundo escuro */
         #painelDespesasOs table th,
