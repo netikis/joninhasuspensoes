@@ -4356,7 +4356,9 @@ function renderHistorico() {
             '<button type="button" class="btn btn-danger" data-ex="' + a.id + '">Excluir</button>'
         );
         var tr = document.createElement('tr');
-        if (ehAgendado) tr.className = 'linha-agendada';
+        tr.className = (ehAgendado ? 'linha-agendada ' : '') + 'hist-linha-hold';
+        tr.setAttribute('data-hist-kind', 'os');
+        tr.setAttribute('data-hist-id', a.id);
         var dataLinhaOs = ehAgendado && a.agendadoPara
             ? a.agendadoPara
             : ((jaPago && a.saida) ? a.saida : (a.entrada || a.criadoEm));
@@ -4385,6 +4387,9 @@ function renderHistorico() {
             '<button type="button" class="btn btn-danger" data-vd-ex="' + esc(o.id) + '">Excluir</button>'
         );
         var trv = document.createElement('tr');
+        trv.className = 'hist-linha-hold';
+        trv.setAttribute('data-hist-kind', 'vd');
+        trv.setAttribute('data-hist-id', o.id);
         trv.innerHTML =
             '<td style="color:#fff;font-weight:600">' + esc(fmtData(o.dataEmissao || o.criadoEm)) + '</td>' +
             '<td style="color:#fff;font-weight:800">' + esc(nomeV) +
@@ -4633,36 +4638,78 @@ function fecharResumoGeralHistorico() {
     if (modal) modal.classList.remove('aberto');
 }
 
-function ligarHold3s(el, onHold) {
-    if (!el || el.getAttribute('data-hold3')) return;
-    el.setAttribute('data-hold3', '1');
+var HOLD_RESUMO_MS = 2000;
+
+function alvoHoldEhAcao(t) {
+    return !!(t && t.closest && t.closest('.actions, .cx-acoes-cell, .cx-opcoes-wrap, button, select, a, input, label'));
+}
+
+function ligarHoldResumo(el, onHold, opts) {
+    if (!el || el.getAttribute('data-hold-resumo')) return;
+    el.setAttribute('data-hold-resumo', '1');
+    opts = opts || {};
     var timer = null;
+    var holding = false;
+    var startX = 0;
+    var startY = 0;
     function limpa() {
         if (timer) { clearTimeout(timer); timer = null; }
+        holding = false;
         el.classList.remove('hold-aguardando');
     }
-    function comeca() {
-        limpa();
-        el.classList.add('hold-aguardando');
-        timer = setTimeout(function () {
-            timer = null;
-            el.classList.remove('hold-aguardando');
-            if (typeof onHold === 'function') onHold();
-        }, 3000);
+    function dispara() {
+        timer = null;
+        holding = false;
+        el.classList.remove('hold-aguardando');
+        if (typeof onHold === 'function') onHold();
     }
-    el.addEventListener('mouseenter', comeca);
-    el.addEventListener('mouseleave', limpa);
-    el.addEventListener('touchstart', comeca, { passive: true });
-    el.addEventListener('touchend', limpa);
-    el.addEventListener('touchcancel', limpa);
+    function pontoEv(ev) {
+        if (ev.touches && ev.touches[0]) return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
+        return { x: ev.clientX || 0, y: ev.clientY || 0 };
+    }
+    function comeca(ev) {
+        if (alvoHoldEhAcao(ev.target)) return;
+        if (ev.type === 'mousedown' && ev.button !== 0) return;
+        if (ev.pointerType === 'mouse' && ev.button != null && ev.button !== 0) return;
+        limpa();
+        holding = true;
+        var p = pontoEv(ev);
+        startX = p.x;
+        startY = p.y;
+        if (ev.pointerId != null && el.setPointerCapture) {
+            try { el.setPointerCapture(ev.pointerId); } catch (err) {}
+        }
+        el.classList.add('hold-aguardando');
+        timer = setTimeout(dispara, HOLD_RESUMO_MS);
+    }
+    function move(ev) {
+        if (!holding) return;
+        var p = pontoEv(ev);
+        if (Math.abs(p.x - startX) > 18 || Math.abs(p.y - startY) > 18) limpa();
+    }
+    el.addEventListener('pointerdown', comeca);
+    el.addEventListener('pointerup', limpa);
+    el.addEventListener('pointercancel', limpa);
+    el.addEventListener('pointerleave', limpa);
+    el.addEventListener('pointermove', move);
+    if (opts.hover) {
+        el.addEventListener('mouseenter', function (e) {
+            if (e.buttons) return;
+            comeca(e);
+        });
+        el.addEventListener('mouseleave', limpa);
+    }
+    el.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+    });
 }
 
 function ligarHoldResumoHistorico() {
     var th = document.getElementById('thHistTotal');
-    ligarHold3s(th, abrirResumoGeralHistorico);
-    document.querySelectorAll('#tabelaAtend td.hist-total-hold').forEach(function (td) {
-        ligarHold3s(td, function () {
-            abrirResumoDocumentoHistorico(td.getAttribute('data-hist-kind'), td.getAttribute('data-hist-id'));
+    ligarHoldResumo(th, abrirResumoGeralHistorico, { hover: true });
+    document.querySelectorAll('#tabelaAtend tr.hist-linha-hold').forEach(function (tr) {
+        ligarHoldResumo(tr, function () {
+            abrirResumoDocumentoHistorico(tr.getAttribute('data-hist-kind'), tr.getAttribute('data-hist-id'));
         });
     });
 }
