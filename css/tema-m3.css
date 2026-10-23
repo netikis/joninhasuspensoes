@@ -418,7 +418,7 @@ body {
 .box th,
 .box td,
 .box strong,
-.box span:not(.btn):not(.badge-db):not(.badge-cx):not(.badge-status) {
+.box span:not(.btn):not(.badge-db):not(.badge-cx):not(.badge-status):not(.badge-pendente):not(.badge-assinado) {
     color: var(--m3-text);
     font-weight: 500;
 }
@@ -811,6 +811,33 @@ tr.row-click:hover { background: #e2e8f0; }
 .badge-pago-os {
     margin-left: 12px;
     vertical-align: middle;
+}
+
+.badge-pendente {
+    background: #fff !important;
+    color: #d40000 !important;
+    font-weight: 800 !important;
+    border-radius: 0 !important;
+    padding: 1px 6px !important;
+}
+
+#modalResumoHist .resumo-hist-itens thead th {
+    background: transparent !important;
+    color: #e8eef5 !important;
+    font-weight: 800 !important;
+    border: none !important;
+}
+#modalResumoHist .resumo-hist-itens tbody tr,
+#modalResumoHist .resumo-hist-itens tbody tr:nth-child(odd),
+#modalResumoHist .resumo-hist-itens tbody tr:nth-child(even),
+#modalResumoHist .resumo-hist-itens tbody tr:hover {
+    background: #fff !important;
+}
+#modalResumoHist .resumo-hist-itens tbody td {
+    background: #fff !important;
+    color: #0f172a !important;
+    font-weight: 700 !important;
+    border-bottom: none !important;
 }
 
 @media print {
