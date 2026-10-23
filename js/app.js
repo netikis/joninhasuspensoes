@@ -4528,7 +4528,7 @@ function htmlResumoGeralHistorico(r) {
         htmlResumoHistCard('Vendas (balcão)', moeda(r.vendas), r.qVd + ' venda(s) · peças ' + moeda(r.pecasVd)) +
         htmlResumoHistCard('Ordens de serviço', moeda(r.totOs), r.qOs + ' OS · peças ' + moeda(r.pecasOs)) +
         (r.qOrc ? htmlResumoHistCard('Orçamentos', moeda(r.totOrc), r.qOrc + ' documento(s)') : '') +
-        htmlResumoHistCard('Total da lista', moeda(r.geral), 'Valores do documento, não do caixa', 'full destaque') +
+        htmlResumoHistCard('Total da lista', moeda(r.geral), '', 'full destaque') +
         '</div>';
 }
 
@@ -4560,14 +4560,14 @@ function htmlResumoOsHistorico(a, db) {
     var extra = '';
     if (serv) extra += '<p class="resumo-hist-serv"><strong>Serviço realizado:</strong> ' + esc(serv) + '</p>';
     if (diag) extra += '<p class="resumo-hist-serv"><strong>Diagnóstico:</strong> ' + esc(diag) + '</p>';
-    return '<p class="hint" style="margin:0 0 10px">' + esc(nome) +
+    return '<p class="resumo-hist-cli">' + esc(nome) +
         (a.placa ? ' · ' + esc(String(a.placa).toUpperCase()) : '') +
         (a.carro ? ' · ' + esc(a.carro) : '') +
         '</p>' + extra +
         '<div class="resumo-hist-grid">' +
         htmlResumoHistCard('Peças', moeda(t.pecas), 'Itens da OS') +
         htmlResumoHistCard('Mão de obra', moeda(t.mao), 'Serviços da OS') +
-        htmlResumoHistCard('Total da OS', moeda(t.total), 'Do documento desta ordem, não do caixa', 'full destaque') +
+        htmlResumoHistCard('Total da OS', moeda(t.total), '', 'full destaque') +
         '</div>' +
         htmlListaItensResumoHist(a.itens || [], false);
 }
@@ -4575,14 +4575,14 @@ function htmlResumoOsHistorico(a, db) {
 function htmlResumoVendaHistorico(o) {
     var t = typeof totaisDocVenda === 'function' ? totaisDocVenda(o) : { pecas: 0, mao: 0, total: Number(o.valor) || 0 };
     var tipo = String(o.tipo || 'VENDA').toUpperCase() === 'ORCAMENTO' ? 'Orçamento' : 'Venda';
-    return '<p class="hint" style="margin:0 0 10px">' + esc(o.clienteNome || '—') +
+    return '<p class="resumo-hist-cli">' + esc(o.clienteNome || '—') +
         (o.numero ? ' · ' + tipo + ' Nº ' + esc(String(o.numero)) : '') +
         (o.placa ? ' · ' + esc(String(o.placa).toUpperCase()) : '') +
         '</p>' +
         '<div class="resumo-hist-grid">' +
         htmlResumoHistCard('Peças', moeda(t.pecas), 'Itens do documento') +
         htmlResumoHistCard('Mão de obra', moeda(t.mao), 'Serviços do documento') +
-        htmlResumoHistCard('Total', moeda(t.total), 'Do documento, não do caixa', 'full destaque') +
+        htmlResumoHistCard('Total', moeda(t.total), '', 'full destaque') +
         '</div>' +
         htmlListaItensResumoHist(o.itens || [], true);
 }
@@ -4597,7 +4597,7 @@ function abrirResumoGeralHistorico() {
     if (tit) tit.textContent = '📊 Resumo da lista';
     if (hint) {
         hint.textContent = r.busca
-            ? 'Lista filtrada por “' + r.busca + '”. Valores dos documentos, não do caixa.'
+            ? 'Lista filtrada por “' + r.busca + '”.'
             : 'Soma dos documentos visíveis. Para uma OS, segure o Total da linha.';
     }
     corpo.innerHTML = htmlResumoGeralHistorico(r);
@@ -4615,14 +4615,14 @@ function abrirResumoDocumentoHistorico(kind, id) {
         var o = (db.orcamentos || []).find(function (x) { return x && String(x.id) === String(id); });
         if (!o) { toast('Documento não encontrado.'); return; }
         if (tit) tit.textContent = '📊 Serviço deste documento';
-        if (hint) hint.textContent = 'Peças e mão de obra lançadas neste documento — não entra valor de caixa.';
+        if (hint) hint.textContent = 'Peças e mão de obra lançadas neste documento.';
         corpo.innerHTML = htmlResumoVendaHistorico(o);
     } else {
         var a = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(id); });
         if (!a && typeof acharAtendimentoPorId === 'function') a = acharAtendimentoPorId(id);
         if (!a) { toast('OS não encontrada.'); return; }
         if (tit) tit.textContent = '📊 Serviço realizado nesta OS';
-        if (hint) hint.textContent = 'Peças e mão de obra desta ordem de serviço — não entra valor de caixa.';
+        if (hint) hint.textContent = 'Peças e mão de obra desta ordem de serviço.';
         corpo.innerHTML = htmlResumoOsHistorico(a, db);
     }
     modal.classList.add('aberto');

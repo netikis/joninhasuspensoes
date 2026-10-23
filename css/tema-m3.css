@@ -821,6 +821,12 @@ tr.row-click:hover { background: #e2e8f0; }
     padding: 1px 6px !important;
 }
 
+#modalResumoHist .hint,
+#modalResumoHist .resumo-hist-cli,
+#modalResumoHist .resumo-hist-serv {
+    color: #fff !important;
+    font-weight: 800;
+}
 #modalResumoHist .resumo-hist-itens thead th {
     background: transparent !important;
     color: #e8eef5 !important;

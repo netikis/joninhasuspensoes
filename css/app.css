@@ -1356,10 +1356,21 @@
         }
         .resumo-hist-card.full { grid-column: 1 / -1; }
         .resumo-hist-card.destaque { border-color: #27ae60; background: rgba(39,174,96,.18); }
+        .resumo-hist-cli {
+            margin: 0 0 10px;
+            color: #fff !important;
+            font-size: 1rem;
+            font-weight: 800;
+            line-height: 1.4;
+        }
+        #modalResumoHist .hint {
+            color: #fff !important;
+            font-weight: 700;
+        }
         .resumo-hist-serv {
             margin: 0 0 10px;
-            color: #e8eef5;
-            font-weight: 600;
+            color: #fff !important;
+            font-weight: 700;
             line-height: 1.4;
             white-space: pre-wrap;
         }
