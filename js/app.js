@@ -4456,15 +4456,42 @@ function renderHistorico() {
     ligarHoldResumoHistorico();
 }
 
+function valorDescontoRealizado(bruto, doc) {
+    var descR = Number(doc && doc.descontoReais) || 0;
+    var descP = Number(doc && doc.descontoPerc) || 0;
+    var descPercValor = Number(doc && doc.descontoPercValor) || 0;
+    bruto = Number(bruto) || 0;
+    if (descR < 0) descR = 0;
+    if (descP < 0) descP = 0;
+    if (!(descPercValor > 0) && descP > 0) {
+        descPercValor = +(Math.max(0, bruto - descR) * descP / 100).toFixed(2);
+    }
+    if (descPercValor > 0 || descR > 0) return +(descR + descPercValor).toFixed(2);
+    if (descP > 0 && typeof totalAposDescontoOs === 'function') {
+        var liq = totalAposDescontoOs(bruto, descR, descP);
+        return Math.max(0, +(bruto - liq).toFixed(2));
+    }
+    return 0;
+}
+
 function totaisOsParaResumo(a) {
-    var t = typeof totaisItens === 'function' ? totaisItens(a && a.itens || []) : { pecas: 0, mao: 0, total: 0 };
+    var t = typeof totaisItens === 'function'
+        ? totaisItens(a && a.itens || [])
+        : { pecas: 0, mao: 0, ganhoPecas: 0, custoPecas: 0, total: 0 };
     if (!(a && a.itens && a.itens.length)) {
         t.pecas = Number(a && a.totalPecas) || t.pecas || 0;
         t.mao = Number(a && a.maoObra) || t.mao || 0;
-        t.total = Number(a && a.total) || (t.pecas + t.mao);
-    } else {
-        t.total = Number(a && a.total) || t.total;
+        t.ganhoPecas = Number(a && a.ganhoPecas) || t.ganhoPecas || 0;
+        t.custoPecas = Number(a && a.custoPecas) || t.custoPecas || 0;
     }
+    t.pecas = Number(t.pecas) || 0;
+    t.mao = Number(t.mao) || 0;
+    t.ganhoPecas = Number(t.ganhoPecas) || 0;
+    t.custoPecas = Number(t.custoPecas) || 0;
+    t.bruto = t.pecas + t.mao;
+    t.desconto = valorDescontoRealizado(t.bruto, a);
+    t.descP = Number(a && a.descontoPerc) || 0;
+    t.total = Math.max(0, +(t.bruto - t.desconto).toFixed(2));
     return t;
 }
 
@@ -4472,21 +4499,23 @@ function montarResumoGeralHistorico() {
     var listas = window._histListasAtuais || { os: [], vendas: [] };
     var os = listas.os || [];
     var docs = listas.vendas || [];
-    var pecasOs = 0, maoOs = 0, totOs = 0, qOs = os.length;
-    var pecasVd = 0, maoVd = 0, totVd = 0, qVd = 0, totOrc = 0, qOrc = 0;
+    var pecasOs = 0, maoOs = 0, ganhoOs = 0, descOs = 0, totOs = 0, qOs = os.length;
+    var pecasVd = 0, maoVd = 0, ganhoVd = 0, descVd = 0, totVd = 0, qVd = 0, totOrc = 0, qOrc = 0;
     var pago = 0, aberto = 0;
     os.forEach(function (a) {
         var t = totaisOsParaResumo(a);
         pecasOs += Number(t.pecas) || 0;
         maoOs += Number(t.mao) || 0;
-        var tot = Number(t.total) || 0;
+        ganhoOs += Number(t.ganhoPecas) || 0;
+        descOs += Number(t.desconto) || 0;
+        var tot = Number(t.bruto) || 0;
         totOs += tot;
-        if (String(a.statusPagamento || '').toUpperCase() === 'PAGO') pago += tot;
-        else aberto += tot;
+        if (String(a.statusPagamento || '').toUpperCase() === 'PAGO') pago += Number(t.total) || 0;
+        else aberto += Number(t.total) || 0;
     });
     docs.forEach(function (o) {
-        var t = typeof totaisDocVenda === 'function' ? totaisDocVenda(o) : { pecas: 0, mao: 0, total: Number(o.valor) || 0 };
-        var tot = Number(t.total != null ? t.total : (o.valor || o.total)) || 0;
+        var t = totaisVendaParaResumo(o);
+        var tot = Number(t.bruto) || 0;
         var tipo = String(o.tipo || 'VENDA').toUpperCase();
         if (tipo === 'ORCAMENTO') {
             qOrc += 1;
@@ -4495,10 +4524,12 @@ function montarResumoGeralHistorico() {
             qVd += 1;
             pecasVd += Number(t.pecas) || 0;
             maoVd += Number(t.mao) || 0;
+            ganhoVd += Number(t.ganhoPecas) || 0;
+            descVd += Number(t.desconto) || 0;
             totVd += tot;
         }
-        if (String(o.statusPagamento || '').toUpperCase() === 'PAGO') pago += tot;
-        else aberto += tot;
+        if (String(o.statusPagamento || '').toUpperCase() === 'PAGO') pago += Number(t.total) || 0;
+        else aberto += Number(t.total) || 0;
     });
     return {
         busca: listas.busca || '',
@@ -4514,6 +4545,9 @@ function montarResumoGeralHistorico() {
         totOrc: totOrc,
         pecas: pecasOs + pecasVd,
         mao: maoOs + maoVd,
+        ganhoPecas: ganhoOs + ganhoVd,
+        desconto: descOs + descVd,
+        bruto: pecasOs + pecasVd + maoOs + maoVd,
         vendas: totVd,
         geral: totOs + totVd + totOrc,
         pago: pago,
@@ -4526,15 +4560,42 @@ function htmlResumoHistCard(k, v, s, extra) {
         '<div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>';
 }
 
+function totaisVendaParaResumo(o) {
+    var t = typeof totaisDocVenda === 'function'
+        ? totaisDocVenda(o)
+        : { pecas: 0, mao: 0, ganhoPecas: 0, custoPecas: 0, total: Number(o && o.valor) || 0 };
+    t.pecas = Number(t.pecas) || 0;
+    t.mao = Number(t.mao) || 0;
+    t.ganhoPecas = Number(t.ganhoPecas) || 0;
+    t.custoPecas = Number(t.custoPecas) || 0;
+    t.bruto = t.pecas + t.mao;
+    t.desconto = valorDescontoRealizado(t.bruto, o);
+    t.descP = Number(o && o.descontoPerc) || 0;
+    t.total = Math.max(0, +(t.bruto - t.desconto).toFixed(2));
+    return t;
+}
+
+function htmlKpisResumoHist(t) {
+    var descTxt = (Number(t.desconto) > 0 ? '− ' : '') + moeda(t.desconto);
+    if (Number(t.descP) > 0) descTxt += ' (' + t.descP + '%)';
+    return '<table class="resumo-hist-kpis"><tbody>' +
+        '<tr><td>Peças (venda)</td><td>' + moeda(t.pecas) + '</td></tr>' +
+        '<tr><td>Ganho em peças (venda − custo)</td><td>' + moeda(t.ganhoPecas) + '</td></tr>' +
+        '<tr><td>Mão de obra (bruta)</td><td>' + moeda(t.mao) + '</td></tr>' +
+        '<tr class="destaque"><td>Valor total (peças + mão de obra)</td><td>' + moeda(t.bruto) + '</td></tr>' +
+        '<tr class="desc"><td>Desconto realizado</td><td>' + descTxt + '</td></tr>' +
+        '</tbody></table>';
+}
+
 function htmlResumoGeralHistorico(r) {
-    return '<div class="resumo-hist-grid">' +
-        htmlResumoHistCard('Peças', moeda(r.pecas), r.qOs + ' OS · ' + r.qVd + ' venda(s) de balcão') +
-        htmlResumoHistCard('Mão de obra', moeda(r.mao), 'OS ' + moeda(r.maoOs) + ' · vendas ' + moeda(r.maoVd)) +
-        htmlResumoHistCard('Vendas (balcão)', moeda(r.vendas), r.qVd + ' venda(s) · peças ' + moeda(r.pecasVd)) +
-        htmlResumoHistCard('Ordens de serviço', moeda(r.totOs), r.qOs + ' OS · peças ' + moeda(r.pecasOs)) +
-        (r.qOrc ? htmlResumoHistCard('Orçamentos', moeda(r.totOrc), r.qOrc + ' documento(s)') : '') +
-        htmlResumoHistCard('Total da lista', moeda(r.geral), '', 'full destaque') +
-        '</div>';
+    return htmlKpisResumoHist({
+        pecas: r.pecas,
+        ganhoPecas: r.ganhoPecas,
+        mao: r.mao,
+        bruto: r.bruto,
+        desconto: r.desconto,
+        descP: 0
+    });
 }
 
 function htmlListaItensResumoHist(itens, venda) {
@@ -4569,26 +4630,18 @@ function htmlResumoOsHistorico(a, db) {
         (a.placa ? ' · ' + esc(String(a.placa).toUpperCase()) : '') +
         (a.carro ? ' · ' + esc(a.carro) : '') +
         '</p>' + extra +
-        '<div class="resumo-hist-grid">' +
-        htmlResumoHistCard('Peças', moeda(t.pecas), 'Itens da OS') +
-        htmlResumoHistCard('Mão de obra', moeda(t.mao), 'Serviços da OS') +
-        htmlResumoHistCard('Total da OS', moeda(t.total), '', 'full destaque') +
-        '</div>' +
+        htmlKpisResumoHist(t) +
         htmlListaItensResumoHist(a.itens || [], false);
 }
 
 function htmlResumoVendaHistorico(o) {
-    var t = typeof totaisDocVenda === 'function' ? totaisDocVenda(o) : { pecas: 0, mao: 0, total: Number(o.valor) || 0 };
+    var t = totaisVendaParaResumo(o);
     var tipo = String(o.tipo || 'VENDA').toUpperCase() === 'ORCAMENTO' ? 'Orçamento' : 'Venda';
     return '<p class="resumo-hist-cli">' + esc(o.clienteNome || '—') +
         (o.numero ? ' · ' + tipo + ' Nº ' + esc(String(o.numero)) : '') +
         (o.placa ? ' · ' + esc(String(o.placa).toUpperCase()) : '') +
         '</p>' +
-        '<div class="resumo-hist-grid">' +
-        htmlResumoHistCard('Peças', moeda(t.pecas), 'Itens do documento') +
-        htmlResumoHistCard('Mão de obra', moeda(t.mao), 'Serviços do documento') +
-        htmlResumoHistCard('Total', moeda(t.total), '', 'full destaque') +
-        '</div>' +
+        htmlKpisResumoHist(t) +
         htmlListaItensResumoHist(o.itens || [], true);
 }
 
@@ -4603,7 +4656,7 @@ function abrirResumoGeralHistorico() {
     if (hint) {
         hint.textContent = r.busca
             ? 'Lista filtrada por “' + r.busca + '”.'
-            : 'Soma dos documentos visíveis. Para uma OS, segure o Total da linha.';
+            : 'Soma dos documentos visíveis. Para uma OS, segure a linha 2 segundos.';
     }
     corpo.innerHTML = htmlResumoGeralHistorico(r);
     modal.classList.add('aberto');

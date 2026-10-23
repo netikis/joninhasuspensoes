@@ -827,6 +827,26 @@ tr.row-click:hover { background: #e2e8f0; }
     color: #fff !important;
     font-weight: 800;
 }
+#modalResumoHist .resumo-hist-kpis tbody tr,
+#modalResumoHist .resumo-hist-kpis tbody tr:nth-child(odd),
+#modalResumoHist .resumo-hist-kpis tbody tr:nth-child(even),
+#modalResumoHist .resumo-hist-kpis tbody tr:hover {
+    background: #fff !important;
+}
+#modalResumoHist .resumo-hist-kpis td {
+    background: #fff !important;
+    color: #0f172a !important;
+    font-weight: 800 !important;
+    border-bottom: none !important;
+}
+#modalResumoHist .resumo-hist-kpis tr.destaque td {
+    background: #dcfce7 !important;
+    color: #14532d !important;
+}
+#modalResumoHist .resumo-hist-kpis tr.desc td {
+    background: #fff !important;
+    color: #b91c1c !important;
+}
 #modalResumoHist .resumo-hist-itens thead th {
     background: transparent !important;
     color: #e8eef5 !important;

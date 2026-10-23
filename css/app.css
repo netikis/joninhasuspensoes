@@ -1369,6 +1369,44 @@
         }
         .resumo-hist-card.full { grid-column: 1 / -1; }
         .resumo-hist-card.destaque { border-color: #27ae60; background: rgba(39,174,96,.18); }
+        .resumo-hist-kpis {
+            width: 100%;
+            margin: 0 0 12px;
+            border-collapse: separate;
+            border-spacing: 0 6px;
+        }
+        .resumo-hist-kpis tbody tr,
+        .resumo-hist-kpis tbody tr:nth-child(odd),
+        .resumo-hist-kpis tbody tr:nth-child(even),
+        .resumo-hist-kpis tbody tr:hover {
+            background: #fff !important;
+        }
+        .resumo-hist-kpis td {
+            background: #fff !important;
+            color: #0f172a !important;
+            font-weight: 700 !important;
+            padding: 10px 12px;
+            border-bottom: none !important;
+            vertical-align: middle;
+        }
+        .resumo-hist-kpis td:first-child {
+            border-radius: 8px 0 0 8px;
+            font-weight: 800 !important;
+        }
+        .resumo-hist-kpis td:last-child {
+            border-radius: 0 8px 8px 0;
+            text-align: right;
+            white-space: nowrap;
+            font-weight: 800 !important;
+        }
+        .resumo-hist-kpis tr.destaque td {
+            background: #dcfce7 !important;
+            color: #14532d !important;
+        }
+        .resumo-hist-kpis tr.desc td {
+            background: #fff !important;
+            color: #b91c1c !important;
+        }
         .resumo-hist-cli {
             margin: 0 0 10px;
             color: #fff !important;
