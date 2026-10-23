@@ -1309,9 +1309,6 @@
             color: #fff;
         }
         .os-acoes-topo {
-            position: sticky;
-            top: 64px;
-            z-index: 28;
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
@@ -1321,7 +1318,6 @@
             background: #162233;
             border: 1px solid var(--line);
             border-radius: 10px;
-            box-shadow: 0 6px 18px rgba(0,0,0,.18);
         }
         .menu-servico-realizado {
             position: fixed;
@@ -3374,8 +3370,6 @@
             body.menu-aberto .sidebar { transform: translateX(0); }
             body.menu-aberto .sidebar-overlay { display: block; }
             body.menu-aberto { overflow: hidden; }
-
-            .os-acoes-topo { top: 56px; }
 
             .main {
                 width: 100%;
