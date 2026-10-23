@@ -1268,6 +1268,12 @@ async function salvarAtendimentoAtual() {
         atualizadoEm: new Date().toISOString(),
         criadoEm: isoComDataLocal(dataEntrada)
     };
+    var waOs = typeof obterTelefoneWhatsAppOs === 'function' ? obterTelefoneWhatsAppOs() : '';
+    if (waOs) {
+        if (!payload.clienteCadastro) payload.clienteCadastro = {};
+        if (!payload.clienteCadastro.telefone) payload.clienteCadastro.telefone = waOs;
+        payload.telefoneWa = waOs;
+    }
     payload = preservarFinanceiroOs(payload, existente);
     if (existente) {
         if (existente.tokenAssinatura) payload.tokenAssinatura = existente.tokenAssinatura;
@@ -1379,9 +1385,10 @@ function editarAtendimento(id, placaHint) {
     abrirPainel('painelVeiculo');
     document.getElementById('atId').value = a.id;
     document.getElementById('atClienteId').value = a.clienteId || '';
-    document.getElementById('atClienteBusca').value = a.clienteAvulso
-        ? (a.clienteNome || '')
-        : (a.clienteNome || nomeCliente(db, a.clienteId));
+    var cOs = a.clienteId && typeof clientePorId === 'function' ? clientePorId(db, a.clienteId) : null;
+    document.getElementById('atClienteBusca').value = cOs && typeof rotuloClienteComTel === 'function'
+        ? rotuloClienteComTel(cOs)
+        : (a.clienteNome || (cOs && cOs.nome) || '');
     atualizarStatusClienteAt();
     var waTel = document.getElementById('atWaTel');
     if (waTel) {

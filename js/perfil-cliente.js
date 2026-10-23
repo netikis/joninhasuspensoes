@@ -6,12 +6,33 @@ var _perfilClienteAbaAtual = 'boletos';
 
 function _pertenceCliente(c, doc) {
     if (!c || !doc) return false;
-    if (doc.clienteId && c.id && String(doc.clienteId) === String(c.id)) return true;
-    var nDoc = String(doc.clienteNome || doc.cliente || '').trim().toLowerCase();
-    var nCli = String(c.nome || '').trim().toLowerCase();
-    var ape = typeof apelidoCliente === 'function' ? apelidoCliente(c).toLowerCase() : String(c.apelido || '').trim().toLowerCase();
-    if (nDoc && nCli && nDoc === nCli) return true;
-    return !!(nDoc && ape && nDoc === ape);
+    if (doc.clienteId) return String(doc.clienteId) === String(c.id);
+    var nDoc = typeof nomeClienteChave === 'function'
+        ? nomeClienteChave(doc.clienteNome || doc.cliente || '')
+        : String(doc.clienteNome || doc.cliente || '').trim().toLowerCase();
+    var nCli = typeof nomeClienteChave === 'function' ? nomeClienteChave(c.nome) : String(c.nome || '').trim().toLowerCase();
+    var ape = typeof nomeClienteChave === 'function'
+        ? nomeClienteChave(typeof apelidoCliente === 'function' ? apelidoCliente(c) : (c.apelido || ''))
+        : String((typeof apelidoCliente === 'function' ? apelidoCliente(c) : c.apelido) || '').trim().toLowerCase();
+    var nomeBate = nDoc && (nDoc === nCli || (ape && nDoc === ape));
+    if (!nomeBate) return false;
+    var telDoc = typeof telefoneDoDocumentoCliente === 'function'
+        ? telefoneDoDocumentoCliente(doc)
+        : String((doc.clienteCadastro && doc.clienteCadastro.telefone) || doc.telefone || '').replace(/\D/g, '');
+    var telCli = typeof telefoneClienteDigitos === 'function'
+        ? telefoneClienteDigitos(c)
+        : String(c.telefone || '').replace(/\D/g, '');
+    if (telDoc && telCli && typeof telefonesEquivalentes === 'function') {
+        return telefonesEquivalentes(telDoc, telCli);
+    }
+    if (telDoc && telCli) return telDoc === telCli;
+    var db = typeof carregar === 'function' ? carregar() : null;
+    var homonimos = (db && typeof clientesComMesmoNome === 'function')
+        ? clientesComMesmoNome(db, doc.clienteNome || doc.cliente || c.nome)
+        : ((db && db.clientes) || []).filter(function (x) {
+            return x && String(x.nome || '').trim().toLowerCase() === String(c.nome || '').trim().toLowerCase();
+        });
+    return homonimos.length === 1 && String(homonimos[0].id) === String(c.id);
 }
 
 function _resumoFeitoOs(a) {
@@ -165,7 +186,7 @@ function _coletarContasCliente(db, c) {
         if (p.status === 'pago') return;
         if (p.vendaId && idsDoc[String(p.vendaId)]) return;
         if (p.atendimentoId && idsOs[String(p.atendimentoId)]) return;
-        if (!_pertenceCliente(c, p) && String(p.cliente || '').trim().toLowerCase() !== String(c.nome || '').trim().toLowerCase()) return;
+        if (!_pertenceCliente(c, p)) return;
         contas.push({
             kind: 'pendente',
             id: p.id,
@@ -430,7 +451,7 @@ function _preencherOsComCliente(c, extra) {
     if (typeof fecharPerfilCliente === 'function') fecharPerfilCliente();
     abrirPainel('painelVeiculo');
     document.getElementById('atClienteId').value = c.id;
-    document.getElementById('atClienteBusca').value = c.nome || '';
+    document.getElementById('atClienteBusca').value = typeof rotuloClienteComTel === 'function' ? rotuloClienteComTel(c) : (c.nome || '');
     if (typeof atualizarStatusClienteAt === 'function') atualizarStatusClienteAt();
     if (extra.carro != null) document.getElementById('atCarro').value = extra.carro;
     if (extra.placa != null) document.getElementById('atPlaca').value = String(extra.placa).toUpperCase();
@@ -443,7 +464,9 @@ function _preencherVendaComCliente(c) {
     if (typeof atualizarBadgeCanal === 'function') atualizarBadgeCanal();
     if (typeof limparVendaForm === 'function') limparVendaForm();
     var inp = document.getElementById('vdCliente');
-    if (inp) inp.value = c.nome || '';
+    if (inp) inp.value = typeof rotuloClienteComTel === 'function' ? rotuloClienteComTel(c) : (c.nome || '');
+    var hidVd = document.getElementById('vdClienteId');
+    if (hidVd) hidVd.value = c.id || '';
     var btnPainel = document.querySelector('.nav-btn[data-panel="painelOrcamento"][data-canal="normal"]') ||
         document.querySelector('.nav-btn[data-panel="painelOrcamento"]');
     abrirPainel('painelOrcamento', btnPainel || undefined);

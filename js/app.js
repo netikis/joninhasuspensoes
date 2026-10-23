@@ -930,6 +930,28 @@ function rotuloNomeCliente(c) {
     return n;
 }
 
+function rotuloClienteComTel(c) {
+    var n = rotuloNomeCliente(c);
+    var t = String((c && (c.telefone || c.tel || c.whatsapp)) || '').trim();
+    return t ? (n + ' · ' + t) : n;
+}
+
+function nomeDigitadoSemTelefone(texto) {
+    var t = String(texto || '').trim();
+    var i = t.indexOf(' · ');
+    if (i > 0) t = t.slice(0, i).trim();
+    return t;
+}
+
+function telefoneDoDocumentoCliente(doc) {
+    if (!doc) return '';
+    var cad = doc.clienteCadastro || {};
+    return soDigitosTel(
+        cad.telefone || cad.tel || cad.whatsapp ||
+        doc.telefone || doc.telefoneWa || doc.tel || doc.whatsapp || ''
+    );
+}
+
 function nomeCliente(db, id) {
     var c = db.clientes.find(function (x) { return x.id === id; });
     return c ? c.nome : '—';
@@ -1021,8 +1043,15 @@ function textoBateComCliente(c, texto) {
     var lower = t.toLowerCase();
     if (String(c.nome || '').trim().toLowerCase() === lower) return true;
     if (rotuloNomeCliente(c).toLowerCase() === lower) return true;
+    if (rotuloClienteComTel(c).toLowerCase() === lower) return true;
     var ape = apelidoCliente(c);
     if (ape && nomeClienteChave(ape) === nomeClienteChave(t)) return true;
+    var nomePart = nomeDigitadoSemTelefone(t);
+    var telPart = soDigitosTel(t.indexOf(' · ') >= 0 ? t.slice(t.indexOf(' · ') + 3) : '');
+    if (nomeClienteChave(nomePart) === nomeClienteChave(c.nome)) {
+        if (!telPart) return true;
+        return telefonesEquivalentes(telPart, telefoneClienteDigitos(c));
+    }
     return false;
 }
 
@@ -1030,20 +1059,59 @@ function _primeiroSeUnico(lista) {
     return (lista && lista.length === 1) ? lista[0] : null;
 }
 
+function clientesComMesmoNome(db, texto) {
+    var chave = nomeClienteChave(nomeDigitadoSemTelefone(texto));
+    if (!chave) return [];
+    return (db.clientes || []).filter(function (c) {
+        if (!c) return false;
+        if (nomeClienteChave(c.nome) === chave) return true;
+        var ape = nomeClienteChave(apelidoCliente(c));
+        return !!(ape && ape === chave);
+    });
+}
+
 function resolverClienteAtendimento(db, texto) {
     var nome = String(texto || '').trim();
     if (!nome) return { ok: false };
     var lower = nome.toLowerCase();
     var lista = db.clientes || [];
-    var exato = _primeiroSeUnico(lista.filter(function (c) {
-        return String(c.nome || '').trim().toLowerCase() === lower;
-    }));
-    if (exato) {
-        return { ok: true, clienteId: exato.id, clienteNome: exato.nome, clienteAvulso: false };
+    var porRotuloTel = lista.find(function (c) {
+        return rotuloClienteComTel(c).toLowerCase() === lower;
+    });
+    if (porRotuloTel) {
+        return { ok: true, clienteId: porRotuloTel.id, clienteNome: porRotuloTel.nome, clienteAvulso: false };
+    }
+    var porTel = clienteUnicoPorTelefone(db, nome);
+    if (porTel) {
+        return { ok: true, clienteId: porTel.id, clienteNome: porTel.nome, clienteAvulso: false };
+    }
+    var nomeLimpo = nomeDigitadoSemTelefone(nome);
+    var telNoTexto = soDigitosTel(nome.indexOf(' · ') >= 0 ? nome.slice(nome.indexOf(' · ') + 3) : '');
+    var homonimos = clientesComMesmoNome(db, nomeLimpo);
+    if (homonimos.length && telNoTexto) {
+        var porNomeTel = homonimos.filter(function (c) {
+            return telefonesEquivalentes(telefoneClienteDigitos(c), telNoTexto);
+        });
+        if (porNomeTel.length === 1) {
+            return { ok: true, clienteId: porNomeTel[0].id, clienteNome: porNomeTel[0].nome, clienteAvulso: false };
+        }
+    }
+    if (homonimos.length === 1) {
+        return { ok: true, clienteId: homonimos[0].id, clienteNome: homonimos[0].nome, clienteAvulso: false };
+    }
+    if (homonimos.length > 1) {
+        return {
+            ok: true,
+            clienteId: null,
+            clienteNome: nomeLimpo,
+            clienteAvulso: true,
+            ambiguo: true,
+            candidatos: homonimos
+        };
     }
     var porApelido = _primeiroSeUnico(lista.filter(function (c) {
         var a = nomeClienteChave(apelidoCliente(c));
-        return a && a === nomeClienteChave(nome);
+        return a && a === nomeClienteChave(nomeLimpo);
     }));
     if (porApelido) {
         return { ok: true, clienteId: porApelido.id, clienteNome: porApelido.nome, clienteAvulso: false };
@@ -1054,11 +1122,7 @@ function resolverClienteAtendimento(db, texto) {
     if (porRotulo) {
         return { ok: true, clienteId: porRotulo.id, clienteNome: porRotulo.nome, clienteAvulso: false };
     }
-    var porTel = clienteUnicoPorTelefone(db, nome);
-    if (porTel) {
-        return { ok: true, clienteId: porTel.id, clienteNome: porTel.nome, clienteAvulso: false };
-    }
-    return { ok: true, clienteId: null, clienteNome: nome, clienteAvulso: true };
+    return { ok: true, clienteId: null, clienteNome: nomeLimpo, clienteAvulso: true };
 }
 
 function resolverClienteDoFormularioOs(db) {
@@ -1073,7 +1137,19 @@ function resolverClienteDoFormularioOs(db) {
             return { ok: true, clienteId: c.id, clienteNome: c.nome, clienteAvulso: false };
         }
     }
-    return resolverClienteAtendimento(db, texto);
+    var r = resolverClienteAtendimento(db, texto);
+    if (r && r.ambiguo) {
+        var wa = (document.getElementById('atWaTel') && document.getElementById('atWaTel').value) || '';
+        if (soDigitosTel(wa).length >= 8) {
+            var porWa = (r.candidatos || []).filter(function (x) {
+                return telefonesEquivalentes(telefoneClienteDigitos(x), wa);
+            });
+            if (porWa.length === 1) {
+                return { ok: true, clienteId: porWa[0].id, clienteNome: porWa[0].nome, clienteAvulso: false };
+            }
+        }
+    }
+    return r;
 }
 
 function snapshotClienteCadastro(db, resolvido) {
@@ -1162,11 +1238,19 @@ function atualizarStatusClienteAt() {
     var r = resolverClienteDoFormularioOs(db);
     if (r.ok && !r.clienteAvulso) {
         hid.value = r.clienteId;
-        status.innerHTML = '<span style="color:#8fe0b8;font-weight:700">Cliente cadastrado</span> — dados do cadastro carregados abaixo.';
+        status.innerHTML = '<span style="color:#8fe0b8;font-weight:700">Cliente cadastrado</span> — ' +
+            esc(rotuloClienteComTel(clientePorId(db, r.clienteId) || { nome: r.clienteNome })) +
+            '. Dados do cadastro abaixo.';
         var snap = snapshotClienteCadastro(db, r);
         card.innerHTML = htmlCardClienteOs(snap);
         card.style.display = '';
         if (waTel && snap && snap.telefone) waTel.value = snap.telefone;
+    } else if (r.ambiguo && r.candidatos && r.candidatos.length) {
+        hid.value = '';
+        status.innerHTML = '<span style="color:#ffd36a;font-weight:700">Há ' + r.candidatos.length +
+            ' cadastros com este nome</span> — escolha na lista pelo telefone, senão o orçamento não entra no cadastro certo.';
+        card.style.display = 'none';
+        card.innerHTML = '';
     } else {
         hid.value = '';
         status.innerHTML = '<span style="color:#9fd3ff;font-weight:700">Cliente avulso</span> — informe o WhatsApp abaixo para enviar. Ou escolha o cadastro na lista embaixo.';
@@ -1187,17 +1271,30 @@ function selecionarClienteAtendimento(c) {
     var busca = document.getElementById('atClienteBusca');
     var hid = document.getElementById('atClienteId');
     if (hid) hid.value = String(c.id || '');
-    if (busca) busca.value = c.nome || '';
+    if (busca) busca.value = rotuloClienteComTel(c);
     esconderSugestoesClienteAt();
     atualizarStatusClienteAt();
 }
 
 function selecionarPrimeiraSugestaoClienteAt() {
     var box = document.getElementById('sugestoesClienteAt');
-    var btn = box && !box.hidden ? box.querySelector('[data-cli-id]') : null;
-    if (!btn) return false;
+    var btns = box && !box.hidden ? box.querySelectorAll('[data-cli-id]') : [];
+    if (!btns.length) return false;
     var db = carregar();
-    var c = (db.clientes || []).find(function (x) { return String(x.id) === String(btn.getAttribute('data-cli-id')); });
+    var busca = document.getElementById('atClienteBusca');
+    var chave = nomeClienteChave(nomeDigitadoSemTelefone(busca ? busca.value : ''));
+    if (btns.length > 1 && chave) {
+        var iguais = 0;
+        btns.forEach(function (b) {
+            var x = clientePorId(db, b.getAttribute('data-cli-id'));
+            if (x && nomeClienteChave(x.nome) === chave) iguais++;
+        });
+        if (iguais > 1) {
+            toast('Há mais de um cadastro com este nome. Escolha pelo telefone na lista.');
+            return false;
+        }
+    }
+    var c = clientePorId(db, btns[0].getAttribute('data-cli-id'));
     if (!c) return false;
     selecionarClienteAtendimento(c);
     return true;
@@ -2296,17 +2393,23 @@ function preencherSelectsCliente(db) {
             return a.nome.localeCompare(b.nome, 'pt-BR');
         }).forEach(function (c) {
             var opt = document.createElement('option');
-            opt.value = c.nome;
-            var ape = apelidoCliente(c);
-            if (ape) opt.label = rotuloNomeCliente(c);
+            opt.value = rotuloClienteComTel(c);
+            opt.label = rotuloClienteComTel(c);
             listaCli.appendChild(opt);
-            if (ape && ape.toLowerCase() !== String(c.nome || '').toLowerCase()) {
-                var optApe = document.createElement('option');
-                optApe.value = ape;
-                optApe.label = rotuloNomeCliente(c);
-                listaCli.appendChild(optApe);
-            }
         });
+    }
+    var inpVd = document.getElementById('vdCliente');
+    if (inpVd && !inpVd.getAttribute('data-cli-vd')) {
+        inpVd.setAttribute('data-cli-vd', '1');
+        function syncClienteVendaId() {
+            var hid = document.getElementById('vdClienteId');
+            if (!hid) return;
+            var dbNow = carregar();
+            var rNow = resolverClienteAtendimento(dbNow, inpVd.value);
+            hid.value = (rNow && rNow.ok && !rNow.clienteAvulso && rNow.clienteId) ? rNow.clienteId : '';
+        }
+        inpVd.addEventListener('input', syncClienteVendaId);
+        inpVd.addEventListener('change', syncClienteVendaId);
     }
     preencherListaProdutosVenda(db);
 }
@@ -2420,13 +2523,46 @@ function unirClientesDuplicadosNoDb(db) {
     return unidos;
 }
 
+function vincularDocsAvulsosPorNomeTelefone(db) {
+    if (!db) return 0;
+    var n = 0;
+    function tentar(doc) {
+        if (!doc) return;
+        var nome = doc.clienteNome || doc.cliente || '';
+        if (!nome) return;
+        var cands = clientesComMesmoNome(db, nome);
+        if (!cands.length) return;
+        var tel = telefoneDoDocumentoCliente(doc);
+        var escolhido = null;
+        if (tel) {
+            var porTel = cands.filter(function (c) {
+                return telefonesEquivalentes(telefoneClienteDigitos(c), tel);
+            });
+            if (porTel.length === 1) escolhido = porTel[0];
+        } else if (!doc.clienteId && cands.length === 1) {
+            escolhido = cands[0];
+        }
+        if (!escolhido) return;
+        if (String(doc.clienteId || '') === String(escolhido.id) && doc.clienteNome === escolhido.nome) return;
+        doc.clienteId = escolhido.id;
+        doc.clienteNome = escolhido.nome;
+        doc.clienteAvulso = false;
+        n += 1;
+    }
+    (db.atendimentos || []).forEach(tentar);
+    (db.orcamentos || []).forEach(tentar);
+    (db.pendentes || []).forEach(tentar);
+    return n;
+}
+
 function garantirClientesUnicos(opts) {
     opts = opts || {};
     var db = carregar();
     var n = unirClientesDuplicadosNoDb(db);
-    if (n) {
+    var n2 = vincularDocsAvulsosPorNomeTelefone(db);
+    if (n || n2) {
         salvar(db);
-        if (!opts.silencio) {
+        if (!opts.silencio && n) {
             toast(n === 1
                 ? 'Cadastros iguais (mesmo nome e telefone) foram juntos em um só.'
                 : n + ' cadastros repetidos foram juntos em um só.');
@@ -5982,7 +6118,10 @@ function editarDocumentoVenda(id) {
         var placaInt = document.getElementById('vdPlacaInterno');
         if (placaInt) placaInt.value = o.placa || '';
     } else {
-        document.getElementById('vdCliente').value = o.clienteNome || '';
+        var cVdEd = o.clienteId ? clientePorId(carregar(), o.clienteId) : null;
+        document.getElementById('vdCliente').value = cVdEd ? rotuloClienteComTel(cVdEd) : (o.clienteNome || '');
+        var hidVdEd = document.getElementById('vdClienteId');
+        if (hidVdEd) hidVdEd.value = o.clienteId || '';
         document.getElementById('vdPlaca').value = o.placa || '';
         if (typeof preencherSelectMecanicoVenda === 'function') preencherSelectMecanicoVenda();
         var selM = document.getElementById('vdMecanicoId');
@@ -6985,6 +7124,8 @@ function limparVendaForm() {
     carrinhoVenda = [];
     produtoVendaSelecionado = null;
     document.getElementById('vdCliente').value = '';
+    var hidVdLimpa = document.getElementById('vdClienteId');
+    if (hidVdLimpa) hidVdLimpa.value = '';
     document.getElementById('vdPlaca').value = '';
     var placaInt = document.getElementById('vdPlacaInterno');
     if (placaInt) placaInt.value = '';
@@ -7046,8 +7187,19 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
         clienteNome = func.nome;
         placa = (document.getElementById('vdPlacaInterno').value || '').toUpperCase().trim();
     } else {
-        clienteNome = textoMaiusculoSalvar(document.getElementById('vdCliente').value);
-        resolvido = resolverClienteAtendimento(db, clienteNome);
+        var textoVd = document.getElementById('vdCliente').value;
+        var hidVd = document.getElementById('vdClienteId');
+        var idVd = hidVd ? String(hidVd.value || '').trim() : '';
+        var cVd = idVd ? clientePorId(db, idVd) : null;
+        if (cVd && textoBateComCliente(cVd, textoVd)) {
+            resolvido = { ok: true, clienteId: cVd.id, clienteNome: cVd.nome, clienteAvulso: false };
+            clienteNome = cVd.nome;
+        } else {
+            resolvido = resolverClienteAtendimento(db, textoVd);
+            clienteNome = (resolvido.ok && !resolvido.clienteAvulso)
+                ? resolvido.clienteNome
+                : nomeDigitadoSemTelefone(textoMaiusculoSalvar(textoVd));
+        }
         placa = (document.getElementById('vdPlaca').value || '').toUpperCase().trim();
     }
     var mecanicoId = '';

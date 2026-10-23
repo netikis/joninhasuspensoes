@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=108">
-    <link rel="stylesheet" href="css/tema-m3.css?v=108">
-    <link rel="stylesheet" href="css/telas.css?v=108">
+    <link rel="stylesheet" href="css/app.css?v=109">
+    <link rel="stylesheet" href="css/tema-m3.css?v=109">
+    <link rel="stylesheet" href="css/telas.css?v=109">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -722,7 +722,8 @@
                         <div class="row" style="margin-top:12px" id="wrapVdClienteNormal">
                             <div class="col" style="flex:2">
                                 <label>1. Buscar cliente (ou digite nome avulso)</label>
-                                <input id="vdCliente" class="cad-maiusculo" list="listaClientesVenda" placeholder="Cliente registrado ou avulso..." autocomplete="off">
+                                <input type="hidden" id="vdClienteId" value="">
+                                <input id="vdCliente" class="cad-maiusculo" list="listaClientesVenda" placeholder="Nome ou Nome · telefone (se houver dois iguais)..." autocomplete="off">
                                 <datalist id="listaClientesVenda"></datalist>
                             </div>
                             <div class="col"><label>Placa (opcional)</label><input id="vdPlaca" maxlength="7" style="text-transform:uppercase"></div>
@@ -2185,18 +2186,18 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=108"></script>
-    <script src="js/storage.js?v=108"></script>
-    <script src="js/ui.js?v=108"></script>
-    <script src="js/auth.js?v=108"></script>
-    <script src="js/os.js?v=108"></script>
-    <script src="js/nuvem.js?v=108"></script>
-    <script src="js/caixa.js?v=108"></script>
-    <script src="js/comissoes.js?v=108"></script>
-    <script src="js/app.js?v=108"></script>
-    <script src="js/func-ponto.js?v=108"></script>
-    <script src="js/perfil-cliente.js?v=108"></script>
-    <script src="js/navegacao.js?v=108"></script>
+    <script src="js/config.js?v=109"></script>
+    <script src="js/storage.js?v=109"></script>
+    <script src="js/ui.js?v=109"></script>
+    <script src="js/auth.js?v=109"></script>
+    <script src="js/os.js?v=109"></script>
+    <script src="js/nuvem.js?v=109"></script>
+    <script src="js/caixa.js?v=109"></script>
+    <script src="js/comissoes.js?v=109"></script>
+    <script src="js/app.js?v=109"></script>
+    <script src="js/func-ponto.js?v=109"></script>
+    <script src="js/perfil-cliente.js?v=109"></script>
+    <script src="js/navegacao.js?v=109"></script>
 </body>
 </html>
 
