@@ -8765,20 +8765,70 @@ function enviarWaOrcamentoSalvo(id, vis) {
     abrirWhatsApp(telefoneDoAtendimento(db, a), msg);
 }
 
+function ultimoDiaDoMes(ym) {
+    var p = String(ym || '').split('-');
+    var y = Number(p[0]) || new Date().getFullYear();
+    var m = Number(p[1]) || 1;
+    return new Date(y, m, 0).getDate();
+}
+
+function padDiaRof(n) {
+    n = Number(n) || 1;
+    return (n < 10 ? '0' : '') + n;
+}
+
+function preencherSelectDiasRof() {
+    ['rofDiaDe', 'rofDiaAte'].forEach(function (id) {
+        var s = document.getElementById(id);
+        if (!s || s.options.length) return;
+        for (var i = 1; i <= 31; i++) {
+            s.appendChild(new Option(padDiaRof(i), String(i)));
+        }
+    });
+    var de = document.getElementById('rofDiaDe');
+    var ate = document.getElementById('rofDiaAte');
+    var hoje = hojeISO();
+    if (de && !de.value) de.value = '1';
+    if (ate && !ate.value) ate.value = String(Number(hoje.slice(8, 10)) || 31);
+}
+
+function atualizarCamposPeriodoOficina() {
+    preencherSelectDiasRof();
+    var tipo = (document.getElementById('rofPeriodo') && document.getElementById('rofPeriodo').value) || 'dia';
+    var vis = function (id, on) {
+        var el = document.getElementById(id);
+        if (el) el.hidden = !on;
+    };
+    vis('wrapRofData', false);
+    vis('wrapRofMes', tipo === 'mes_escolhido' || tipo === 'dia_escolhido');
+    vis('wrapRofDiaDe', tipo === 'dia_escolhido');
+    vis('wrapRofDiaAte', tipo === 'dia_escolhido');
+    vis('rofHintDias', tipo === 'dia_escolhido');
+}
+
 function periodoOficina() {
     var tipo = (document.getElementById('rofPeriodo') && document.getElementById('rofPeriodo').value) || 'dia';
     var hoje = hojeISO();
     if (tipo === 'dia') return { inicio: hoje, fim: hoje, label: 'Dia ' + fmtData(hoje) };
     if (tipo === 'dia_escolhido') {
-        var d = document.getElementById('rofData').value || hoje;
-        return { inicio: d, fim: d, label: 'Dia ' + fmtData(d) };
+        var mes = (document.getElementById('rofMes') && document.getElementById('rofMes').value) || hoje.slice(0, 7);
+        var ult = ultimoDiaDoMes(mes);
+        var de = Math.min(ult, Math.max(1, Number(document.getElementById('rofDiaDe') && document.getElementById('rofDiaDe').value) || 1));
+        var ate = Math.min(ult, Math.max(1, Number(document.getElementById('rofDiaAte') && document.getElementById('rofDiaAte').value) || ult));
+        if (ate < de) { var tmp = de; de = ate; ate = tmp; }
+        var inicio = mes + '-' + padDiaRof(de);
+        var fim = mes + '-' + padDiaRof(ate);
+        var label = de === ate
+            ? ('Dia ' + fmtData(inicio))
+            : ('Dias ' + padDiaRof(de) + ' a ' + padDiaRof(ate) + ' · ' + mes);
+        return { inicio: inicio, fim: fim, label: label };
     }
     if (tipo === 'mes') {
         var m = hoje.slice(0, 7);
-        return { inicio: m + '-01', fim: m + '-31', label: 'Mês ' + m };
+        return { inicio: m + '-01', fim: m + '-' + padDiaRof(ultimoDiaDoMes(m)), label: 'Mês ' + m };
     }
-    var mes = (document.getElementById('rofMes') && document.getElementById('rofMes').value) || hoje.slice(0, 7);
-    return { inicio: mes + '-01', fim: mes + '-31', label: 'Mês ' + mes };
+    var mesEsc = (document.getElementById('rofMes') && document.getElementById('rofMes').value) || hoje.slice(0, 7);
+    return { inicio: mesEsc + '-01', fim: mesEsc + '-' + padDiaRof(ultimoDiaDoMes(mesEsc)), label: 'Mês ' + mesEsc };
 }
 
 function dataAtendimentoISO(a) {
@@ -9215,9 +9265,38 @@ function resumoGeralPeriodoOficina(per, r) {
     };
 }
 
+function htmlResumoPorDiaRelatorio(linhas) {
+    var por = {};
+    (linhas || []).forEach(function (l) {
+        var d = String(l.data || '');
+        if (!d) return;
+        if (!por[d]) por[d] = { data: d, q: 0, pecas: 0, ganho: 0, mao: 0, comissao: 0, maoCasa: 0 };
+        var x = por[d];
+        x.q += 1;
+        x.pecas += Number(l.pecas) || 0;
+        x.ganho += Number(l.ganho) || 0;
+        x.mao += Number(l.mao) || 0;
+        x.comissao += Number(l.comissao) || 0;
+        x.maoCasa += Number(l.maoCasa) || 0;
+    });
+    var dias = Object.keys(por).sort();
+    if (dias.length < 2) return '';
+    var html = '<h3 style="margin:14px 0 8px">Resumo por dia</h3>';
+    html += '<table><thead><tr><th>Dia</th><th>Qtd</th><th>Peças</th><th>Lucro peça</th><th>MO</th><th>Comissão</th><th>MO casa</th></tr></thead><tbody>';
+    dias.forEach(function (d) {
+        var x = por[d];
+        html += '<tr><td>' + esc(fmtData(x.data)) + '</td><td>' + x.q + '</td><td>' + moeda(x.pecas) +
+            '</td><td class="ganho-linha">' + moeda(x.ganho) + '</td><td>' + moeda(x.mao) +
+            '</td><td>' + moeda(x.comissao) + '</td><td>' + moeda(x.maoCasa) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+}
+
 function renderRelatorioOficina() {
     var panel = document.getElementById('painelRelatorioOficina');
     if (!panel) return;
+    if (typeof atualizarCamposPeriodoOficina === 'function') atualizarCamposPeriodoOficina();
     var per = periodoOficina();
     var r = calcularRelatorioOficina(per);
     var g = resumoGeralPeriodoOficina(per, r);
@@ -9239,9 +9318,11 @@ function renderRelatorioOficina() {
     var html = '<p><strong>' + esc(per.label) + '</strong> · apenas documentos <strong>PAGO</strong></p>';
     html += '<p class="hint">Lucro peças <strong class="ganho-linha">' + moeda(r.ganho) + '</strong> + MO casa <strong>' + moeda(r.maoCasa) + '</strong> − despesas <strong>' + moeda(r.despesas) + '</strong> = <strong>' + moeda(r.resultado) + '</strong> · Comissão funcionários (fora do lucro da casa): <strong>' + moeda(r.comissao) + '</strong></p>';
     html += '<p class="hint">Data de cada linha = pagamento no caixa (quando existir). Inclui OS e vendas do balcão.</p>';
+    html += htmlResumoPorDiaRelatorio(r.linhas);
     if (!r.linhas.length) {
         html += '<div class="empty">Nenhuma OS/venda paga no período.</div>';
     } else {
+        html += '<h3 style="margin:14px 0 8px">Detalhe de cada OS / venda</h3>';
         html += '<table><thead><tr><th>Data pgto</th><th>Tipo</th><th>Cliente</th><th>Placa</th><th>Peças</th><th>Lucro peça</th><th>MO</th><th>Comissão</th><th>MO casa</th></tr></thead><tbody>';
         html += r.linhas.map(function (l) {
             var tipo = l.origem === 'VENDA'
@@ -9590,11 +9671,23 @@ function imprimirRelatorioOficina() {
         }
     });
     var rofP = document.getElementById('rofPeriodo');
-    if (rofP) rofP.addEventListener('change', renderRelatorioOficina);
+    if (rofP) rofP.addEventListener('change', function () {
+        atualizarCamposPeriodoOficina();
+        renderRelatorioOficina();
+    });
     var rofD = document.getElementById('rofData');
     if (rofD) { if (!rofD.value) rofD.value = hojeISO(); }
     var rofM = document.getElementById('rofMes');
-    if (rofM) { if (!rofM.value) rofM.value = hojeISO().slice(0, 7); }
+    if (rofM) {
+        if (!rofM.value) rofM.value = hojeISO().slice(0, 7);
+        rofM.addEventListener('change', renderRelatorioOficina);
+    }
+    preencherSelectDiasRof();
+    ['rofDiaDe', 'rofDiaAte'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', renderRelatorioOficina);
+    });
+    atualizarCamposPeriodoOficina();
     document.addEventListener('click', function (ev) {
         var t = ev.target;
         if (!t || !t.getAttribute) return;

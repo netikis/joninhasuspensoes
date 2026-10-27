@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=118">
-    <link rel="stylesheet" href="css/tema-m3.css?v=118">
-    <link rel="stylesheet" href="css/telas.css?v=118">
+    <link rel="stylesheet" href="css/app.css?v=119">
+    <link rel="stylesheet" href="css/tema-m3.css?v=119">
+    <link rel="stylesheet" href="css/telas.css?v=119">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -1315,18 +1315,31 @@
                     <div class="col"><label>Período</label>
                         <select id="rofPeriodo">
                             <option value="dia">Dia de hoje</option>
-                            <option value="dia_escolhido">Dia escolhido</option>
+                            <option value="dia_escolhido">Dias escolhidos (01 a 31)</option>
                             <option value="mes">Mês atual</option>
                             <option value="mes_escolhido">Mês escolhido</option>
                         </select>
                     </div>
-                    <div class="col"><label>Data (dia)</label><input type="date" id="rofData"></div>
-                    <div class="col"><label>Mês</label><input type="month" id="rofMes"></div>
+                    <div class="col" id="wrapRofData" hidden>
+                        <label>Data (dia)</label><input type="date" id="rofData">
+                    </div>
+                    <div class="col" id="wrapRofMes" hidden>
+                        <label>Mês</label><input type="month" id="rofMes">
+                    </div>
+                    <div class="col" id="wrapRofDiaDe" hidden>
+                        <label>Do dia</label>
+                        <select id="rofDiaDe"></select>
+                    </div>
+                    <div class="col" id="wrapRofDiaAte" hidden>
+                        <label>Até o dia</label>
+                        <select id="rofDiaAte"></select>
+                    </div>
                     <div class="col" style="align-self:end">
                         <button type="button" class="btn btn-secondary" id="btnRofAtualizar">🔄 Atualizar</button>
                         <button type="button" class="btn btn-pdf" id="btnRofPdf">🖨️ Imprimir / PDF</button>
                     </div>
                 </div>
+                <p class="hint" id="rofHintDias" hidden>Escolha o <strong>mês</strong> e os dias de <strong>01 a 31</strong>. Ex.: do <strong>01 ao 05</strong> puxa tudo pago nesses dias, com resumo por dia e o detalhe de cada OS/venda.</p>
             </div>
             <div class="cards cards-oficina" style="margin-bottom:14px">
                 <button type="button" class="card card-atalho" data-rof-ir="pecas" title="Ver peças no detalhe" style="background:#34495e">
@@ -2213,18 +2226,18 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=118"></script>
-    <script src="js/storage.js?v=118"></script>
-    <script src="js/ui.js?v=118"></script>
-    <script src="js/auth.js?v=118"></script>
-    <script src="js/os.js?v=118"></script>
-    <script src="js/nuvem.js?v=118"></script>
-    <script src="js/caixa.js?v=118"></script>
-    <script src="js/comissoes.js?v=118"></script>
-    <script src="js/app.js?v=118"></script>
-    <script src="js/func-ponto.js?v=118"></script>
-    <script src="js/perfil-cliente.js?v=118"></script>
-    <script src="js/navegacao.js?v=118"></script>
+    <script src="js/config.js?v=119"></script>
+    <script src="js/storage.js?v=119"></script>
+    <script src="js/ui.js?v=119"></script>
+    <script src="js/auth.js?v=119"></script>
+    <script src="js/os.js?v=119"></script>
+    <script src="js/nuvem.js?v=119"></script>
+    <script src="js/caixa.js?v=119"></script>
+    <script src="js/comissoes.js?v=119"></script>
+    <script src="js/app.js?v=119"></script>
+    <script src="js/func-ponto.js?v=119"></script>
+    <script src="js/perfil-cliente.js?v=119"></script>
+    <script src="js/navegacao.js?v=119"></script>
 </body>
 </html>
 

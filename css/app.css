@@ -1181,6 +1181,7 @@
         }
 
         .col { flex: 1; min-width: 140px; }
+        #painelRelatorioOficina [hidden] { display: none !important; }
 
         label {
             display: block;
