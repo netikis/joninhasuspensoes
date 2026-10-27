@@ -9374,6 +9374,7 @@ function renderRelatorioOficina() {
     document.getElementById('rofMaoLiq').textContent = moeda(r.maoCasa);
     document.getElementById('rofDespesas').textContent = moeda(r.despesas);
     document.getElementById('rofResultado').textContent = moeda(r.resultado);
+    setG('rofTotalCaixa', moeda(g.entradas));
     var qPago = r.linhas.filter(function (l) { return l.pago; }).length;
     var qAberto = r.linhas.length - qPago;
     var html = '<p><strong>' + esc(per.label) + '</strong> · serviço realizado na data da OS/venda · ' +
@@ -9443,6 +9444,15 @@ function irDestinoRelatorioOficina(tipo) {
         else abrirPainel('painelCaixa');
         return;
     }
+    if (tipo === 'caixa') {
+        var boxEnt = document.querySelector('#painelRelatorioOficina .rof-resumo-geral') || document.getElementById('rofGerEntradas');
+        if (boxEnt) {
+            boxEnt.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            boxEnt.classList.add('cx-atalho-foco');
+            setTimeout(function () { boxEnt.classList.remove('cx-atalho-foco'); }, 1800);
+        }
+        return;
+    }
     focarDetalheRelatorioOficina();
 }
 window.irDestinoRelatorioOficina = irDestinoRelatorioOficina;
@@ -9467,13 +9477,14 @@ function imprimirRelatorioOficina() {
     var html = '<html><head><title>Lucro da casa — ' + esc(per.label) + '</title><style>body{font-family:Segoe UI,sans-serif;padding:20px;color:#111} table{width:100%;border-collapse:collapse;margin-top:12px} th,td{border:1px solid #ccc;padding:6px;font-size:12px;text-align:left} h1{font-size:18px;margin:0 0 8px} .k{color:#444}</style></head><body>';
     html += '<h1>' + esc(emp.nome || 'Joninha Suspensões') + '</h1>';
     html += '<p class="k">Lucro da casa — ' + esc(per.label) + ' · gerado em ' + esc(new Date().toLocaleString('pt-BR')) + '</p>';
+    var g = resumoGeralPeriodoOficina(per, r);
     html += '<p><b>Lucro peças:</b> ' + moeda(r.ganho) +
         ' &nbsp;|&nbsp; <b>MO bruta:</b> ' + moeda(r.mao) +
         ' &nbsp;|&nbsp; <b>Comissão:</b> ' + moeda(r.comissao) +
         ' &nbsp;|&nbsp; <b>MO casa:</b> ' + moeda(r.maoCasa) +
         ' &nbsp;|&nbsp; <b>Despesas:</b> ' + moeda(r.despesas) +
-        ' &nbsp;|&nbsp; <b>Lucro (casa):</b> ' + moeda(r.resultado) + '</p>';
-    var g = resumoGeralPeriodoOficina(per, r);
+        ' &nbsp;|&nbsp; <b>Lucro (casa):</b> ' + moeda(r.resultado) +
+        ' &nbsp;|&nbsp; <b>Total de tudo (caixa):</b> ' + moeda(g.entradas) + '</p>';
     html += '<p><b>Resumo geral:</b> Entradas ' + moeda(g.entradas) +
         ' &nbsp;|&nbsp; Saídas ' + moeda(g.saidas) +
         ' &nbsp;|&nbsp; Contas a receber ' + moeda(g.pendentes) +
