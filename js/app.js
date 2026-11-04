@@ -1781,49 +1781,41 @@ function atualizarKPIs(db) {
     var cfg = db.caixaConfig || { inicialBalcao: 0, inicialBanco: 0 };
     var hojeKpi = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
     var iniMesKpi = hojeKpi.slice(0, 7) + '-01';
+    var mesKpi = (typeof totaisMesCorrentePainel === 'function') ? totaisMesCorrentePainel(db) : null;
     var somarMes = (typeof somarListaPeriodo === 'function')
         ? function (lista, tipo) { return somarListaPeriodo(lista, tipo, iniMesKpi, hojeKpi); }
         : function (lista, tipo) {
             return (lista || []).filter(function (x) { return x && x.tipo === tipo; })
                 .reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
         };
-    var entradas = somarMes(db.caixa, 'entrada');
-    var saidas = somarMes(db.caixa, 'saida');
-    var entBanco = somarMes(db.caixaBanco, 'entrada');
-    var saiBanco = somarMes(db.caixaBanco, 'saida');
+    var entradas = mesKpi ? mesKpi.entradas : (somarMes(db.caixa, 'entrada') + somarMes(db.caixaBanco, 'entrada'));
+    var saidas = mesKpi ? mesKpi.saidas : (somarMes(db.caixa, 'saida') + somarMes(db.caixaBanco, 'saida'));
     var painelKpi = (typeof totaisPainelCaixa === 'function') ? totaisPainelCaixa(db) : null;
     var pendOcultas = (painelKpi && painelKpi.cfg && painelKpi.cfg.pendOcultasPainel) || {};
     var pendentes = (db.pendentes || []).filter(function (p) { return p.status !== 'pago' && !pendOcultas[p.id]; });
     var totPend = pendentes.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
-    if (painelKpi) {
-        setTxt('kpiInicioEntradas', moeda(painelKpi.balcao.entradas + painelKpi.banco.entradas));
-        setTxt('kpiInicioSaidas', moeda(painelKpi.balcao.saidas + painelKpi.banco.saidas));
-        var corteKpi = String((painelKpi.cfg && (painelKpi.cfg.zeradoEm || painelKpi.cfg.fechadoEm)) || '');
-        setTxt('kpiInicioDesde', /^\d{4}-\d{2}-\d{2}/.test(corteKpi)
-            ? 'Contando desde o último fechamento (' + fmtData(corteKpi.slice(0, 10)) + '). Ao fechar, os cards zeram.'
-            : 'Contando desde o início (ainda não houve fechamento). Ao fechar, os cards zeram.');
-    } else {
-        setTxt('kpiInicioEntradas', moeda(entradas + entBanco));
-        setTxt('kpiInicioSaidas', moeda(saidas + saiBanco));
+    setTxt('kpiInicioEntradas', moeda(entradas));
+    setTxt('kpiInicioSaidas', moeda(saidas));
+    var mesNomeKpi = (typeof rotuloMesYm === 'function') ? rotuloMesYm(hojeKpi.slice(0, 7)) : hojeKpi.slice(0, 7);
+    var txtDesde = 'Entradas e saídas de ' + mesNomeKpi + ' (dia 01 até hoje). Saldo em caixa: dinheiro real.';
+    if (mesKpi && mesKpi.sangrias > 0) {
+        txtDesde += ' Sangria deste mês: ' + moeda(mesKpi.sangrias) + '.';
     }
+    setTxt('kpiInicioDesde', txtDesde);
     setTxt('kpiInicioPendentes', moeda(totPend));
     setTxt('kpiInicioQtdPend', pendentes.length);
     if (painelKpi) {
         setTxt('kpiCaixa', moeda(painelKpi.balcao.saldo + painelKpi.banco.saldo));
     } else {
-        setTxt('kpiCaixa', moeda((Number(cfg.inicialBalcao) || 0) + entradas + (Number(cfg.inicialBanco) || 0) + entBanco - saidas - saiBanco));
+        setTxt('kpiCaixa', moeda((Number(cfg.inicialBalcao) || 0) + (Number(cfg.inicialBanco) || 0) + entradas - saidas));
     }
     if (typeof calcularRelatorioOficina === 'function') {
-        var hojePainel = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
-        var ofPainel = calcularRelatorioOficina({ inicio: '2000-01-01', fim: hojePainel, label: 'tudo' });
+        var ofPainel = calcularRelatorioOficina({ inicio: iniMesKpi, fim: hojeKpi, label: hojeKpi.slice(0, 7) });
         var ganhoNosso = (Number(ofPainel.ganho) || 0) + (Number(ofPainel.mao) || 0);
         var custoPecas = Number(ofPainel.custoPecas);
         if (!(custoPecas > 0)) {
             custoPecas = Math.max(0, (Number(ofPainel.pecas) || 0) - (Number(ofPainel.ganho) || 0));
         }
-        var cfgKpi = (painelKpi && painelKpi.cfg) || {};
-        ganhoNosso = Math.max(0, ganhoNosso - (Number(cfgKpi.basePainelGanho) || 0));
-        custoPecas = Math.max(0, custoPecas - (Number(cfgKpi.basePainelCusto) || 0));
         setTxt('kpiInicioGanho', moeda(ganhoNosso));
         setTxt('kpiInicioCusto', moeda(custoPecas));
     }
@@ -5154,6 +5146,8 @@ function abrirModalReceberOs(atendimentoId) {
     if (elDtPag) elDtPag.value = hojeISO();
     var elDtSai = document.getElementById('recOsDataSaida');
     if (elDtSai) elDtSai.value = dataISODia(a.saida) || hojeISO();
+    var elMesAnt = document.getElementById('recOsMesAnterior');
+    if (elMesAnt) elMesAnt.checked = false;
     var nome = nomeAtendimento(info.db, a);
     document.getElementById('receberOsResumo').innerHTML =
         '<strong>' + esc(nome) + '</strong> — ' + esc(a.carro || '—') +
@@ -5217,6 +5211,13 @@ function confirmarRecebimentoOs() {
     var dataPag = dataISODia(document.getElementById('recOsDataPag') && document.getElementById('recOsDataPag').value) || hojeISO();
     var dataSaida = dataISODia(document.getElementById('recOsDataSaida') && document.getElementById('recOsDataSaida').value) ||
         dataISODia(a.saida) || hojeISO();
+    var mesAnt = !!(document.getElementById('recOsMesAnterior') && document.getElementById('recOsMesAnterior').checked);
+    if (mesAnt) {
+        var dAnt = (typeof ultimoDiaMesAnteriorISO === 'function') ? ultimoDiaMesAnteriorISO(hojeISO()) : dataPag;
+        var ymHoje = hojeISO().slice(0, 7);
+        if (!dataPag || dataPag.slice(0, 7) >= ymHoje) dataPag = dAnt;
+        if (!dataSaida || dataSaida.slice(0, 7) >= ymHoje) dataSaida = dAnt;
+    }
     var pagIso = isoComDataLocal(dataPag);
     var recs = (a.recebimentos || []).slice();
     tot.splits.forEach(function (r) {
@@ -5279,6 +5280,8 @@ function confirmarRecebimentoOs() {
                 saida: dataSaida
             },
             pagoEm: dataPag,
+            data: dataSaida,
+            competenciaMesAnterior: mesAnt || dataSaida.slice(0, 7) < hojeISO().slice(0, 7),
             criadoEm: isoComDataLocal(dataSaida)
         };
         if (formaPagamentoEhDigital(r.forma)) {
@@ -5300,7 +5303,7 @@ function confirmarRecebimentoOs() {
             id: uid(),
             cliente: nome,
             clienteId: a.clienteId || null,
-            descricao: 'OS ' + placa + (nome && nome !== '—' ? ' · ' + nome : '') + ' — saldo em aberto',
+            descricao: 'OS ' + placa,
             valor: +tot.aberto.toFixed(2),
             vencimento: venc,
             status: 'aberto',
@@ -5572,6 +5575,24 @@ document.getElementById('modalReceberOs').addEventListener('click', function (e)
 });
 var btnRecOsOk = document.getElementById('btnReceberOsConfirmar');
 if (btnRecOsOk) btnRecOsOk.addEventListener('click', confirmarRecebimentoOs);
+(function ligarRecOsMesAnterior() {
+    var ck = document.getElementById('recOsMesAnterior');
+    if (!ck || ck._ligado) return;
+    ck._ligado = true;
+    ck.addEventListener('change', function () {
+        var dAnt = (typeof ultimoDiaMesAnteriorISO === 'function') ? ultimoDiaMesAnteriorISO() : '';
+        var hoje = (typeof hojeISO === 'function') ? hojeISO() : '';
+        var elPag = document.getElementById('recOsDataPag');
+        var elSai = document.getElementById('recOsDataSaida');
+        if (ck.checked) {
+            if (elPag && dAnt) elPag.value = dAnt;
+            if (elSai && dAnt) elSai.value = dAnt;
+        } else {
+            if (elPag && hoje) elPag.value = hoje;
+            if (elSai && hoje) elSai.value = hoje;
+        }
+    });
+})();
 ['recOsDescReais', 'recOsDescPerc', 'recOsDinheiro', 'recOsPix', 'recOsDebito', 'recOsCredito', 'recOsBoleto', 'recOsBoletoDias'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.addEventListener('input', calcRecOsTotais);

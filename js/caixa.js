@@ -201,6 +201,71 @@ function somarListaPeriodo(lista, tipo, ini, fim) {
     }).reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
 }
 
+function lancamentoEhSangria(x) {
+    if (!x) return false;
+    if (x.sangria === true || String(x.categoria || '') === 'sangria') return true;
+    return /^sangria\b/i.test(String(x.descricao || ''));
+}
+
+function dataCaixaISO(x) {
+    return String((x && (x.data || x.criadoEm || x.pagoEm)) || '').slice(0, 10);
+}
+
+function periodoMesCorrente() {
+    var hoje = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
+    return { inicio: hoje.slice(0, 7) + '-01', fim: hoje, ym: hoje.slice(0, 7) };
+}
+
+function ultimoDiaMesAnteriorISO(hoje) {
+    var dIso = (typeof dataISODia === 'function' ? dataISODia(hoje) : '') ||
+        ((typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10));
+    var d = new Date(dIso.slice(0, 10) + 'T12:00:00');
+    d.setDate(0);
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1);
+    if (m.length < 2) m = '0' + m;
+    var day = String(d.getDate());
+    if (day.length < 2) day = '0' + day;
+    return y + '-' + m + '-' + day;
+}
+
+function somarListaPeriodoFiltro(lista, tipo, ini, fim, pred) {
+    return (lista || []).filter(function (x) {
+        if (!x || x.tipo !== tipo) return false;
+        var d = dataCaixaISO(x);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+        if (ini && d < ini) return false;
+        if (fim && d > fim) return false;
+        if (pred && !pred(x)) return false;
+        return true;
+    }).reduce(function (s, x) { return s + (Number(x.valor) || 0); }, 0);
+}
+
+function totaisMesCorrentePainel(db) {
+    db = db || ((typeof carregarMain === 'function') ? carregarMain() : carregar());
+    var per = periodoMesCorrente();
+    function soma(lista, tipo, pred) {
+        return somarListaPeriodoFiltro(lista, tipo, per.inicio, per.fim, pred);
+    }
+    var naoSangria = function (x) { return !lancamentoEhSangria(x); };
+    var soSangria = function (x) { return lancamentoEhSangria(x); };
+    var entradasBrutas = soma(db.caixa, 'entrada') + soma(db.caixaBanco, 'entrada');
+    var saidas = soma(db.caixa, 'saida', naoSangria) + soma(db.caixaBanco, 'saida', naoSangria);
+    var sangrias = soma(db.caixa, 'saida', soSangria) + soma(db.caixaBanco, 'saida', soSangria);
+    return {
+        inicio: per.inicio,
+        fim: per.fim,
+        ym: per.ym,
+        entradasBrutas: entradasBrutas,
+        sangrias: sangrias,
+        entradas: Math.max(0, +(entradasBrutas - sangrias).toFixed(2)),
+        saidas: saidas
+    };
+}
+window.totaisMesCorrentePainel = totaisMesCorrentePainel;
+window.ultimoDiaMesAnteriorISO = ultimoDiaMesAnteriorISO;
+window.lancamentoEhSangria = lancamentoEhSangria;
+
 function totaisPainelLista(lista, baseEnt, baseSai, inicial) {
     var brutasE = somarLista(lista, 'entrada');
     var brutasS = somarLista(lista, 'saida');
@@ -629,6 +694,108 @@ document.getElementById('btnCxFocoEntrada').addEventListener('click', function (
 document.getElementById('btnCxFocoDespesa').addEventListener('click', function () {
     lancarBalcaoRapido('saida');
 });
+
+function fecharModalSangriaCaixa() {
+    var m = document.getElementById('modalSangriaCaixa');
+    if (m) m.classList.remove('aberto');
+}
+
+function atualizarPreviaSangria() {
+    var el = document.getElementById('sgPrevia');
+    if (!el) return;
+    var valor = (typeof parseMoeda === 'function')
+        ? parseMoeda(document.getElementById('sgValor') && document.getElementById('sgValor').value)
+        : Number(String((document.getElementById('sgValor') && document.getElementById('sgValor').value) || '').replace(',', '.')) || 0;
+    var mes = totaisMesCorrentePainel();
+    if (!(valor > 0)) {
+        el.innerHTML = 'Entradas deste mês agora: <strong>' + moeda(mes.entradas) + '</strong>' +
+            (mes.sangrias > 0 ? ' (já tem sangria de ' + moeda(mes.sangrias) + ')' : '') + '.';
+        return;
+    }
+    el.innerHTML = 'Entradas deste mês: <strong>' + moeda(mes.entradas) + '</strong> → depois da sangria: <strong>' +
+        moeda(Math.max(0, mes.entradas - valor)) + '</strong>. O saldo em caixa desce ' + moeda(valor) +
+        ' (bate com o dinheiro que saiu da gaveta).';
+}
+
+function abrirModalSangriaCaixa() {
+    var m = document.getElementById('modalSangriaCaixa');
+    if (!m) return;
+    var elV = document.getElementById('sgValor');
+    var elD = document.getElementById('sgData');
+    var elO = document.getElementById('sgObs');
+    var elDest = document.getElementById('sgDestino');
+    if (elV) elV.value = '';
+    if (elD) elD.value = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
+    if (elO) elO.value = 'Recebimento de OS do mês passado';
+    if (elDest) elDest.value = 'balcao';
+    atualizarPreviaSangria();
+    m.classList.add('aberto');
+    if (elV) elV.focus();
+}
+
+function confirmarSangriaCaixa() {
+    var valor = (typeof parseMoeda === 'function')
+        ? parseMoeda(document.getElementById('sgValor') && document.getElementById('sgValor').value)
+        : Number(String((document.getElementById('sgValor') && document.getElementById('sgValor').value) || '').replace(',', '.')) || 0;
+    if (!(valor > 0)) {
+        toast('Informe o valor da sangria.');
+        return;
+    }
+    var destino = (document.getElementById('sgDestino') && document.getElementById('sgDestino').value) || 'balcao';
+    var data = (typeof dataISODia === 'function'
+        ? dataISODia(document.getElementById('sgData') && document.getElementById('sgData').value)
+        : '') || ((typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10));
+    var obs = String((document.getElementById('sgObs') && document.getElementById('sgObs').value) || '').trim() ||
+        'Recebimento de OS do mês passado';
+    if (!confirm(
+        'Confirmar sangria de ' + moeda(valor) + '?\n\n' +
+        'Sai do ' + (destino === 'banco' ? 'banco' : 'balcão') + ' em ' + (typeof fmtData === 'function' ? fmtData(data) : data) + '.\n' +
+        'Esse valor deixa de contar nas Entradas deste mês.'
+    )) return;
+    var db = (typeof carregarMain === 'function') ? carregarMain() : carregar();
+    var lanc = {
+        id: uid(),
+        tipo: 'saida',
+        categoria: 'sangria',
+        sangria: true,
+        descricao: 'Sangria — ' + obs,
+        valor: +Number(valor).toFixed(2),
+        forma: destino === 'banco' ? 'PIX' : 'Dinheiro',
+        conta: destino,
+        data: data,
+        criadoEm: (typeof isoComDataLocal === 'function') ? isoComDataLocal(data) : (data + 'T12:00:00.000')
+    };
+    if (destino === 'banco') {
+        if (!db.caixaBanco) db.caixaBanco = [];
+        db.caixaBanco.push(lanc);
+    } else {
+        if (!db.caixa) db.caixa = [];
+        db.caixa.push(lanc);
+    }
+    if (typeof salvarMain === 'function') salvarMain(db);
+    else salvar(db);
+    if (typeof agendarSyncAutomatico === 'function') agendarSyncAutomatico('salvar');
+    fecharModalSangriaCaixa();
+    toast('Sangria de ' + moeda(valor) + ' lançada.');
+    if (typeof renderCaixa === 'function') renderCaixa();
+    if (typeof renderCaixaBanco === 'function') renderCaixaBanco();
+    if (typeof atualizarKPIs === 'function') atualizarKPIs(typeof carregarMain === 'function' ? carregarMain() : db);
+}
+window.abrirModalSangriaCaixa = abrirModalSangriaCaixa;
+
+(function ligarSangriaCaixa() {
+    var m = document.getElementById('modalSangriaCaixa');
+    if (!m) return;
+    m.addEventListener('click', function (e) { if (e.target === m) fecharModalSangriaCaixa(); });
+    var bI = document.getElementById('btnInicioSangria');
+    if (bI) bI.addEventListener('click', abrirModalSangriaCaixa);
+    var bC = document.getElementById('btnSgCancelar');
+    if (bC) bC.addEventListener('click', fecharModalSangriaCaixa);
+    var bOk = document.getElementById('btnSgConfirmar');
+    if (bOk) bOk.addEventListener('click', confirmarSangriaCaixa);
+    var elV = document.getElementById('sgValor');
+    if (elV) elV.addEventListener('input', atualizarPreviaSangria);
+})();
 
 document.getElementById('btnZerarCaixa').addEventListener('click', zerarPainelCaixa);
 document.getElementById('btnSincronizarPainelCaixa').addEventListener('click', sincronizarPainelCaixa);
@@ -1511,6 +1678,16 @@ function receberPendente(id, destino) {
     var i = (db.pendentes || []).findIndex(function (p) { return p.id === id; });
     if (i < 0) return;
     var p = db.pendentes[i];
+    var hoje = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
+    var dAnt = (typeof ultimoDiaMesAnteriorISO === 'function') ? ultimoDiaMesAnteriorISO(hoje) : hoje;
+    var ymd = prompt(
+        'Data que este valor entra no caixa (define o mês).\n\n' +
+        'Se for OS do MÊS PASSADO, use ' + dAnt + ' — assim não soma nas Entradas deste mês.',
+        hoje
+    );
+    if (ymd == null) return;
+    ymd = (typeof dataISODia === 'function' ? dataISODia(ymd) : String(ymd || '').slice(0, 10)) || hoje;
+    var isoLanc = (typeof isoComDataLocal === 'function') ? isoComDataLocal(ymd) : (ymd + 'T12:00:00.000');
     var lanc = {
         id: uid(),
         tipo: 'entrada',
@@ -1521,7 +1698,10 @@ function receberPendente(id, destino) {
         pendenteId: p.id,
         vendaId: p.vendaId || '',
         atendimentoId: p.atendimentoId || '',
-        criadoEm: new Date().toISOString()
+        pagoEm: ymd,
+        data: ymd,
+        competenciaMesAnterior: ymd.slice(0, 7) < hoje.slice(0, 7),
+        criadoEm: isoLanc
     };
     if (destino === 'banco') {
         if (!db.caixaBanco) db.caixaBanco = [];
@@ -1539,7 +1719,7 @@ function receberPendente(id, destino) {
             o.saldoAberto = Math.max(0, +(tot - rec).toFixed(2));
             o.statusPagamento = o.saldoAberto < 0.01 ? 'PAGO' : 'PARCIAL';
             if (!o.recebimentos) o.recebimentos = [];
-            o.recebimentos.push({ forma: lanc.forma, valor: lanc.valor, em: lanc.criadoEm });
+            o.recebimentos.push({ forma: lanc.forma, valor: lanc.valor, em: isoLanc });
             o.atualizadoEm = new Date().toISOString();
         }
     }
@@ -1552,13 +1732,14 @@ function receberPendente(id, destino) {
             os.saldoAberto = Math.max(0, +(totOs - recOs).toFixed(2));
             os.statusPagamento = os.saldoAberto < 0.01 ? 'PAGO' : 'PARCIAL';
             if (!os.recebimentos) os.recebimentos = [];
-            os.recebimentos.push({ forma: lanc.forma, valor: lanc.valor, em: lanc.criadoEm });
+            os.recebimentos.push({ forma: lanc.forma, valor: lanc.valor, em: isoLanc });
             os.formaPagamento = (os.formaPagamento ? os.formaPagamento + ' + ' : '') + lanc.forma;
             os.atualizadoEm = new Date().toISOString();
             if (os.statusPagamento === 'PAGO' && (os.status || '') !== 'Entregue') {
                 os.status = 'Entregue';
-                if (!os.saida) os.saida = (typeof hojeISO === 'function') ? hojeISO() : new Date().toISOString().slice(0, 10);
+                if (!os.saida) os.saida = ymd;
             }
+            os.recebidoEm = isoLanc;
         }
     }
     if (canalVendas !== 'interno') marcarExcluido(db, 'pendentes', p.id);
@@ -1641,9 +1822,18 @@ function renderPendentes() {
             var placaPend = (osPend && osPend.placa)
                 ? String(osPend.placa).toUpperCase()
                 : (typeof placaDeTextoLivre === 'function' ? placaDeTextoLivre(descExibir) : '');
-            var nomePend = p.cliente || '';
             if (!descExibir || /^OS\b/i.test(descExibir) || /saldo em aberto/i.test(descExibir)) {
-                descExibir = 'OS ' + (placaPend || 'sem placa') + (nomePend ? ' · ' + nomePend : '') + ' — saldo em aberto';
+                descExibir = 'OS ' + (placaPend || 'sem placa');
+            } else {
+                descExibir = String(descExibir)
+                    .replace(/\s*[·\-–—]\s*.*?saldo em aberto/i, '')
+                    .replace(/\s*—\s*saldo em aberto/i, '')
+                    .trim();
+                var nomeCli = String(p.cliente || '').trim();
+                if (nomeCli) {
+                    var reNome = new RegExp('\\s*[·\\-]\\s*' + nomeCli.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+                    descExibir = descExibir.replace(reNome, '').trim();
+                }
             }
         }
         var acoesDoc = p.vendaId

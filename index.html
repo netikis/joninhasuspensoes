@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=121">
-    <link rel="stylesheet" href="css/tema-m3.css?v=121">
-    <link rel="stylesheet" href="css/telas.css?v=121">
+    <link rel="stylesheet" href="css/app.css?v=122">
+    <link rel="stylesheet" href="css/tema-m3.css?v=122">
+    <link rel="stylesheet" href="css/telas.css?v=122">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -207,12 +207,12 @@
                 <button type="button" class="card card-atalho card-ent" data-relatorio-servicos="entradas" title="Ver relatório dos serviços e vendas">
                     <div class="k">Entradas</div>
                     <div class="v" id="kpiInicioEntradas">R$ 0</div>
-                    <div class="card-sub">OS e venda pagas · clique para ver</div>
+                    <div class="card-sub">Deste mês (dia 01 até hoje)</div>
                 </button>
                 <button type="button" class="card card-atalho card-sai" data-atalho-pasta="saidas" title="Abrir pasta de saídas">
                     <div class="k">Saídas</div>
                     <div class="v" id="kpiInicioSaidas">R$ 0</div>
-                    <div class="card-sub">Clique para entrar na pasta</div>
+                    <div class="card-sub">Despesas deste mês · clique para ver</div>
                 </button>
                 <button type="button" class="card card-atalho card-pen" data-atalho-pasta="pendentes" title="Abrir pasta de contas a receber">
                     <div class="k">Contas a receber</div>
@@ -226,7 +226,8 @@
                 </button>
             </div>
             <div class="inicio-fech-bar">
-                <p class="hint" id="kpiInicioDesde">Contando desde o último fechamento.</p>
+                <p class="hint" id="kpiInicioDesde">Entradas e saídas: dia 01 deste mês até hoje. Saldo em caixa: dinheiro real.</p>
+                <button type="button" class="btn btn-danger" id="btnInicioSangria">💸 Sangria do caixa</button>
                 <button type="button" class="btn btn-ok" id="btnInicioFecharCaixa">🔒 Fechar caixa e zerar</button>
                 <button type="button" class="btn btn-secondary" id="btnInicioFecharPeriodo">📅 Fechar por período</button>
             </div>
@@ -234,12 +235,12 @@
                 <button type="button" class="card card-atalho card-ent" data-goto="painelRelatorioOficina" title="Ganho da casa: mão de obra + lucro em peças (OS e venda juntas)">
                     <div class="k">Ganho nosso</div>
                     <div class="v" id="kpiInicioGanho">R$ 0</div>
-                    <div class="card-sub">MO + lucro em peças · OS e venda</div>
+                    <div class="card-sub">Deste mês · MO + lucro em peças</div>
                 </button>
                 <button type="button" class="card card-atalho card-sai" data-goto="painelRelatorioOficina" title="Custo das peças (despesa da oficina)">
                     <div class="k">Despesa (custo peças)</div>
                     <div class="v" id="kpiInicioCusto">R$ 0</div>
-                    <div class="card-sub">O que saiu no custo das peças</div>
+                    <div class="card-sub">Custo das peças deste mês</div>
                 </button>
             </div>
             <div class="cards">
@@ -1155,7 +1156,7 @@
         <section id="painelPendentes" class="panel">
             <div class="box">
                 <h2>Contas a Receber (Pendentes)</h2>
-                <p class="hint">OS em aberto: use <strong>Receber OS</strong>. Conta avulsa: Balcão ou Banco. No vencimento, clique em <strong>Editar</strong> e coloque o dia que o cliente combinou pagar — no Início o sistema alerta nessa data. Ao receber, o valor some daqui e entra no caixa.</p>
+                <p class="hint">OS em aberto: use <strong>Receber OS</strong>. Se o valor for de <strong>mês passado</strong>, marque isso na baixa ou coloque a data do mês antigo — assim não soma nas Entradas de agora. Clique em <strong>Editar</strong> no vencimento para mudar o dia combinado.</p>
                 <form id="formPendente">
                     <div class="row">
                         <div class="col" style="flex:2"><label>Cliente</label><input id="pdCliente" required placeholder="Nome do cliente"></div>
@@ -1898,8 +1899,13 @@
 
             <div class="row" style="margin-top:6px">
                 <div class="col"><label>Data que recebi (pagamento)</label><input id="recOsDataPag" type="date"></div>
-                <div class="col"><label>Data da saída (lança no caixa)</label><input id="recOsDataSaida" type="date"></div>
+                <div class="col"><label>Data que entra no caixa (define o mês)</label><input id="recOsDataSaida" type="date"></div>
             </div>
+            <label class="rec-os-check" style="display:flex;align-items:flex-start;gap:8px;margin:10px 0 4px;font-weight:700">
+                <input type="checkbox" id="recOsMesAnterior" style="margin-top:3px">
+                <span>Este valor é de <strong>mês passado</strong> — não somar nas Entradas deste mês</span>
+            </label>
+            <p class="hint" style="margin-top:0">Se marcar, o valor cai no mês anterior. O dinheiro entra no saldo, mas o card Entradas deste mês não incham.</p>
 
             <div class="rec-os-bloco">
                 <div class="rec-os-linha"><span>1) Valor total do orçamento</span><strong id="recOsTotalBruto">R$ 0,00</strong></div>
@@ -2020,15 +2026,39 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modalSangriaCaixa">
+        <div class="modal-box" style="width:min(440px,100%)">
+            <h3>💸 Sangria do caixa</h3>
+            <p class="hint">Use quando receber OS do <strong>mês passado</strong>. A sangria tira esse valor do total deste mês. O <strong>saldo em caixa</strong> continua batendo com o dinheiro da gaveta/conta.</p>
+            <label>Valor da sangria (R$)</label>
+            <input id="sgValor" inputmode="decimal" placeholder="0,00">
+            <label>De onde sai</label>
+            <select id="sgDestino">
+                <option value="balcao">Balcão (dinheiro)</option>
+                <option value="banco">Banco / PIX / cartão</option>
+            </select>
+            <div class="row" style="margin-top:6px">
+                <div class="col"><label>Data</label><input id="sgData" type="date"></div>
+            </div>
+            <label>Observação</label>
+            <input id="sgObs" placeholder="Recebimento de OS do mês passado">
+            <div id="sgPrevia" class="hint" style="margin-top:10px"></div>
+            <div class="modal-acoes" style="flex-direction:column;gap:8px;margin-top:10px">
+                <button type="button" class="btn btn-ok" id="btnSgConfirmar" style="width:100%">Confirmar sangria</button>
+                <button type="button" class="btn btn-danger" id="btnSgCancelar" style="width:100%">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modalDatasOs">
         <div class="modal-box" style="width:min(440px,100%)">
             <h3>📅 Alterar datas da OS</h3>
             <p class="hint" id="datasOsResumo"></p>
             <div class="row">
                 <div class="col"><label>Data que recebi (pagamento)</label><input id="datasOsPag" type="date"></div>
-                <div class="col"><label>Data da saída (lança no caixa)</label><input id="datasOsSaida" type="date"></div>
+                <div class="col"><label>Data que entra no caixa (define o mês)</label><input id="datasOsSaida" type="date"></div>
             </div>
-            <p class="hint">Os lançamentos desta OS no caixa passam para a data da saída.</p>
+            <p class="hint">Se for OS do mês passado, coloque a data no mês antigo. Assim o valor não soma nas Entradas deste mês.</p>
             <div class="modal-acoes" style="flex-direction:column;gap:8px;margin-top:10px">
                 <button type="button" class="btn btn-ok" id="btnDatasOsSalvar" style="width:100%">💾 Salvar datas</button>
                 <button type="button" class="btn btn-danger" id="btnDatasOsCancelar" style="width:100%">Cancelar</button>
@@ -2231,18 +2261,18 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=121"></script>
-    <script src="js/storage.js?v=121"></script>
-    <script src="js/ui.js?v=121"></script>
-    <script src="js/auth.js?v=121"></script>
-    <script src="js/os.js?v=121"></script>
-    <script src="js/nuvem.js?v=121"></script>
-    <script src="js/caixa.js?v=121"></script>
-    <script src="js/comissoes.js?v=121"></script>
-    <script src="js/app.js?v=121"></script>
-    <script src="js/func-ponto.js?v=121"></script>
-    <script src="js/perfil-cliente.js?v=121"></script>
-    <script src="js/navegacao.js?v=121"></script>
+    <script src="js/config.js?v=122"></script>
+    <script src="js/storage.js?v=122"></script>
+    <script src="js/ui.js?v=122"></script>
+    <script src="js/auth.js?v=122"></script>
+    <script src="js/os.js?v=122"></script>
+    <script src="js/nuvem.js?v=122"></script>
+    <script src="js/caixa.js?v=122"></script>
+    <script src="js/comissoes.js?v=122"></script>
+    <script src="js/app.js?v=122"></script>
+    <script src="js/func-ponto.js?v=122"></script>
+    <script src="js/perfil-cliente.js?v=122"></script>
+    <script src="js/navegacao.js?v=122"></script>
 </body>
 </html>
 
