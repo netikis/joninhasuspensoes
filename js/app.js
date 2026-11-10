@@ -5849,11 +5849,13 @@ function focarLeitor() {
 
 function atualizarCamposTipoProd() {
     var tipoEl = document.getElementById('prodTipo');
+    var nomeEl = document.getElementById('prodNome');
     var serv = tipoEl && tipoEl.value === 'servico';
+    var alinh = typeof textoTemAlinhamento === 'function' && textoTemAlinhamento(nomeEl && nomeEl.value);
     var wrapQtd = document.getElementById('wrapProdQtd');
     var wrapUn = document.getElementById('wrapProdUn');
-    if (wrapQtd) wrapQtd.style.display = serv ? 'none' : '';
-    if (wrapUn) wrapUn.style.display = serv ? 'none' : '';
+    if (wrapQtd) wrapQtd.style.display = (serv && !alinh) ? 'none' : '';
+    if (wrapUn) wrapUn.style.display = (serv && !alinh) ? 'none' : '';
 }
 
 function preencherFormProd(p, manterFocoNome) {
@@ -5910,8 +5912,9 @@ document.getElementById('btnFocoLeitor').addEventListener('click', focarLeitor);
 
 (function ligarTipoProdCadastro() {
     var el = document.getElementById('prodTipo');
-    if (!el) return;
-    el.addEventListener('change', atualizarCamposTipoProd);
+    if (el) el.addEventListener('change', atualizarCamposTipoProd);
+    var nome = document.getElementById('prodNome');
+    if (nome) nome.addEventListener('input', atualizarCamposTipoProd);
     atualizarCamposTipoProd();
 })();
 
@@ -5964,10 +5967,13 @@ document.getElementById('formProduto').addEventListener('submit', function (e) {
     }
     var agora = new Date().toISOString();
     var tipoCad = (document.getElementById('prodTipo') && document.getElementById('prodTipo').value) || 'produto';
+    var nomeProd = textoMaiusculoSalvar(document.getElementById('prodNome').value);
     var ehServ = tipoCad === 'servico';
+    var alinh = typeof textoTemAlinhamento === 'function' && textoTemAlinhamento(nomeProd);
+    var controlaEst = !ehServ || alinh;
     var payload = {
         id: id || uid(),
-        nome: textoMaiusculoSalvar(document.getElementById('prodNome').value),
+        nome: nomeProd,
         categoria: textoMaiusculoSalvar(document.getElementById('prodCat').value),
         descricao: textoMaiusculoSalvar((document.getElementById('prodDescricao') || { value: '' }).value),
         codigo: codigo,
@@ -5975,8 +5981,8 @@ document.getElementById('formProduto').addEventListener('submit', function (e) {
         tipo: ehServ ? 'servico' : 'produto',
         custo: Number(document.getElementById('prodCusto').value) || 0,
         venda: Number(document.getElementById('prodVenda').value) || 0,
-        qtd: ehServ ? 0 : (Number(document.getElementById('prodQtd').value) || 0),
-        unidade: ehServ ? 'serv' : (document.getElementById('prodUn').value || 'un'),
+        qtd: controlaEst ? (Number(document.getElementById('prodQtd').value) || 0) : 0,
+        unidade: controlaEst ? (document.getElementById('prodUn').value || 'un') : 'serv',
         atualizadoEm: agora
     };
     if (id) {
@@ -6069,7 +6075,7 @@ function renderProdutos() {
     if (chkAll) chkAll.checked = false;
     tb.innerHTML = '';
     var qtdBaixo = lista.filter(function (p) {
-        return !produtoEhServico(p) && (Number(p.qtd) || 0) < 2;
+        return (typeof produtoControlaEstoque === 'function' ? produtoControlaEstoque(p) : !produtoEhServico(p)) && (Number(p.qtd) || 0) < 2;
     }).length;
     var alertaEl = document.getElementById('alertaEstoqueBaixo');
     if (alertaEl) {
@@ -6686,7 +6692,7 @@ function atualizarResumoEstoqueVenda() {
         info.innerHTML = '';
         return;
     }
-    if (produtoEhServico(p)) {
+    if (produtoEhServico(p) && !(typeof produtoControlaEstoque === 'function' && produtoControlaEstoque(p))) {
         info.className = 'estoque-resumo';
         info.innerHTML = '<strong>Tipo de serviço</strong> ' + esc(p.nome) +
             ' — não usa unidade cadastrada e <strong>não baixa estoque</strong>.';
@@ -6752,7 +6758,7 @@ function preencherCamposProdutoEstoque() {
     document.getElementById('vdProdQtd').value = '1';
     atualizarTotalLinhaEstoque();
     atualizarResumoEstoqueVenda();
-    if (produtoEhServico(p)) {
+    if (produtoEhServico(p) && !(typeof produtoControlaEstoque === 'function' && produtoControlaEstoque(p))) {
         toast('Tipo de serviço: ' + p.nome + ' — sem unidade e sem baixa de estoque.');
         return;
     }
@@ -7137,12 +7143,13 @@ document.getElementById('btnVdAddEstoque').addEventListener('click', function ()
     var venda = Number(document.getElementById('vdProdVenda').value) || 0;
     if (qtd <= 0) { toast('Informe a quantidade.'); return; }
     var tipoDoc = document.getElementById('vdTipo').value;
-    var un = produtoEhServico(p) ? 'serv' : (document.getElementById('vdProdUn').value || p.unidade || 'un');
+    var controlaEstVd = typeof produtoControlaEstoque === 'function' ? produtoControlaEstoque(p) : !produtoEhServico(p);
+    var un = controlaEstVd ? (document.getElementById('vdProdUn').value || p.unidade || 'un') : 'serv';
     var disp = calcularDisponivelEstoqueVenda(p);
     var livre = disp.livre;
 
-    /* Venda direta: só o que tem no estoque. Serviço e orçamento: sem baixa. */
-    if (tipoDoc === 'VENDA' && !produtoEhServico(p)) {
+    /* Venda direta: só o que tem no estoque. Serviço (exceto alinhamento) e orçamento: sem baixa. */
+    if (tipoDoc === 'VENDA' && controlaEstVd) {
         if (livre <= 0) {
             toast('Estoque disponível do produto ' + p.nome + ': 0 ' + rotuloUnidade(un) + ' — venda bloqueada.');
             atualizarResumoEstoqueVenda();
@@ -7170,7 +7177,7 @@ document.getElementById('btnVdAddEstoque').addEventListener('click', function ()
         margem: Number(document.getElementById('vdProdMargem').value) || 0,
         venda: venda,
         total: qtd * venda,
-        baixaEstoque: tipoDoc === 'VENDA' && !produtoEhServico(p)
+        baixaEstoque: tipoDoc === 'VENDA' && controlaEstVd
     };
     aplicarComissaoCamposNoItemVenda(itemEstoque, 'vdProdFuncId', 'vdProdTipoComissao', qtd);
     if (substituirItemCarrinhoSeEditando('estoque', itemEstoque)) {
@@ -7670,7 +7677,7 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
             var it = carrinhoVenda[i];
             if (!it.produtoId) continue;
             var prodCart = (db.produtos || []).find(function (p) { return p && p.id === it.produtoId; });
-            if (produtoEhServico(prodCart) || it.unidade === 'serv') continue;
+            if ((typeof produtoControlaEstoque === 'function' ? !produtoControlaEstoque(prodCart) : (produtoEhServico(prodCart) || it.unidade === 'serv'))) continue;
             necessidade[it.produtoId] = (necessidade[it.produtoId] || 0) + (Number(it.qtd) || 0);
         }
         var ids = Object.keys(necessidade);
@@ -8541,6 +8548,11 @@ function salvarAtendimentoRapidoParaEnvio() {
         db.atendimentos.push(payload);
     }
     limparExcluido(db, 'atendimentos', payload.id);
+    if (typeof aplicarBaixaEstoqueOs === 'function') {
+        aplicarBaixaEstoqueOs(db, payload, existenteRapido);
+        var ixRap = (db.atendimentos || []).findIndex(function (a) { return a && String(a.id) === String(payload.id); });
+        if (ixRap >= 0) db.atendimentos[ixRap].estoqueBaixado = payload.estoqueBaixado || {};
+    }
     salvar(db);
     document.getElementById('atId').value = payload.id;
     return payload;

@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.4.22';
+var APP_VERSION = '1.4.23';
 
 function rotuloBuildApp() {
     var v = String(APP_VERSION || '');
@@ -17,6 +17,18 @@ function produtoEhServico(p) {
     if (!p) return false;
     if (String(p.tipo || '').toLowerCase() === 'servico') return true;
     return String(p.unidade || '') === 'serv';
+}
+
+function textoTemAlinhamento(s) {
+    var t = String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return t.indexOf('alinh') >= 0;
+}
+
+/** Alinhamento e peças com estoque dão baixa, mesmo se o cadastro estiver como "tipo de serviço". */
+function produtoControlaEstoque(p) {
+    if (!p) return false;
+    if (textoTemAlinhamento(p.nome || p.desc || '')) return true;
+    return !produtoEhServico(p);
 }
 
 function codigoPecaDe(p) {
