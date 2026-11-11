@@ -2815,6 +2815,18 @@
             font-weight: 800;
         }
         .pd-venc-td { min-width: 168px; }
+        .pd-ord-th {
+            background: transparent;
+            border: 0;
+            padding: 0;
+            color: inherit;
+            font: inherit;
+            font-weight: 800;
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+        .pd-ord-th.ativo { color: #f1c40f !important; }
         .pd-venc-linha {
             display: flex;
             align-items: center;

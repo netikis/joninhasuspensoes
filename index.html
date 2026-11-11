@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=124">
-    <link rel="stylesheet" href="css/tema-m3.css?v=124">
-    <link rel="stylesheet" href="css/telas.css?v=124">
+    <link rel="stylesheet" href="css/app.css?v=125">
+    <link rel="stylesheet" href="css/tema-m3.css?v=125">
+    <link rel="stylesheet" href="css/telas.css?v=125">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -1182,8 +1182,27 @@
             </div>
             <div class="box">
                 <h2>Pendências abertas</h2>
+                <div class="row" style="margin:0 0 10px;align-items:flex-end">
+                    <div class="col" style="max-width:320px">
+                        <label>Ordenar por data (dia e mês)</label>
+                        <select id="pdOrdem">
+                            <option value="os" selected>Data OS — 15/11, depois 16/11…</option>
+                            <option value="venc">Vencimento — 15/11, depois 16/11…</option>
+                        </select>
+                    </div>
+                </div>
+                <p class="hint" style="margin-top:0">A lista segue o calendário: a data mais antiga fica em cima, a do dia seguinte embaixo.</p>
                 <table>
-                    <thead><tr><th>Cliente</th><th>Descrição</th><th>Data OS</th><th>Vencimento</th><th>Valor</th><th>Ações</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Descrição</th>
+                            <th><button type="button" class="pd-ord-th" data-pd-ord="os">Data OS</button></th>
+                            <th><button type="button" class="pd-ord-th" data-pd-ord="venc">Vencimento</button></th>
+                            <th>Valor</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
                     <tbody id="tabelaPendentes"></tbody>
                 </table>
             </div>
@@ -2261,18 +2280,18 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=124"></script>
-    <script src="js/storage.js?v=124"></script>
-    <script src="js/ui.js?v=124"></script>
-    <script src="js/auth.js?v=124"></script>
-    <script src="js/os.js?v=124"></script>
-    <script src="js/nuvem.js?v=124"></script>
-    <script src="js/caixa.js?v=124"></script>
-    <script src="js/comissoes.js?v=124"></script>
-    <script src="js/app.js?v=124"></script>
-    <script src="js/func-ponto.js?v=124"></script>
-    <script src="js/perfil-cliente.js?v=124"></script>
-    <script src="js/navegacao.js?v=124"></script>
+    <script src="js/config.js?v=125"></script>
+    <script src="js/storage.js?v=125"></script>
+    <script src="js/ui.js?v=125"></script>
+    <script src="js/auth.js?v=125"></script>
+    <script src="js/os.js?v=125"></script>
+    <script src="js/nuvem.js?v=125"></script>
+    <script src="js/caixa.js?v=125"></script>
+    <script src="js/comissoes.js?v=125"></script>
+    <script src="js/app.js?v=125"></script>
+    <script src="js/func-ponto.js?v=125"></script>
+    <script src="js/perfil-cliente.js?v=125"></script>
+    <script src="js/navegacao.js?v=125"></script>
 </body>
 </html>
 

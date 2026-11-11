@@ -1776,6 +1776,53 @@ function excluirPendenteDaLista(id) {
 }
 window.excluirPendenteDaLista = excluirPendenteDaLista;
 
+var pdOrdemAtual = 'os';
+
+function isoVencimentoPendente(p) {
+    if (!p) return '';
+    return (typeof dataISODia === 'function' ? dataISODia(p.vencimento) : '') ||
+        String(p.vencimento || '').slice(0, 10);
+}
+
+function ordenarPendentesPorData(lista, db, ordem) {
+    ordem = ordem === 'venc' ? 'venc' : 'os';
+    return (lista || []).slice().sort(function (a, b) {
+        var da = ordem === 'venc' ? isoVencimentoPendente(a) : dataServicoPendenteISO(a, db);
+        var dbd = ordem === 'venc' ? isoVencimentoPendente(b) : dataServicoPendenteISO(b, db);
+        if (!da) da = '9999-99-99';
+        if (!dbd) dbd = '9999-99-99';
+        if (da !== dbd) return da.localeCompare(dbd);
+        var va = isoVencimentoPendente(a) || '9999-99-99';
+        var vb = isoVencimentoPendente(b) || '9999-99-99';
+        if (va !== vb) return va.localeCompare(vb);
+        return String(a.cliente || '').localeCompare(String(b.cliente || ''), 'pt-BR');
+    });
+}
+
+function ligarOrdemPendentes() {
+    var sel = document.getElementById('pdOrdem');
+    if (sel && !sel._pdOrdemLigado) {
+        sel._pdOrdemLigado = true;
+        sel.value = pdOrdemAtual;
+        sel.addEventListener('change', function () {
+            pdOrdemAtual = sel.value === 'venc' ? 'venc' : 'os';
+            renderPendentes();
+        });
+    }
+    document.querySelectorAll('[data-pd-ord]').forEach(function (b) {
+        if (b._pdOrdemLigado) return;
+        b._pdOrdemLigado = true;
+        b.addEventListener('click', function () {
+            pdOrdemAtual = b.getAttribute('data-pd-ord') === 'venc' ? 'venc' : 'os';
+            if (sel) sel.value = pdOrdemAtual;
+            renderPendentes();
+        });
+    });
+    document.querySelectorAll('[data-pd-ord]').forEach(function (b) {
+        b.classList.toggle('ativo', b.getAttribute('data-pd-ord') === pdOrdemAtual);
+    });
+}
+
 function dataServicoPendenteISO(p, db) {
     if (!p) return '';
     db = db || (typeof carregar === 'function' ? carregar() : {});
@@ -1813,6 +1860,10 @@ function renderPendentes() {
     var total = lista.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
     document.getElementById('pdTotal').textContent = moeda(total);
     document.getElementById('pdQtd').textContent = String(lista.length);
+    ligarOrdemPendentes();
+    var selOrd = document.getElementById('pdOrdem');
+    if (selOrd) pdOrdemAtual = selOrd.value === 'venc' ? 'venc' : 'os';
+    lista = ordenarPendentesPorData(lista, db, pdOrdemAtual);
     var tb = document.getElementById('tabelaPendentes');
     if (!tb._pdDocClickLigado) {
         tb._pdDocClickLigado = true;
@@ -1834,7 +1885,7 @@ function renderPendentes() {
         tb.innerHTML = '<tr><td colspan="6" class="muted">Nenhuma conta pendente.</td></tr>';
         return;
     }
-    lista.slice().reverse().forEach(function (p) {
+    lista.forEach(function (p) {
         var tr = document.createElement('tr');
         var descExibir = p.descricao || '';
         if (p.atendimentoId) {
