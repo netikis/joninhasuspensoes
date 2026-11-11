@@ -1776,6 +1776,26 @@ function excluirPendenteDaLista(id) {
 }
 window.excluirPendenteDaLista = excluirPendenteDaLista;
 
+function dataServicoPendenteISO(p, db) {
+    if (!p) return '';
+    db = db || (typeof carregar === 'function' ? carregar() : {});
+    if (p.atendimentoId) {
+        var a = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(p.atendimentoId); });
+        if (a) {
+            if (typeof dataServicoOsISO === 'function') return dataServicoOsISO(a);
+            return String(a.entrada || a.saida || a.criadoEm || '').slice(0, 10);
+        }
+    }
+    if (p.vendaId) {
+        var o = (db.orcamentos || []).find(function (x) { return x && String(x.id) === String(p.vendaId); });
+        if (o) {
+            if (typeof dataServicoVendaISO === 'function') return dataServicoVendaISO(o);
+            return String(o.dataEmissao || o.criadoEm || '').slice(0, 10);
+        }
+    }
+    return String(p.dataServico || p.criadoEm || '').slice(0, 10);
+}
+
 function renderPendentes() {
     var db = carregar();
     if (typeof sincronizarPendentesDoAberto === 'function' && sincronizarPendentesDoAberto(db)) {
@@ -1811,7 +1831,7 @@ function renderPendentes() {
         gerarArvorePastasCaixa({ elId: 'arvorePastasPendentes', filtro: 'pendentes', idPrefix: 'pasta_pen' });
     }
     if (!lista.length) {
-        tb.innerHTML = '<tr><td colspan="5" class="muted">Nenhuma conta pendente.</td></tr>';
+        tb.innerHTML = '<tr><td colspan="6" class="muted">Nenhuma conta pendente.</td></tr>';
         return;
     }
     lista.slice().reverse().forEach(function (p) {
@@ -1852,6 +1872,8 @@ function renderPendentes() {
             hj.setHours(12, 0, 0, 0);
             if (!isNaN(dv.getTime())) atraso = Math.floor((hj.getTime() - dv.getTime()) / 86400000);
         }
+        var dataOsIso = dataServicoPendenteISO(p, db);
+        var dataOsHtml = esc(fmtData(dataOsIso) || '—');
         var vencIso = typeof dataISODia === 'function' ? dataISODia(p.vencimento) : String(p.vencimento || '').slice(0, 10);
         var vencHtml = esc(fmtData(p.vencimento) || '—');
         if (vencIso && atraso === 0) vencHtml += ' <span style="color:#b45309;font-weight:800">Vence hoje</span>';
@@ -1864,6 +1886,7 @@ function renderPendentes() {
         tr.innerHTML =
             '<td>' + esc(p.cliente) + '</td>' +
             '<td>' + esc(descExibir) + '</td>' +
+            '<td><strong>' + dataOsHtml + '</strong></td>' +
             '<td class="pd-venc-td">' +
             '<div class="pd-venc-linha"><span>' + vencHtml + '</span>' +
             '<button type="button" class="btn btn-secondary" data-pd-edit-venc="' + esc(p.id) + '">Editar</button></div>' +
@@ -2237,7 +2260,7 @@ function coletarItensRelatorioMensal(db, filtro, mesAno) {
 
     (db.pendentes || []).forEach(function (p) {
         if (!p || p.status === 'pago') return;
-        var ref = p.criadoEm || p.vencimento;
+        var ref = dataServicoPendenteISO(p, db) || p.criadoEm || p.vencimento;
         var ma = mesAnoDeIso(ref);
         if (!ma && p.vencimento) {
             var v = String(p.vencimento);
@@ -2512,7 +2535,7 @@ function montarArvoreCaixaDados(db) {
     });
     (db.pendentes || []).forEach(function (p) {
         if (!p || p.status === 'pago') return;
-        var ref = p.criadoEm || p.vencimento;
+        var ref = dataServicoPendenteISO(p, db) || p.criadoEm || p.vencimento;
         addDoc(ref, {
             data: fmtData(ref),
             descricao: (p.cliente ? p.cliente + ' — ' : '') + (p.descricao || '—'),
