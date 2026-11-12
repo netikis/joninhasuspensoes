@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=126">
-    <link rel="stylesheet" href="css/tema-m3.css?v=126">
-    <link rel="stylesheet" href="css/telas.css?v=126">
+    <link rel="stylesheet" href="css/app.css?v=127">
+    <link rel="stylesheet" href="css/tema-m3.css?v=127">
+    <link rel="stylesheet" href="css/telas.css?v=127">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -510,6 +510,7 @@
                                     <label>Descrição mão de obra</label>
                                     <input id="maoDesc" class="cad-maiusculo" placeholder="Ex: ALINHAMENTO, TROCA AMORTECEDOR..." autocomplete="off">
                                     <div id="sugestoesMaoDesc" class="sugestoes-catalogo" hidden></div>
+                                    <p class="hint" style="margin:4px 0 0;font-weight:600">Alinhamento do cadastro baixa estoque mesmo lançado como mão de obra ou serviço. Escolha Camionete, Original ou Rebaixado na lista.</p>
                                 </div>
                                 <div class="col"><label>Funcionário</label>
                                     <select id="maoFuncId"><option value="">— sem funcionário —</option></select>
@@ -865,7 +866,7 @@
 
                     <div class="box">
                         <h3>4. Mão de obra / serviço</h3>
-                        <p class="hint">Amortecedor feito na venda: pode lançar a peça no estoque com comissão, ou a mão de obra aqui. Escolha o funcionário e o tipo (Amortecedor % ou original R$).</p>
+                        <p class="hint">Amortecedor feito na venda: pode lançar a peça no estoque com comissão, ou a mão de obra aqui. Escolha o funcionário e o tipo (Amortecedor % ou original R$). Alinhamento cadastrado baixa estoque também nesta mão de obra/serviço.</p>
                         <div class="row" style="align-items:flex-end">
                             <div class="col autocomplete-wrap" style="flex:1.6"><label>Descrição</label><input id="vdMaoDesc" class="cad-maiusculo" placeholder="Ex: Alinhamento, funilaria..." autocomplete="off"><div id="sugestoesVdMao" class="sugestoes-catalogo" hidden></div></div>
                             <div class="col">
@@ -2282,18 +2283,18 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=126"></script>
-    <script src="js/storage.js?v=126"></script>
-    <script src="js/ui.js?v=126"></script>
-    <script src="js/auth.js?v=126"></script>
-    <script src="js/os.js?v=126"></script>
-    <script src="js/nuvem.js?v=126"></script>
-    <script src="js/caixa.js?v=126"></script>
-    <script src="js/comissoes.js?v=126"></script>
-    <script src="js/app.js?v=126"></script>
-    <script src="js/func-ponto.js?v=126"></script>
-    <script src="js/perfil-cliente.js?v=126"></script>
-    <script src="js/navegacao.js?v=126"></script>
+    <script src="js/config.js?v=127"></script>
+    <script src="js/storage.js?v=127"></script>
+    <script src="js/ui.js?v=127"></script>
+    <script src="js/auth.js?v=127"></script>
+    <script src="js/os.js?v=127"></script>
+    <script src="js/nuvem.js?v=127"></script>
+    <script src="js/caixa.js?v=127"></script>
+    <script src="js/comissoes.js?v=127"></script>
+    <script src="js/app.js?v=127"></script>
+    <script src="js/func-ponto.js?v=127"></script>
+    <script src="js/perfil-cliente.js?v=127"></script>
+    <script src="js/navegacao.js?v=127"></script>
 </body>
 </html>
 

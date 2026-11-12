@@ -6102,11 +6102,12 @@ function renderProdutos() {
         var vendaNum = Number(p.venda) || 0;
         var qtdNum = Number(p.qtd) || 0;
         var ehServ = produtoEhServico(p);
-        var estoqueBaixo = !ehServ && qtdNum < 2;
+        var controlaEst = typeof produtoControlaEstoque === 'function' ? produtoControlaEstoque(p) : !ehServ;
+        var estoqueBaixo = controlaEst && qtdNum < 2;
         if (estoqueBaixo) tr.className = 'linha-estoque-baixo';
-        var qtdTxt = ehServ
-            ? 'Tipo de serviço'
-            : (String(p.qtd) + ' ' + rotuloUnidade(p.unidade));
+        var qtdTxt = controlaEst
+            ? (String(p.qtd) + ' ' + rotuloUnidade(p.unidade || 'un'))
+            : 'Tipo de serviço';
         tr.innerHTML =
             '<td style="text-align:center">' +
             '<input type="checkbox" class="check-etiqueta"' +
@@ -7251,6 +7252,7 @@ document.getElementById('btnVdAddAvulso').addEventListener('click', function () 
         venda: venda,
         total: qtd * venda
     };
+    if (typeof vincularProdutoEstoqueNoItemOs === 'function') vincularProdutoEstoqueNoItemOs(itemAvulso);
     aplicarComissaoCamposNoItemVenda(itemAvulso, 'vdAvFuncId', 'vdAvTipoComissao', qtd);
     if (substituirItemCarrinhoSeEditando('avulso', itemAvulso)) {
         document.getElementById('vdAvNome').value = '';
@@ -7321,6 +7323,10 @@ document.getElementById('btnVdAddMao').addEventListener('click', function () {
         comissaoPct: dadosMo.pct || 0,
         comissaoValor: comissaoValor
     };
+    if (typeof vincularProdutoEstoqueNoItemOs === 'function') {
+        vincularProdutoEstoqueNoItemOs(itemMao, typeof produtoMaoVendaSelecionado !== 'undefined' ? produtoMaoVendaSelecionado : null);
+    }
+    produtoMaoVendaSelecionado = null;
     if (substituirItemCarrinhoSeEditando('mao', itemMao)) {
         document.getElementById('vdMaoDesc').value = '';
         document.getElementById('vdMaoValor').value = '';
@@ -7332,6 +7338,9 @@ document.getElementById('btnVdAddMao').addEventListener('click', function () {
     document.getElementById('vdMaoValor').value = '';
     document.getElementById('vdMaoDesc').focus();
     if (typeof atualizarPreviewComissaoVd === 'function') atualizarPreviewComissaoVd();
+    if (itemMao.baixaEstoque) {
+        toast('Mão de obra adicionada. Baixa estoque ao finalizar a venda.');
+    }
 });
 
 function aplicarComissaoCamposNoItemVenda(item, funcId, tipoId, qtd) {
@@ -7680,10 +7689,12 @@ document.getElementById('btnVdFinalizar').addEventListener('click', function () 
         var necessidade = {};
         for (var i = 0; i < carrinhoVenda.length; i++) {
             var it = carrinhoVenda[i];
-            if (!it.produtoId) continue;
+            if (typeof vincularProdutoEstoqueNoItemOs === 'function') vincularProdutoEstoqueNoItemOs(it, null, db);
+            if (!it.produtoId || it.baixaEstoque === false) continue;
             var prodCart = (db.produtos || []).find(function (p) { return p && p.id === it.produtoId; });
-            if ((typeof produtoControlaEstoque === 'function' ? !produtoControlaEstoque(prodCart) : (produtoEhServico(prodCart) || it.unidade === 'serv'))) continue;
-            necessidade[it.produtoId] = (necessidade[it.produtoId] || 0) + (Number(it.qtd) || 0);
+            if (!prodCart) continue;
+            if (typeof produtoControlaEstoque === 'function' ? !produtoControlaEstoque(prodCart) : (produtoEhServico(prodCart) || it.unidade === 'serv')) continue;
+            necessidade[it.produtoId] = (necessidade[it.produtoId] || 0) + (Number(it.qtd) || 1);
         }
         var ids = Object.keys(necessidade);
         for (var j = 0; j < ids.length; j++) {

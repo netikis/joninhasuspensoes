@@ -1,7 +1,7 @@
 'use strict';
 /* Joninha — config + estado compartilhado (etapa 2.2) */
 
-var APP_VERSION = '1.4.26';
+var APP_VERSION = '1.4.27';
 
 function rotuloBuildApp() {
     var v = String(APP_VERSION || '');
@@ -22,6 +22,13 @@ function produtoEhServico(p) {
 function textoTemAlinhamento(s) {
     var t = String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     return t.indexOf('alinh') >= 0;
+}
+
+/** Alinhamento no item da OS/venda: descrição, nome ou tipo de comissão. */
+function itemTemAlinhamento(it) {
+    if (!it) return false;
+    if (textoTemAlinhamento(it.desc) || textoTemAlinhamento(it.nome)) return true;
+    return String(it.tipoMao || '').toLowerCase() === 'alinhamento';
 }
 
 /** Alinhamento e peças com estoque dão baixa, mesmo se o cadastro estiver como "tipo de serviço". */
