@@ -1800,6 +1800,11 @@ function ordenarPendentesPorData(lista, db, ordem) {
 }
 
 function ligarOrdemPendentes() {
+    var busca = document.getElementById('pdBusca');
+    if (busca && !busca._pdBuscaLigado) {
+        busca._pdBuscaLigado = true;
+        busca.addEventListener('input', function () { renderPendentes(); });
+    }
     var sel = document.getElementById('pdOrdem');
     if (sel && !sel._pdOrdemLigado) {
         sel._pdOrdemLigado = true;
@@ -1857,6 +1862,22 @@ function renderPendentes() {
         if (p.vendaId && exPd['vd:' + String(p.vendaId)]) return false;
         return true;
     });
+    var qBusca = String((document.getElementById('pdBusca') && document.getElementById('pdBusca').value) || '')
+        .toLowerCase().trim();
+    if (qBusca) {
+        lista = lista.filter(function (p) {
+            var blob = [p.cliente, p.descricao, p.valor];
+            if (p.atendimentoId) {
+                var a = (db.atendimentos || []).find(function (x) { return x && String(x.id) === String(p.atendimentoId); });
+                if (a) blob.push(a.placa, a.carro, a.clienteNome);
+            }
+            if (p.vendaId) {
+                var o = (db.orcamentos || []).find(function (x) { return x && String(x.id) === String(p.vendaId); });
+                if (o) blob.push(o.placa, o.numero, o.clienteNome);
+            }
+            return blob.join(' ').toLowerCase().indexOf(qBusca) > -1;
+        });
+    }
     var total = lista.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
     document.getElementById('pdTotal').textContent = moeda(total);
     document.getElementById('pdQtd').textContent = String(lista.length);
@@ -1882,7 +1903,9 @@ function renderPendentes() {
         gerarArvorePastasCaixa({ elId: 'arvorePastasPendentes', filtro: 'pendentes', idPrefix: 'pasta_pen' });
     }
     if (!lista.length) {
-        tb.innerHTML = '<tr><td colspan="6" class="muted">Nenhuma conta pendente.</td></tr>';
+        tb.innerHTML = '<tr><td colspan="6" class="muted">' +
+            (qBusca ? 'Nenhuma nota aberta para “' + esc(qBusca) + '”.' : 'Nenhuma conta pendente.') +
+            '</td></tr>';
         return;
     }
     lista.forEach(function (p) {

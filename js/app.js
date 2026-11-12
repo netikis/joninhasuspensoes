@@ -1596,9 +1596,13 @@ function sincronizarPendentesDoAberto(db) {
     (db.atendimentos || []).forEach(function (a) {
         if (!a || !a.id) return;
         var placa = String(a.placa || '').toUpperCase().replace(/\s+/g, '');
+        var mesmas = (db.atendimentos || []).filter(function (x) {
+            return x && String(x.placa || '').toUpperCase().replace(/\s+/g, '') === placa;
+        });
+        if (!placa || placa.length < 4 || mesmas.length !== 1) return;
         db.pendentes.forEach(function (p) {
             if (!p || p.status === 'pago' || p.atendimentoId || p.vendaId) return;
-            if (placa && placa.length >= 4 && placaDaDesc(p.descricao) === placa) {
+            if (placaDaDesc(p.descricao) === placa) {
                 p.atendimentoId = a.id;
                 mudou = true;
             }
@@ -1662,11 +1666,9 @@ function sincronizarPendentesDoAberto(db) {
         var aberto = a.saldoAberto != null
             ? Number(a.saldoAberto)
             : Math.max(0, (Number(a.total) || 0) - (Number(a.valorRecebido) || 0));
-        var vale = (st === 'PARCIAL' || st === 'PENDENTE') && aberto > 0.009;
+        var vale = aberto > 0.009 && st !== 'PAGO' && String(a.status || '') !== 'Agendado';
         var placa = String(a.placa || '').toUpperCase().replace(/\s+/g, '');
-        var p = acharPendente('atendimentoId', a.id, function (x) {
-            return placa && placa.length >= 4 && placaDaDesc(x.descricao) === placa;
-        });
+        var p = acharPendente('atendimentoId', a.id);
         if (!vale) {
             db.pendentes.forEach(function (x) {
                 if (x && String(x.atendimentoId || '') === String(a.id)) marcarFora(x);
@@ -1694,7 +1696,10 @@ function sincronizarPendentesDoAberto(db) {
         else {
             rec.id = (typeof uid === 'function') ? uid() : ('pd_' + Date.now());
             rec.status = 'aberto';
-            rec.criadoEm = new Date().toISOString();
+            var dOs = (typeof dataServicoOsISO === 'function') ? dataServicoOsISO(a) : '';
+            rec.criadoEm = dOs
+                ? ((typeof isoComDataLocal === 'function') ? isoComDataLocal(dOs) : dOs)
+                : new Date().toISOString();
             db.pendentes.push(rec);
             mudou = true;
         }

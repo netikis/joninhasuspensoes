@@ -1252,6 +1252,13 @@
             flex: 1;
             min-width: 180px;
         }
+        #pdBusca {
+            width: 100%;
+            font-size: 1.05rem;
+            font-weight: 700;
+            min-height: 46px;
+            margin: 6px 0 12px;
+        }
 
         table {
             width: 100%;
