@@ -2796,10 +2796,11 @@
             align-items: center;
             gap: 8px;
             margin: 5px 0;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            position: relative;
         }
         .alerta-vencido-item {
-            flex: 1 1 220px;
+            flex: 1 1 auto;
             min-width: 0;
             text-align: left;
             background: rgba(255,255,255,0.12);
@@ -2811,15 +2812,21 @@
             border-radius: 8px;
             padding: 7px 10px;
             cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .alerta-vencido-item:hover {
             background: rgba(255,255,255,0.22);
         }
         .alerta-vencidos-30 .alerta-vencido-rec {
-            flex-shrink: 0;
+            flex: 0 0 auto;
+            position: relative;
+            z-index: 1;
             padding: 6px 10px;
             font-size: 0.75rem;
             font-weight: 800;
+            white-space: nowrap;
         }
         .pd-venc-td { min-width: 168px; }
         .pd-ord-th {
