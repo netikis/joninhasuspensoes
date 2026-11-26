@@ -31,9 +31,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css?v=128">
-    <link rel="stylesheet" href="css/tema-m3.css?v=128">
-    <link rel="stylesheet" href="css/telas.css?v=128">
+    <link rel="stylesheet" href="css/app.css?v=129">
+    <link rel="stylesheet" href="css/tema-m3.css?v=129">
+    <link rel="stylesheet" href="css/telas.css?v=129">
 </head>
 <body class="aguardando-login">
     <div class="tela-login" id="telaLogin">
@@ -1464,6 +1464,7 @@
                         <div class="col" style="flex:2"><label>Nome</label><input id="pfNomeFunc" class="cad-maiusculo" required placeholder="Ex: João, Pedro..."></div>
                         <div class="col"><label>Telefone / WhatsApp</label><input id="pfTelFunc" placeholder="(00) 00000-0000"></div>
                         <div class="col"><label>Cargo / função</label><input id="pfCargoFunc" placeholder="Mecânico, ajudante..."></div>
+                        <div class="col"><label>Data de entrada na empresa</label><input id="pfDataEntradaFunc" type="date" required></div>
                     </div>
                     <div class="row" style="margin-top:10px">
                         <div class="col"><label>MO Alinhamento (%)</label><input id="pfComissaoAlinhamento" type="number" min="0" max="100" step="0.5" placeholder="Ex: 30" value="30"></div>
@@ -1495,7 +1496,7 @@
                             </label>
                         </div>
                     </div>
-                    <p class="hint" style="margin-top:8px">Na OS e no orçamento, Alinhamento / Serviço / Amortecedor usam a <strong>%</strong>. Original 1 e <strong>Rebaixados</strong> usam o <strong>R$ fixo</strong>. Você escolhe o tipo em cada linha de mão de obra.</p>
+                    <p class="hint" style="margin-top:8px">Na OS e no orçamento, Alinhamento / Serviço / Amortecedor usam a <strong>%</strong>. Original 1 e <strong>Rebaixados</strong> usam o <strong>R$ fixo</strong>. Você escolhe o tipo em cada linha de mão de obra. <strong>Desmarque Ativo</strong> ou <strong>Exclua</strong> para o nome não aparecer mais em serviço / mão de obra.</p>
                     <input type="hidden" id="pfComissaoPct" value="40">
                     <div class="row" style="margin-top:14px">
                         <button type="submit" class="btn btn-primary" id="btnSalvarFunc">Salvar funcionário</button>
@@ -1522,6 +1523,7 @@
                                 <th>Nome</th>
                                 <th>Telefone</th>
                                 <th>Cargo</th>
+                                <th>Entrada</th>
                                 <th>Alinh.%</th>
                                 <th>Serv.%</th>
                                 <th>Amort.%</th>
@@ -2283,18 +2285,18 @@
     <div class="mirror-print-section" id="printNota"></div>
 
     <!-- Lógica: config → storage → ui → auth → os → nuvem → caixa → comissoes → app -->
-    <script src="js/config.js?v=128"></script>
-    <script src="js/storage.js?v=128"></script>
-    <script src="js/ui.js?v=128"></script>
-    <script src="js/auth.js?v=128"></script>
-    <script src="js/os.js?v=128"></script>
-    <script src="js/nuvem.js?v=128"></script>
-    <script src="js/caixa.js?v=128"></script>
-    <script src="js/comissoes.js?v=128"></script>
-    <script src="js/app.js?v=128"></script>
-    <script src="js/func-ponto.js?v=128"></script>
-    <script src="js/perfil-cliente.js?v=128"></script>
-    <script src="js/navegacao.js?v=128"></script>
+    <script src="js/config.js?v=129"></script>
+    <script src="js/storage.js?v=129"></script>
+    <script src="js/ui.js?v=129"></script>
+    <script src="js/auth.js?v=129"></script>
+    <script src="js/os.js?v=129"></script>
+    <script src="js/nuvem.js?v=129"></script>
+    <script src="js/caixa.js?v=129"></script>
+    <script src="js/comissoes.js?v=129"></script>
+    <script src="js/app.js?v=129"></script>
+    <script src="js/func-ponto.js?v=129"></script>
+    <script src="js/perfil-cliente.js?v=129"></script>
+    <script src="js/navegacao.js?v=129"></script>
 </body>
 </html>
 

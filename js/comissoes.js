@@ -119,6 +119,14 @@ function limparFormFuncionario() {
     preencherDadosPontoFormFunc(null);
     document.getElementById('pfFuncEditId').value = '';
     document.getElementById('pfAtivoFunc').checked = true;
+    var dtEnt = document.getElementById('pfDataEntradaFunc');
+    if (dtEnt) {
+        if (typeof hojeISO === 'function') dtEnt.value = hojeISO();
+        else {
+            var d = new Date();
+            dtEnt.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+    }
     var a = document.getElementById('pfComissaoAlinhamento');
     var s = document.getElementById('pfComissaoServico');
     var m = document.getElementById('pfComissaoAmortecedor');
@@ -137,6 +145,17 @@ function limparFormFuncionario() {
     document.getElementById('btnSalvarFunc').textContent = 'Salvar funcionário';
 }
 
+(function initDataEntradaFuncNovo() {
+    var el = document.getElementById('pfDataEntradaFunc');
+    if (!el || el.value) return;
+    if (typeof hojeISO === 'function') {
+        el.value = hojeISO();
+        return;
+    }
+    var d = new Date();
+    el.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+})();
+
 function preencherFormFuncionario(f) {
     if (!f) return;
     document.getElementById('pfFuncEditId').value = f.id;
@@ -145,6 +164,10 @@ function preencherFormFuncionario(f) {
     document.getElementById('pfCargoFunc').value = f.cargo || '';
     document.getElementById('pfObsFunc').value = f.obs || '';
     document.getElementById('pfAtivoFunc').checked = f.ativo !== false;
+    var dtEnt = document.getElementById('pfDataEntradaFunc');
+    if (dtEnt) {
+        dtEnt.value = String(f.dataEntrada || f.criadoEm || '').slice(0, 10);
+    }
     preencherDadosPontoFormFunc(f);
     var leg = f.comissaoPct != null ? Number(f.comissaoPct) : 40;
     if (isNaN(leg)) leg = 40;
@@ -213,6 +236,9 @@ function excluirFuncionarioPorId(id) {
     try {
         var main = carregarMain();
         marcarExcluido(main, 'funcionarios', idStr);
+        main.funcionarios = (main.funcionarios || []).filter(function (f) {
+            return f && String(f.id) !== idStr;
+        });
         salvarMain(main);
     } catch (eMain) { /* ok */ }
 
@@ -221,6 +247,7 @@ function excluirFuncionarioPorId(id) {
     renderPagFuncionarios();
     if (typeof preencherSelectFuncionariosVenda === 'function') preencherSelectFuncionariosVenda();
     if (typeof preencherSelectMaoFunc === 'function') preencherSelectMaoFunc();
+    if (typeof preencherSelectMecanicoVenda === 'function') preencherSelectMecanicoVenda();
 
     /* Empurra lista sem o excluído + mapa de exclusões para a nuvem */
     if (typeof agendarSyncAutomatico === 'function') agendarSyncAutomatico('excluir-funcionario');
@@ -258,6 +285,7 @@ function abrirModalVerFuncionario(id) {
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">NOME</span><div>' + esc(f.nome || '—') + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">TELEFONE</span><div>' + esc(f.telefone || '—') + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">CARGO</span><div>' + esc(f.cargo || '—') + '</div></div>' +
+            '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">DATA DE ENTRADA</span><div>' + esc((typeof fmtData === 'function' ? fmtData(f.dataEntrada || f.criadoEm) : (f.dataEntrada || '—'))) + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO ALINHAMENTO</span><div>' + esc(String(alin)) + '%</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO SERVIÇO</span><div>' + esc(String(serv)) + '%</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">MO AMORTECEDOR</span><div>' + esc(String(amort)) + '%</div></div>' +
@@ -266,7 +294,7 @@ function abrirModalVerFuncionario(id) {
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">STATUS</span><div style="color:' + (ativo ? '#2ecc71' : '#e74c3c') + '">' + (ativo ? 'Ativo' : 'Inativo') + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">SALÁRIO</span><div>' + moeda(Number(f.salario) || 0) + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">DIA DO PAGAMENTO</span><div>' + (f.diaPagamento ? 'Dia ' + esc(String(f.diaPagamento)) : '—') + '</div></div>' +
-            '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">ENTRADA</span><div>' + esc(f.horaEntrada || '—') + '</div></div>' +
+            '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">HORÁRIO DE ENTRADA</span><div>' + esc(f.horaEntrada || '—') + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">PIN</span><div>' + (f.pin ? 'Definido' : 'Não definido') + '</div></div>' +
             '<div style="grid-column:1/-1"><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">OBSERVAÇÃO</span><div>' + esc(f.obs || '—') + '</div></div>' +
             '<div><span class="lbl" style="color:#9a9aa3;font-size:0.7rem">CADASTRADO EM</span><div>' + esc(fmtData(f.criadoEm) || '—') + '</div></div>' +
@@ -285,6 +313,7 @@ function atualizarTelasFuncionarios() {
     try { renderPagFuncionarios(); } catch (e2) { /* ok */ }
     try { renderComissoes(); } catch (e3) { /* ok */ }
     try { if (typeof preencherSelectMaoFunc === 'function') preencherSelectMaoFunc(); } catch (e4) { /* ok */ }
+    try { if (typeof preencherSelectMecanicoVenda === 'function') preencherSelectMecanicoVenda(); } catch (e4b) { /* ok */ }
     try { if (typeof preencherSelectFuncionariosVenda === 'function') preencherSelectFuncionariosVenda(); } catch (e5) { /* ok */ }
     try { if (typeof renderLoginsFuncCfg === 'function') renderLoginsFuncCfg(); } catch (e6) { /* ok */ }
     try { if (typeof preencherSelectLoginFunc === 'function') preencherSelectLoginFunc(); } catch (e7) { /* ok */ }
@@ -325,7 +354,7 @@ function renderListaFuncionarios() {
             : listarFuncionariosOrdenados(db, false);
         var funcs = base.filter(function (f) {
             if (!q) return true;
-            return [f.nome, f.telefone, f.cargo, f.obs].join(' ').toLowerCase().indexOf(q) >= 0;
+            return [f.nome, f.telefone, f.cargo, f.obs, f.dataEntrada].join(' ').toLowerCase().indexOf(q) >= 0;
         });
         var tb = document.getElementById('tabelaFuncionarios');
         var vaz = document.getElementById('listaFuncionariosVazia');
@@ -349,6 +378,7 @@ function renderListaFuncionarios() {
                     '<td style="color:#fff;font-weight:800">' + esc(f.nome || '—') + '</td>' +
                     '<td style="color:#fff;font-weight:700">' + esc(f.telefone || '—') + '</td>' +
                     '<td style="color:#fff;font-weight:700">' + esc(f.cargo || '—') + '</td>' +
+                    '<td style="color:#fff;font-weight:700">' + esc((typeof fmtData === 'function' ? fmtData(f.dataEntrada) : f.dataEntrada) || '—') + '</td>' +
                     '<td style="color:#fff;font-weight:800">' + esc(String(alin)) + '%</td>' +
                     '<td style="color:#fff;font-weight:800">' + esc(String(serv)) + '%</td>' +
                     '<td style="color:#fff;font-weight:800">' + esc(String(amort)) + '%</td>' +
@@ -463,11 +493,13 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
     var cargo = textoMaiusculoSalvar(document.getElementById('pfCargoFunc').value);
     var obs = document.getElementById('pfObsFunc').value.trim();
     var ativo = document.getElementById('pfAtivoFunc').checked;
+    var dataEntrada = String((document.getElementById('pfDataEntradaFunc') && document.getElementById('pfDataEntradaFunc').value) || '').slice(0, 10);
     var pcts = lerPctsComissaoFormFunc();
     var ponto = lerDadosPontoFormFunc();
     var pin = (document.getElementById('pfPinFunc').value || '').trim();
     var editId = document.getElementById('pfFuncEditId').value;
     if (!nome) { toast('Informe o nome do funcionário.'); return; }
+    if (!dataEntrada) { toast('Informe a data de entrada na empresa.'); return; }
     comCanalInterno(function () {
         var db = carregar();
         if (!db.funcionarios) db.funcionarios = [];
@@ -486,6 +518,7 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
                 cargo: cargo,
                 obs: obs,
                 ativo: ativo,
+                dataEntrada: dataEntrada,
                 comissaoAlinhamentoPct: pcts.comissaoAlinhamentoPct,
                 comissaoServicoPct: pcts.comissaoServicoPct,
                 comissaoAmortecedorPct: pcts.comissaoAmortecedorPct,
@@ -495,7 +528,8 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
                 pin: pin || prevPin,
                 atualizadoEm: agora
             });
-            toast('Funcionário atualizado — Alinh. ' + pcts.comissaoAlinhamentoPct + '% · Serv. ' + pcts.comissaoServicoPct + '% · Amort. ' + pcts.comissaoAmortecedorPct + '% · Orig.1 ' + moeda(pcts.comissaoAmortecedorOriginalValor) + ' · Rebaixados ' + moeda(pcts.comissaoAmortecedorOriginalValor2) + '.');
+            toast((ativo ? 'Funcionário atualizado' : 'Funcionário inativo — some da OS / mão de obra') +
+                ' — Alinh. ' + pcts.comissaoAlinhamentoPct + '% · Serv. ' + pcts.comissaoServicoPct + '% · Amort. ' + pcts.comissaoAmortecedorPct + '% · Orig.1 ' + moeda(pcts.comissaoAmortecedorOriginalValor) + ' · Rebaixados ' + moeda(pcts.comissaoAmortecedorOriginalValor2) + '.');
         } else {
             db.funcionarios.push(Object.assign({}, ponto, {
                 id: uid(),
@@ -504,6 +538,7 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
                 cargo: cargo,
                 obs: obs,
                 ativo: ativo,
+                dataEntrada: dataEntrada,
                 comissaoAlinhamentoPct: pcts.comissaoAlinhamentoPct,
                 comissaoServicoPct: pcts.comissaoServicoPct,
                 comissaoAmortecedorPct: pcts.comissaoAmortecedorPct,
@@ -521,7 +556,9 @@ document.getElementById('formFuncionario').addEventListener('submit', function (
     });
     renderListaFuncionarios();
     renderPagFuncionarios();
-    preencherSelectFuncionariosVenda();
+    if (typeof preencherSelectFuncionariosVenda === 'function') preencherSelectFuncionariosVenda();
+    if (typeof preencherSelectMaoFunc === 'function') preencherSelectMaoFunc();
+    if (typeof preencherSelectMecanicoVenda === 'function') preencherSelectMecanicoVenda();
 });
 
 document.getElementById('btnCancelarFunc').addEventListener('click', limparFormFuncionario);
@@ -677,11 +714,16 @@ document.getElementById('buscaPagFunc').addEventListener('input', renderPagFunci
 
 function listarFuncionariosParaSelect(soAtivos) {
     var map = {};
+    var mapaEx = {};
+    try {
+        if (typeof mapaExcluidosFuncionarios === 'function') mapaEx = mapaExcluidosFuncionarios() || {};
+    } catch (eEx) { mapaEx = {}; }
     function add(lista) {
         (lista || []).forEach(function (f) {
             if (!f || !f.id) return;
-            if (soAtivos && f.ativo === false) return;
             var id = String(f.id);
+            if (typeof funcionarioEstaExcluido === 'function' &&
+                funcionarioEstaExcluido(id, mapaEx, f.atualizadoEm || f.criadoEm)) return;
             var prev = map[id];
             if (!prev || String(f.atualizadoEm || f.criadoEm || '') >= String(prev.atualizadoEm || prev.criadoEm || '')) {
                 map[id] = f;
@@ -707,7 +749,11 @@ function listarFuncionariosParaSelect(soAtivos) {
             comCanalInterno(function () { add((carregar() || {}).funcionarios); });
         }
     } catch (e3) { /* ok */ }
-    return Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) {
+    return Object.keys(map).map(function (k) { return map[k]; }).filter(function (f) {
+        if (!f) return false;
+        if (soAtivos && f.ativo === false) return false;
+        return true;
+    }).sort(function (a, b) {
         return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR');
     });
 }
@@ -728,7 +774,7 @@ function preencherSelectMaoFunc() {
         if (!sel) return;
         var cur = sel.value;
         sel.innerHTML = first + opts;
-        if (cur) sel.value = cur;
+        if (cur && funcs.some(function (f) { return String(f.id) === String(cur); })) sel.value = cur;
     }
     preencher('maoFuncId', '<option value="">— sem funcionário —</option>');
     preencher('pecaFuncId', '<option value="">— sem comissão —</option>');
@@ -758,7 +804,7 @@ function preencherSelectMecanicoVenda() {
             ? (id === 'vdMaoFuncId' ? '<option value="">— usar funcionário 1 —</option>' : '<option value="">— sem comissão —</option>')
             : '<option value="">— sem funcionário —</option>';
         sel.innerHTML = first + opts;
-        if (cur) sel.value = cur;
+        if (cur && funcs.some(function (f) { return String(f.id) === String(cur); })) sel.value = cur;
     });
     if (typeof atualizarRotulosTipoMaoOriginal === 'function') atualizarRotulosTipoMaoOriginal();
     if (typeof atualizarPreviewComissaoVd === 'function') atualizarPreviewComissaoVd();

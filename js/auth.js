@@ -426,7 +426,7 @@ function forcarAplicarFuncionariosNuvem(remotos) {
         var mesclado = Object.assign({}, cur);
         ['telefone', 'cargo', 'obs', 'pin', 'comissaoPct', 'comissaoAlinhamentoPct',
             'comissaoServicoPct', 'comissaoAmortecedorPct', 'comissaoAmortecedorOriginalValor',
-            'comissaoAmortecedorOriginalValor2', 'criadoEm'].forEach(function (campo) {
+            'comissaoAmortecedorOriginalValor2', 'criadoEm', 'dataEntrada'].forEach(function (campo) {
             if (r[campo] != null && r[campo] !== '') mesclado[campo] = r[campo];
         });
         byId[rid] = Object.assign(mesclado, {

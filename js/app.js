@@ -6717,7 +6717,7 @@ function preencherSelectFuncionariosVenda() {
         var extra = f.cargo ? ' · ' + f.cargo : '';
         return '<option value="' + esc(f.id) + '">' + esc(f.nome + extra) + '</option>';
     }).join('');
-    if (atual && funcs.some(function (f) { return f.id === atual; })) sel.value = atual;
+    if (atual && funcs.some(function (f) { return String(f.id) === String(atual); })) sel.value = atual;
 }
 
 function encontrarProdutoPorBusca(texto) {

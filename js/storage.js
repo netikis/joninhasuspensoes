@@ -63,10 +63,16 @@ function estadoVazio() {
 
 function mesclarFuncionarios(a, b) {
     var map = {};
+    var mapaEx = {};
+    try {
+        if (typeof mapaExcluidosFuncionarios === 'function') mapaEx = mapaExcluidosFuncionarios() || {};
+    } catch (eEx) { mapaEx = {}; }
     function add(lista) {
         (lista || []).forEach(function (f) {
             if (!f || !f.id) return;
             var id = String(f.id);
+            if (typeof funcionarioEstaExcluido === 'function' &&
+                funcionarioEstaExcluido(id, mapaEx, f.atualizadoEm || f.criadoEm)) return;
             var prev = map[id];
             if (!prev || String(f.atualizadoEm || f.criadoEm || '') > String(prev.atualizadoEm || prev.criadoEm || '')) {
                 map[id] = f;
@@ -75,7 +81,12 @@ function mesclarFuncionarios(a, b) {
     }
     add(a);
     add(b);
-    return Object.keys(map).map(function (k) { return map[k]; });
+    return Object.keys(map).map(function (k) { return map[k]; }).filter(function (f) {
+        if (!f || !f.id) return false;
+        if (typeof funcionarioEstaExcluido === 'function' &&
+            funcionarioEstaExcluido(f.id, mapaEx, f.atualizadoEm || f.criadoEm)) return false;
+        return true;
+    });
 }
 
 function excluidosVazio() {
